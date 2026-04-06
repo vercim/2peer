@@ -1,0 +1,55 @@
+{
+  "name": "electron-webrtc-screen-call",
+  "version": "0.3.0",
+  "description": "Simple Electron P2P screen call app using WebRTC and hash IDs",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^25.1.8",
+    "electron": "^35.0.0"
+  },
+  "build": {
+    "appId": "com.screencall.p2p",
+    "productName": "Screen Call",
+    "copyright": "Copyright © 2026",
+    "files": [
+      "src/**/*",
+      "signal/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Network"
+    },
+    "extraMetadata": {
+      "main": "src/main.js"
+    }
+  },
+  "author": "Screen Call"
+}
