@@ -1,7 +1,7 @@
 {
-  "name": "electron-webrtc-screen-call",
+  "name": "2peer",
   "version": "0.3.0",
-  "description": "Simple Electron P2P screen call app using WebRTC and hash IDs",
+  "description": "P2P call app using WebRTC",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -17,8 +17,8 @@
     "electron": "^35.0.0"
   },
   "build": {
-    "appId": "com.screencall.p2p",
-    "productName": "Screen Call",
+    "appId": "dev.vercim.2peer",
+    "productName": "2peer",
     "copyright": "Copyright © 2026",
     "files": [
       "src/**/*",
@@ -51,5 +51,5 @@
       "main": "src/main.js"
     }
   },
-  "author": "Screen Call"
+  "author": "vercim"
 }
