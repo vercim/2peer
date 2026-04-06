@@ -99,7 +99,7 @@ app.whenReady().then(() => {
     } catch (_) {
       callback({ video: null, audio: false });
     }
-  }, { useSystemPicker: false });
+  }, { useSystemPicker: true });
 
   ipcMain.handle('profile:get', () => ensureProfile());
   ipcMain.handle('profile:regen', () => {
