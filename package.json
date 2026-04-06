@@ -42,11 +42,6 @@
       "icon": "assets/icon.icns",
       "category": "public.app-category.utilities"
     },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icon.png",
-      "category": "Network"
-    },
     "extraMetadata": {
       "main": "src/main.js"
     }
