@@ -37,7 +37,6 @@ function startSignalingServer() {
       if (currentId && signalClients.get(currentId) === ws) signalClients.delete(currentId);
     });
   });
-  console.log(`[signal] Embedded signaling server on ws://localhost:${SIGNAL_PORT}`);
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
@@ -108,7 +107,7 @@ app.whenReady().then(() => {
     return profile;
   });
   ipcMain.handle('app:get-config', () => ({
-    signalServerUrl: process.env.SIGNAL_SERVER_URL || 'ws://26.156.250.104:3030'
+    signalServerUrl: process.env.SIGNAL_SERVER_URL || 'wss://twopeer-fumb.onrender.com'
   }));
   ipcMain.handle('sources:get', async () => {
     const sources = await desktopCapturer.getSources({
