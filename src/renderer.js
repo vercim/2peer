@@ -21,15 +21,17 @@ const confirmOk           = document.getElementById('confirmOk');
 const confirmCancel       = document.getElementById('confirmCancel');
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let selfId         = '';
-let currentPeerId  = '';
-let supabaseClient = null;
-let myChannel      = null;
-let pc             = null;
-let localStream    = null;
-let pendingIce     = [];
-let isPolite       = false;
+let selfId           = '';
+let currentPeerId    = '';
+let supabaseClient   = null;
+let myChannel        = null;
+let supabaseConfig   = null;
+let pc               = null;
+let localStream      = null;
+let pendingIce       = [];
+let isPolite         = false;
 let incomingCallData = null;
+let reconnectTimer   = null;
 
 const rtcConfig = {
   iceServers: [
@@ -157,8 +159,8 @@ async function ensureLocalScreen() {
 
   const stream = await navigator.mediaDevices.getDisplayMedia({
     video: {
-      width:     { ideal: 3840, max: 3840 },
-      height:    { ideal: 2160, max: 2160 },
+      width:     { ideal: 7680, max: 7680 },
+      height:    { ideal: 4320, max: 4320 },
       frameRate: { ideal: 60,   max: 60   },
       displaySurface: 'monitor'
     },
@@ -169,7 +171,7 @@ async function ensureLocalScreen() {
   const [track] = stream.getVideoTracks();
   track.contentHint = 'detail';
   await track.applyConstraints({
-    width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 60, max: 60 }
+    width: { ideal: 7680 }, height: { ideal: 4320 }, frameRate: { ideal: 60, max: 60 }
   }).catch(() => {});
 
   track.onended = () => { setStatus('Трансляция остановлена.'); hangup(false); };
@@ -196,11 +198,11 @@ function applyMaxQualityEncoding(sender) {
   else                             maxBitrate = 15_000_000;
 
   params.encodings.forEach(enc => {
-    enc.maxBitrate           = maxBitrate;
-    enc.maxFramerate         = 60;
+    enc.maxBitrate            = maxBitrate;
+    enc.maxFramerate          = 60;
     enc.scaleResolutionDownBy = 1.0;
-    enc.priority             = 'high';
-    enc.networkPriority      = 'high';
+    enc.priority              = 'high';
+    enc.networkPriority       = 'high';
   });
   sender.setParameters(params).catch(console.error);
 }
@@ -250,9 +252,22 @@ async function attachLocalTracks() {
 }
 
 // ── Supabase Signaling ────────────────────────────────────────────────────────
+// ── Supabase Signaling ────────────────────────────────────────────────────────
+let outChannel = null; // постоянный канал для отправки текущему пиру
+
 async function connectSupabase(url, key) {
-  supabaseClient = window.supabase.createClient(url, key);
-  serverTag.textContent = 'Supabase Realtime';
+  if (!supabaseClient) {
+    supabaseClient = window.supabase.createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    serverTag.textContent = 'Supabase Realtime';
+  }
+
+  if (myChannel) {
+    try { await supabaseClient.removeChannel(myChannel); } catch (_) {}
+    myChannel = null;
+    await new Promise(r => setTimeout(r, 200));
+  }
 
   myChannel = supabaseClient.channel(`peer:${selfId}`, {
     config: { broadcast: { self: false } }
@@ -262,40 +277,73 @@ async function connectSupabase(url, key) {
     .on('broadcast', { event: 'signal' }, ({ payload }) => {
       handleSignal(payload).catch(e => setStatus(e.message || 'Ошибка сигналинга.', true));
     })
-    .subscribe((status, err) => {
-      console.log('[Supabase] status:', status, err);
+    .subscribe((status) => {
+      console.log('[Supabase] status:', status);
       if (status === 'SUBSCRIBED') {
+        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
         setStatus('Готово. Поделитесь ID и нажмите «Позвонить».');
-      } else if (status === 'CHANNEL_ERROR') {
-        setStatus('Ошибка подключения к Supabase: ' + (err?.message || status), true);
-      } else if (status === 'TIMED_OUT') {
-        setStatus('Supabase не отвечает. Проверьте ключи.', true);
-      } else if (status === 'CLOSED') {
-        setStatus('Канал закрыт.', true);
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setStatus('Переподключение к сигналингу...');
+        if (!reconnectTimer && supabaseConfig) {
+          reconnectTimer = setTimeout(async () => {
+            reconnectTimer = null;
+            await connectSupabase(supabaseConfig.supabaseUrl, supabaseConfig.supabaseKey).catch(() => {});
+          }, 2000);
+        }
       }
     });
 }
 
-async function send(payload) {
-  if (!supabaseClient) { setStatus('Нет подключения к Supabase.', true); return; }
-  const targetChannel = supabaseClient.channel(`peer:${payload.to}`);
-  await targetChannel.send({
-    type: 'broadcast',
-    event: 'signal',
-    payload: { ...payload, from: selfId }
+// Создаём исходящий канал к пиру один раз и переиспользуем
+async function ensureOutChannel(peerId) {
+  if (outChannel && outChannel._topic === `realtime:peer:${peerId}`) return;
+
+  if (outChannel) {
+    try { await supabaseClient.removeChannel(outChannel); } catch (_) {}
+    outChannel = null;
+  }
+
+  const ch = supabaseClient.channel(`peer:${peerId}`, {
+    config: { broadcast: { self: false } }
+  });
+
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Не удалось подключиться к собеседнику (timeout)')), 8000);
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED')   { clearTimeout(timer); outChannel = ch; resolve(); }
+      if (status === 'CHANNEL_ERROR') { clearTimeout(timer); reject(new Error('Ошибка канала к собеседнику')); }
+    });
   });
 }
 
+async function send(payload) {
+  if (!supabaseClient) { setStatus('Нет подключения к Supabase.', true); return; }
+  try {
+    await ensureOutChannel(payload.to);
+    await outChannel.send({
+      type: 'broadcast',
+      event: 'signal',
+      payload: { ...payload, from: selfId }
+    });
+  } catch (e) {
+    console.error('[send error]', e.message);
+    setStatus('Ошибка отправки: ' + e.message, true);
+  }
+}
+
 async function handleSignal(msg) {
+  console.log('[signal received]', msg.type, 'from', msg.from);
+  
   if (msg.type === 'call')      handleIncomingCall(msg);
   if (msg.type === 'answer')    await handleAnswer(msg);
   if (msg.type === 'candidate') await handleCandidate(msg);
   if (msg.type === 'decline') {
-    setStatus(`Собеседник <strong style="font-family:monospace">${msg.from}</strong> отклонил звонок.`);
+    setStatus(`<strong style="font-family:monospace">${msg.from}</strong> отклонил звонок.`);
     hangup(false);
   }
   if (msg.type === 'hangup') {
-    setStatus(`Собеседник <strong style="font-family:monospace">${msg.from}</strong> завершил звонок.`);
+    setStatus(`<strong style="font-family:monospace">${msg.from}</strong> завершил звонок.`);
     hangup(false);
   }
   if (msg.type === 'error') setStatus(msg.message, true);
@@ -305,10 +353,8 @@ async function handleSignal(msg) {
 async function startCall() {
   const peerId = remoteIdInput.value.trim();
   if (!peerId) { setStatus('Введите ID собеседника.', true); return; }
-
   const ok = await showConfirm(`Позвонить <strong>${peerId}</strong>?`);
   if (!ok) return;
-
   hangup(false);
   isPolite = false;
   createPeerConnection(peerId);
@@ -355,7 +401,7 @@ async function handleAnswer({ from, answer }) {
   if (!pc) return;
   await pc.setRemoteDescription(answer);
   pc.getSenders().forEach(applyMaxQualityEncoding);
-  setStatus(`Собеседник <strong style="font-family:monospace">${from}</strong> принял звонок.`);
+  setStatus(`<strong style="font-family:monospace">${from}</strong> принял звонок.`);
 }
 
 async function handleCandidate({ candidate }) {
@@ -366,6 +412,10 @@ async function handleCandidate({ candidate }) {
 
 function hangup(notify = true) {
   if (notify && currentPeerId) send({ type: 'hangup', to: currentPeerId });
+  if (outChannel) {
+    supabaseClient?.removeChannel(outChannel).catch(() => {});
+    outChannel = null;
+  }
   if (pc) { pc.getSenders().forEach(s => s.track?.stop()); pc.close(); }
   pc = null;
   currentPeerId = '';
@@ -407,13 +457,20 @@ copyIdBtn.addEventListener('click', async () => {
 regenIdBtn.addEventListener('click', async () => {
   const ok = await showConfirm('Сбросить ID? Текущий ID станет недоступен.');
   if (!ok) return;
-  if (myChannel) { await supabaseClient.removeChannel(myChannel); myChannel = null; }
-  const profile = await window.electronAPI.regenerateProfile();
-  selfId = profile.id;
-  selfIdEl.textContent = selfId;
-  const config = await window.electronAPI.getConfig();
-  await connectSupabase(config.supabaseUrl, config.supabaseKey);
-  setStatus('Создан новый ID.');
+  try {
+    if (myChannel) {
+      await supabaseClient.removeChannel(myChannel).catch(() => {});
+      myChannel = null;
+      await new Promise(r => setTimeout(r, 200));
+    }
+    const profile = await window.electronAPI.regenerateProfile();
+    selfId = profile.id;
+    selfIdEl.textContent = selfId;
+    await connectSupabase(supabaseConfig.supabaseUrl, supabaseConfig.supabaseKey);
+    setStatus('Создан новый ID.');
+  } catch (e) {
+    setStatus(e.message || 'Не удалось сменить ID.', true);
+  }
 });
 
 callBtn.addEventListener('click', () => {
@@ -438,8 +495,8 @@ window.addEventListener('beforeunload', () => hangup(true));
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async function init() {
   const profile = await window.electronAPI.getProfile();
-  const config  = await window.electronAPI.getConfig();
+  supabaseConfig = await window.electronAPI.getConfig();
   selfId = profile.id;
   selfIdEl.textContent = selfId;
-  await connectSupabase(config.supabaseUrl, config.supabaseKey);
+  await connectSupabase(supabaseConfig.supabaseUrl, supabaseConfig.supabaseKey);
 })();
