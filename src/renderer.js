@@ -398,11 +398,25 @@ async function attachLocalTracks() {
 let outChannel = null; // постоянный канал для отправки текущему пиру
 
 async function connectSupabase(url, key) {
+  console.log('[Supabase] connecting to:', url);
+  console.log('[Supabase] supabase lib available:', typeof window.supabase);
+  
+  if (!window.supabase) {
+    setStatus('Ошибка: библиотека Supabase не загружена.', true);
+    return;
+  }
+  
   if (!supabaseClient) {
-    supabaseClient = window.supabase.createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    serverTag.textContent = 'Supabase Realtime';
+    try {
+      supabaseClient = window.supabase.createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
+      serverTag.textContent = 'Supabase Realtime';
+    } catch (e) {
+      console.log('[Supabase] createClient error:', e);
+      setStatus('Ошибка инициализации Supabase: ' + e.message, true);
+      return;
+    }
   }
 
   if (myChannel) {
@@ -425,14 +439,30 @@ async function connectSupabase(url, key) {
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
         setStatus('Готово. Поделитесь ID и нажмите «Позвонить».');
       }
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        setStatus('Переподключение к сигналингу...');
+      if (status === 'CHANNEL_ERROR') {
+        console.log('[Supabase] CHANNEL_ERROR - checking connection...');
+        setStatus('Ошибка канала. Пробуем переподключиться...');
+        if (!reconnectTimer && supabaseConfig) {
+          reconnectTimer = setTimeout(async () => {
+            reconnectTimer = null;
+            await connectSupabase(supabaseConfig.supabaseUrl, supabaseConfig.supabaseKey).catch(e => {
+              console.log('[Supabase] reconnect failed:', e);
+            });
+          }, 3000);
+        }
+      }
+      if (status === 'TIMED_OUT') {
+        setStatus('Таймаут подключения. Пробуем снова...');
         if (!reconnectTimer && supabaseConfig) {
           reconnectTimer = setTimeout(async () => {
             reconnectTimer = null;
             await connectSupabase(supabaseConfig.supabaseUrl, supabaseConfig.supabaseKey).catch(() => {});
           }, 2000);
         }
+      }
+      if (status === 'CLOSED') {
+        console.log('[Supabase] connection closed');
+        setStatus('Подключение закрыто.');
       }
     });
 }
@@ -646,28 +676,30 @@ document.getElementById('pipBtn').addEventListener('click', async () => {
 });
 
 let fsWindowOpen = false;
-let fsVideoType = 'remote';
 
 document.getElementById('fullscreenBtn').addEventListener('click', () => {
-  const wrap = document.getElementById('remoteVideoWrap');
-  if (wrap.requestFullscreen) {
-    wrap.requestFullscreen();
-  } else if (wrap.webkitRequestFullscreen) {
-    wrap.webkitRequestFullscreen();
-  }
+  fsWindowOpen = true;
+  window.electronAPI.openFullscreen();
 });
 
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement) {
+if (window.electronAPI.onFsClosed) {
+  window.electronAPI.onFsClosed(() => {
     fsWindowOpen = false;
-  }
-});
+  });
+}
 
-document.addEventListener('webkitfullscreenchange', () => {
-  if (!document.webkitFullscreenElement) {
-    fsWindowOpen = false;
+if (window.electronAPI.onFsVideo) {
+  window.electronAPI.onFsVideo((stream) => {
+    const fsVideo = document.getElementById('fsVideo');
+    if (fsVideo && stream) fsVideo.srcObject = stream;
+  });
+}
+
+setInterval(() => {
+  if (fsWindowOpen && window.electronAPI?.sendVideoToFs) {
+    window.electronAPI.sendVideoToFs(remoteVideo.srcObject);
   }
-});
+}, 200);
 
 
 

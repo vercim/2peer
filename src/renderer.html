@@ -249,15 +249,18 @@
       position: relative;
       background: #050505;
     }
-    .video-wrap:fullscreen {
-      background: #000;
+    .video-wrap.placeholder {
+      background: #0a0a0a;
     }
-    .video-wrap:fullscreen video {
-      position: fixed;
+    .video-wrap.placeholder::after {
+      content: 'Нет трансляции';
+      position: absolute;
       inset: 0;
-      width: 100vw;
-      height: 100vh;
-      object-fit: contain;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #444;
+      font-size: 14px;
     }
     video {
       position: absolute;

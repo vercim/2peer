@@ -26,6 +26,7 @@ function setProfile(profile) {
 let pendingSourceId = null;
 
 let mainWindow = null;
+let fullscreenWindow = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -37,8 +38,31 @@ function createWindow() {
     }
   });
   mainWindow.loadFile(path.join(__dirname, 'renderer.html'));
-  // mainWindow.webContents.openDevTools();
   return mainWindow;
+}
+
+function createFullscreenWindow() {
+  if (fullscreenWindow) {
+    fullscreenWindow.focus();
+    return fullscreenWindow;
+  }
+  fullscreenWindow = new BrowserWindow({
+    fullscreen: true,
+    frame: false,
+    backgroundColor: '#000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true, nodeIntegration: false, sandbox: false
+    }
+  });
+  fullscreenWindow.loadFile(path.join(__dirname, 'fullscreen.html'));
+  fullscreenWindow.on('closed', () => {
+    fullscreenWindow = null;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fs:closed');
+    }
+  });
+  return fullscreenWindow;
 }
 
 function registerIpcHandlers() {
@@ -70,6 +94,12 @@ function registerIpcHandlers() {
   ipcMain.handle('sources:set-pending', (_, sourceId) => { pendingSourceId = sourceId; });
   ipcMain.handle('window:minimize', (event) => { BrowserWindow.fromWebContents(event.sender)?.minimize(); });
   ipcMain.handle('window:close',    (event) => { BrowserWindow.fromWebContents(event.sender)?.close(); });
+  ipcMain.handle('window:fullscreen', () => { createFullscreenWindow(); });
+  ipcMain.on('fs:video', (event, stream) => {
+    if (fullscreenWindow && !fullscreenWindow.isDestroyed()) {
+      fullscreenWindow.webContents.send('fs:video', stream);
+    }
+  });
   ipcMain.handle('app:version', () => APP_VERSION);
 }
 
