@@ -33,6 +33,41 @@ let isPolite         = false;
 let incomingCallData = null;
 let reconnectTimer   = null;
 
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  
+  if (type === 'incoming') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+  } else if (type === 'accepted') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(659, audioCtx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.2);
+  } else if (type === 'ended') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.1);
+  }
+}
+
 const rtcConfig = {
   iceServers: [
     { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
@@ -369,6 +404,7 @@ async function handleSignal(msg) {
 async function startCall() {
   const peerId = remoteIdInput.value.trim();
   if (!peerId) { setStatus('Введите ID собеседника.', true); return; }
+  if (peerId === selfId) { setStatus('Нельзя звонить себе.', true); return; }
   const ok = await showConfirm(`Позвонить <strong>${peerId}</strong>?`);
   if (!ok) return;
   hangup(false);
@@ -384,6 +420,7 @@ function handleIncomingCall({ from, offer }) {
   incomingCallData = { from, offer };
   incomingCallEl.classList.add('active');
   callerIdLabel.textContent = from;
+  playSound('incoming');
   setStatus(`Входящий звонок от <strong style="font-family:monospace">${from}</strong>.`);
 }
 
@@ -401,6 +438,7 @@ async function acceptCall() {
   pendingIce = [];
   await pc.setLocalDescription(await pc.createAnswer());
   send({ type: 'answer', to: from, answer: pc.localDescription });
+  playSound('accepted');
   setStatus(`Звонок принят. Подключаемся к <strong style="font-family:monospace">${from}</strong>...`);
 }
 
@@ -409,6 +447,7 @@ function declineCall() {
   const { from } = incomingCallData;
   incomingCallData = null;
   incomingCallEl.classList.remove('active');
+  playSound('ended');
   send({ type: 'decline', to: from });
   setStatus(`Вызов от <strong style="font-family:monospace">${from}</strong> отклонён.`);
 }
@@ -429,7 +468,10 @@ async function handleCandidate({ candidate }) {
 }
 
 function hangup(notify = true) {
-  if (notify && currentPeerId) send({ type: 'hangup', to: currentPeerId });
+  if (notify && currentPeerId) {
+    send({ type: 'hangup', to: currentPeerId });
+    playSound('ended');
+  }
   if (outChannel) {
     supabaseClient?.removeChannel(outChannel).catch(() => {});
     outChannel = null;
@@ -513,6 +555,8 @@ window.addEventListener('beforeunload', () => hangup(true));
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async function init() {
   const profile = await window.electronAPI.getProfile();
+  const version = await window.electronAPI.getVersion();
+  versionTag.textContent = 'v' + version;
   supabaseConfig = await window.electronAPI.getConfig();
   selfId = profile.id;
   selfIdEl.textContent = selfId;

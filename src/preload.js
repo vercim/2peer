@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSources:        () => ipcRenderer.invoke('sources:get'),
   setPendingSource:  (id) => ipcRenderer.invoke('sources:set-pending', id),
   minimizeWindow:    () => ipcRenderer.invoke('window:minimize'),
-  closeWindow:       () => ipcRenderer.invoke('window:close')
+  closeWindow:       () => ipcRenderer.invoke('window:close'),
+  getVersion:        () => ipcRenderer.invoke('app:version')
 });
