@@ -38,38 +38,49 @@ let isPolite         = false;
 let incomingCallData = null;
 let reconnectTimer   = null;
 
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
 
 function playSound(type) {
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
+  const ctx = initAudio();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
   osc.connect(gain);
-  gain.connect(audioCtx.destination);
+  gain.connect(ctx.destination);
   
   if (type === 'incoming') {
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.15);
-    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.15);
+    osc.stop(ctx.currentTime + 0.15);
   } else if (type === 'accepted') {
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(523, audioCtx.currentTime);
-    osc.frequency.setValueAtTime(659, audioCtx.currentTime + 0.08);
-    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+    osc.frequency.setValueAtTime(523, ctx.currentTime);
+    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.2);
+    osc.stop(ctx.currentTime + 0.2);
   } else if (type === 'ended') {
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(400, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.1);
+    osc.stop(ctx.currentTime + 0.1);
   }
 }
 
@@ -505,17 +516,12 @@ async function handleSignal(msg) {
 
 function handleRemoteBroadcastStopped() {
   console.log('[handleRemoteBroadcastStopped]');
-  remoteVideo.srcObject = null;
-  remoteMeta.textContent = '—';
-  if (pc) {
-    const senders = pc.getSenders();
-    for (const sender of senders) {
-      if (sender.track && sender.track.kind === 'video') {
-        sender.track.stop();
-        pc.removeTrack(sender);
-      }
-    }
+  if (remoteVideo.srcObject) {
+    const stream = remoteVideo.srcObject;
+    stream.getTracks().forEach(t => t.stop());
+    remoteVideo.srcObject = null;
   }
+  remoteMeta.textContent = '—';
   setStatus('Трансляция собеседника завершена.');
 }
 
@@ -581,20 +587,14 @@ async function handleAnswer({ from, answer }) {
 }
 
 async function handleRenegotiate({ from, offer }) {
-  console.log('[handleRenegotiate] from', from);
+  console.log('[handleRenegotiate] from', from, 'signalingState:', pc?.signalingState);
   if (!pc || pc.signalingState === 'closed') {
     console.log('[handleRenegotiate] no pc or closed');
     return;
   }
   
-  const existingSenders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
-  for (const sender of existingSenders) {
-    sender.track.stop();
-    pc.removeTrack(sender);
-  }
-  
   await pc.setRemoteDescription(offer);
-  for (const c of pendingIce) await pc.addIceCandidate(c);
+  for (const c of pendingIce) await pc.addIceCandidate(c).catch(() => {});
   pendingIce = [];
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
@@ -653,32 +653,25 @@ let fsWindowOpen = false;
 let fsVideoType = 'remote';
 
 document.getElementById('fullscreenBtn').addEventListener('click', () => {
-  fsWindowOpen = true;
-  fsVideoType = 'remote';
-  window.electronAPI.openFullscreen('remote');
+  const wrap = document.getElementById('remoteVideoWrap');
+  if (wrap.requestFullscreen) {
+    wrap.requestFullscreen();
+  } else if (wrap.webkitRequestFullscreen) {
+    wrap.webkitRequestFullscreen();
+  }
 });
 
-if (window.electronAPI.onFsClosed) {
-  window.electronAPI.onFsClosed(() => {
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) {
     fsWindowOpen = false;
-  });
-}
-
-if (window.electronAPI.onFsVideoUpdate) {
-  window.electronAPI.onFsVideoUpdate((data) => {
-    const fsVideo = document.getElementById('fullscreenVideo');
-    if (fsVideo && data) {
-      fsVideo.srcObject = data;
-    }
-  });
-}
-
-setInterval(() => {
-  if (window.electronAPI?.sendVideoUpdate && fsWindowOpen) {
-    const stream = fsVideoType === 'local' ? localVideo.srcObject : remoteVideo.srcObject;
-    window.electronAPI.sendVideoUpdate(stream);
   }
-}, 200);
+});
+
+document.addEventListener('webkitfullscreenchange', () => {
+  if (!document.webkitFullscreenElement) {
+    fsWindowOpen = false;
+  }
+});
 
 
 
