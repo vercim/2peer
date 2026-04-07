@@ -4,27 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>2peer</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="compiled.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   </head>
   <body class="bg-bg text-text font-sans text-[13px] antialiased">
     <!-- Titlebar -->
     <div
-      class="h-[38px] flex items-center justify-between px-[8px_14px] bg-panel border-b border-border shrink-0"
+      class="h-[38px] flex items-center justify-between pl-[14px] bg-panel border-b border-border shrink-0"
       style="-webkit-app-region: drag"
     >
       <div
-        class="flex items-center gap-[8px] text-[13px] font-semibold text-muted pl-[4px]"
+        class="flex items-center gap-[10px] text-[13px] font-semibold text-muted"
       >
         <div
-          class="w-[7px] h-[7px] rounded-full bg-[#444]"
+          class="w-[8px] h-[8px] rounded-full bg-[#444]"
           id="statusDot"
         ></div>
         2peer
       </div>
       <div class="flex" style="-webkit-app-region: no-drag">
         <button
-          class="w-[38px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
+          class="w-[40px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
           id="btnMinimize"
           title="Minimize"
         >
@@ -33,7 +33,7 @@
           </svg>
         </button>
         <button
-          class="w-[38px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
+          class="w-[50px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
           id="btnClose"
           title="Close"
         >
