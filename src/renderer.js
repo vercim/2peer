@@ -138,6 +138,11 @@ function cleanupRemoteStream() {
 async function ensureLocalScreen() {
   if (localStream && localStream.active) return localStream;
 
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+  }
+
   const stream = await navigator.mediaDevices.getDisplayMedia({
     video: {
       width:     { ideal: 7680, max: 7680 },
@@ -255,6 +260,11 @@ broadcastBtn.addEventListener('click', async () => {
 
   const sourceId = await showSourcePicker();
   if (!sourceId) return;
+
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+  }
 
   try {
     await ensureLocalScreen();
@@ -627,12 +637,14 @@ let fsWindowOpen = false;
 let fsHideTimeout = null;
 
 function showFsControls() {
-  document.getElementById('fsControls').classList.add('visible');
-  document.getElementById('fsCenterClose').classList.add('visible');
+  const controls = document.getElementById('fsControls');
+  const centerClose = document.getElementById('fsCenterClose');
+  controls.style.display = 'flex';
+  centerClose.style.display = 'flex';
   clearTimeout(fsHideTimeout);
   fsHideTimeout = setTimeout(() => {
-    document.getElementById('fsControls').classList.remove('visible');
-    document.getElementById('fsCenterClose').classList.remove('visible');
+    controls.style.display = 'none';
+    centerClose.style.display = 'none';
   }, 3000);
 }
 
@@ -671,8 +683,8 @@ document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement) {
     fsWindowOpen = false;
     clearTimeout(fsHideTimeout);
-    document.getElementById('fsControls').classList.remove('visible');
-    document.getElementById('fsCenterClose').classList.remove('visible');
+    document.getElementById('fsControls').style.display = 'none';
+    document.getElementById('fsCenterClose').style.display = 'none';
   }
 });
 
@@ -680,8 +692,8 @@ document.addEventListener('webkitfullscreenchange', () => {
   if (!document.webkitFullscreenElement) {
     fsWindowOpen = false;
     clearTimeout(fsHideTimeout);
-    document.getElementById('fsControls').classList.remove('visible');
-    document.getElementById('fsCenterClose').classList.remove('visible');
+    document.getElementById('fsControls').style.display = 'none';
+    document.getElementById('fsCenterClose').style.display = 'none';
   }
 });
 
@@ -694,8 +706,6 @@ document.addEventListener('keydown', (e) => {
     }
   }
 });
-
-
 
 // ── Window controls ───────────────────────────────────────────────────────────
 document.getElementById('btnMinimize').addEventListener('click', () => window.electronAPI.minimizeWindow());
