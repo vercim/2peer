@@ -227,6 +227,7 @@ function createPeerConnection(peerId) {
 
   pc.onconnectionstatechange = () => {
     const st = pc?.connectionState;
+    console.log('[connectionState]', st);
     if (st === 'connected')    setStatus(`Соединение активно с <strong style="font-family:monospace">${currentPeerId}</strong>.`);
     if (st === 'failed')       setStatus('P2P соединение не удалось.', true);
     if (st === 'disconnected') setStatus('Соединение потеряно.');
@@ -234,6 +235,7 @@ function createPeerConnection(peerId) {
   };
 
   pc.oniceconnectionstatechange = () => {
+    console.log('[iceConnectionState]', pc?.iceConnectionState);
     if (pc?.iceConnectionState === 'failed') pc.restartIce();
   };
 
@@ -308,9 +310,11 @@ async function ensureOutChannel(peerId) {
     config: { broadcast: { self: false } }
   });
 
+  console.log('[ensureOutChannel] subscribing to peer:', peerId);
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Не удалось подключиться к собеседнику (timeout)')), 8000);
     ch.subscribe((status) => {
+      console.log('[ensureOutChannel] subscribe status:', status);
       if (status === 'SUBSCRIBED')   { clearTimeout(timer); outChannel = ch; resolve(); }
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') { clearTimeout(timer); reject(new Error('Не удалось подключиться к собеседнику (' + status + ')')); }
     });
@@ -320,12 +324,15 @@ async function ensureOutChannel(peerId) {
 async function send(payload) {
   if (!supabaseClient) { setStatus('Нет подключения к Supabase.', true); return; }
   try {
+    console.log('[send] ensuring channel to', payload.to);
     await ensureOutChannel(payload.to);
+    console.log('[send] sending payload', payload.type);
     await outChannel.send({
       type: 'broadcast',
       event: 'signal',
       payload: { ...payload, from: selfId }
     });
+    console.log('[send] done');
   } catch (e) {
     console.error('[send error]', e.message);
     setStatus('Ошибка отправки: ' + e.message, true);
