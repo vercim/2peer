@@ -312,11 +312,20 @@ async function ensureOutChannel(peerId) {
 
   console.log('[ensureOutChannel] subscribing to peer:', peerId);
   await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Не удалось подключиться к собеседнику (timeout)')), 8000);
+    const timer = setTimeout(() => {
+      if (outChannel) {
+        console.log('[ensureOutChannel] timeout but channel exists, using it');
+        resolve();
+      } else {
+        reject(new Error('Не удалось подключиться к собеседнику (timeout)'));
+      }
+    }, 8000);
     ch.subscribe((status) => {
       console.log('[ensureOutChannel] subscribe status:', status);
-      if (status === 'SUBSCRIBED')   { clearTimeout(timer); outChannel = ch; resolve(); }
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') { clearTimeout(timer); reject(new Error('Не удалось подключиться к собеседнику (' + status + ')')); }
+      clearTimeout(timer);
+      if (status === 'SUBSCRIBED')   { outChannel = ch; resolve(); }
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { reject(new Error('Не удалось подключиться к собеседнику (' + status + ')')); }
+      else { outChannel = ch; resolve(); }
     });
   });
 }
@@ -405,10 +414,12 @@ function declineCall() {
 }
 
 async function handleAnswer({ from, answer }) {
+  console.log('[handleAnswer] setting remote description');
   if (!pc) return;
   await pc.setRemoteDescription(answer);
   pc.getSenders().forEach(applyMaxQualityEncoding);
   setStatus(`<strong style="font-family:monospace">${from}</strong> принял звонок.`);
+  console.log('[handleAnswer] done, pc.connectionState:', pc.connectionState);
 }
 
 async function handleCandidate({ candidate }) {
