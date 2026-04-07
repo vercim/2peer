@@ -94,6 +94,43 @@
     object-fit: contain;
   }
 
+  /* Grid for multiple window thumbnails (max 4 columns) */
+  .windows-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  @media (max-width: 1200px) {
+    .windows-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  @media (max-width: 900px) {
+    .windows-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 600px) {
+    .windows-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Individual window tile styling (optional enhancement) */
+  .windows-grid .window-tile {
+    position: relative;
+    background: #0a0a0a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .windows-grid .window-tile video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
   video:fullscreen,
   video:-webkit-full-screen {
     object-fit: contain;

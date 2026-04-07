@@ -263,15 +263,27 @@ function hideRemotePlaceholder() {
 function createPeerConnection(peerId) {
   currentPeerId = peerId;
   pc = new RTCPeerConnection(rtcConfig);
-  const remoteStream = new MediaStream();
-  remoteVideo.srcObject = remoteStream;
+  // Remote stream will be assigned dynamically
+  let remoteStream = null;
+  remoteVideo.srcObject = null;
 
   pc.ontrack = (event) => {
     document.getElementById("remoteVideoWrap").classList.remove("placeholder");
-    const stream = event?.streams?.[0];
-    if (stream) {
-      stream.getTracks().forEach((t) => remoteStream.addTrack(t));
-      // Attach per-track state listeners for remote video
+    const stream = event?.streams?.[0] || null;
+    if (stream && remoteVideo.srcObject !== stream) {
+      remoteVideo.srcObject = stream;
+      remoteStream = stream;
+    }
+    // Attach per-track state listeners for remote video
+    if (stream && stream.getVideoTracks) {
+      // Listen for removals to update placeholder state
+      try {
+        stream.onremovetrack = () => {
+          if (!streamHasVideo(stream)) showRemotePlaceholder();
+        };
+      } catch {
+        // ignore if not supported
+      }
       stream.getVideoTracks().forEach((track) => {
         track.onmute = () => {
           if (!streamHasVideo(stream)) showRemotePlaceholder();
@@ -281,9 +293,6 @@ function createPeerConnection(peerId) {
         };
         track.onended = () => showRemotePlaceholder();
       });
-      if (!streamHasVideo(stream)) {
-        showRemotePlaceholder();
-      }
     }
     const s = event.track.getSettings ? event.track.getSettings() : {};
     remoteMeta.textContent = `${s.width || "?"}×${s.height || "?"} @${Math.round(s.frameRate || "?")}fps`;
