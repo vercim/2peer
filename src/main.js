@@ -12,10 +12,22 @@ let wss = null;
 function startSignalingServer() {
   wss = new WebSocket.Server({ port: SIGNAL_PORT });
 
-  function send(ws, payload) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(payload));
-    }
+  async function send(payload) {
+    if (!supabaseClient) { setStatus('Нет подключения к Supabase.', true); return; }
+  
+    // Создаём временный канал, подписываемся, отправляем, удаляем
+    const targetChannel = supabaseClient.channel(`peer:${payload.to}`);
+    await new Promise((resolve) => {
+      targetChannel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') resolve();
+      });
+    });
+    await targetChannel.send({
+      type: 'broadcast',
+      event: 'signal',
+      payload: { ...payload, from: selfId }
+    });
+    await supabaseClient.removeChannel(targetChannel);
   }
 
   wss.on('connection', (ws) => {

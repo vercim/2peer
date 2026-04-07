@@ -23,13 +23,16 @@
     "appId": "dev.vercim.2peer",
     "productName": "2peer",
     "mac": {
+      "icon": "assets/icon.icns",
       "target": ["dmg", "zip"],
       "category": "public.app-category.utilities"
     },
     "win": {
+      "icon": "assets/icon.ico",
       "target": ["nsis"]
     },
     "linux": {
+      "icon": "assets/icon.png",
       "target": ["AppImage", "deb"]
     },
     "nsis": {
