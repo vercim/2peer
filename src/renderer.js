@@ -312,7 +312,7 @@ async function ensureOutChannel(peerId) {
     const timer = setTimeout(() => reject(new Error('Не удалось подключиться к собеседнику (timeout)')), 8000);
     ch.subscribe((status) => {
       if (status === 'SUBSCRIBED')   { clearTimeout(timer); outChannel = ch; resolve(); }
-      if (status === 'CHANNEL_ERROR') { clearTimeout(timer); reject(new Error('Ошибка канала к собеседнику')); }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') { clearTimeout(timer); reject(new Error('Не удалось подключиться к собеседнику (' + status + ')')); }
     });
   });
 }
@@ -376,7 +376,7 @@ async function acceptCall() {
   const { from, offer } = incomingCallData;
   incomingCallData = null;
   incomingCallEl.classList.remove('active');
-  hangup(false);
+  if (pc) { pc.getSenders().forEach(s => s.track?.stop()); pc.close(); pc = null; }
   isPolite = true;
   createPeerConnection(from);
   await attachLocalTracks();
