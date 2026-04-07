@@ -37,6 +37,8 @@ let pendingIce       = [];
 let isPolite         = false;
 let incomingCallData = null;
 let reconnectTimer   = null;
+let isBroadcasting   = false;
+let isStoppingBroadcast = false;
 
 function setStatus(msg, isErr = false) {
   const entry = document.createElement('div');
