@@ -192,6 +192,7 @@ async function startBroadcast() {
   
   if (pc && pc.connectionState === 'connected' && currentPeerId) {
     await attachLocalTracks();
+    await new Promise(r => setTimeout(r, 100));
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
@@ -677,29 +678,27 @@ document.getElementById('pipBtn').addEventListener('click', async () => {
 
 let fsWindowOpen = false;
 
-document.getElementById('fullscreenBtn').addEventListener('click', () => {
+document.getElementById('fullscreenBtn').addEventListener('click', async () => {
+  const wrap = document.getElementById('remoteVideoWrap');
+  if (wrap.requestFullscreen) {
+    await wrap.requestFullscreen();
+  } else if (wrap.webkitRequestFullscreen) {
+    await wrap.webkitRequestFullscreen();
+  }
   fsWindowOpen = true;
-  window.electronAPI.openFullscreen();
 });
 
-if (window.electronAPI.onFsClosed) {
-  window.electronAPI.onFsClosed(() => {
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) {
     fsWindowOpen = false;
-  });
-}
-
-if (window.electronAPI.onFsVideo) {
-  window.electronAPI.onFsVideo((stream) => {
-    const fsVideo = document.getElementById('fsVideo');
-    if (fsVideo && stream) fsVideo.srcObject = stream;
-  });
-}
-
-setInterval(() => {
-  if (fsWindowOpen && window.electronAPI?.sendVideoToFs) {
-    window.electronAPI.sendVideoToFs(remoteVideo.srcObject);
   }
-}, 200);
+});
+
+document.addEventListener('webkitfullscreenchange', () => {
+  if (!document.webkitFullscreenElement) {
+    fsWindowOpen = false;
+  }
+});
 
 
 

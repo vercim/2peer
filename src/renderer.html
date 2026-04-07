@@ -262,6 +262,19 @@
       color: #444;
       font-size: 14px;
     }
+    .video-wrap:fullscreen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #000;
+    }
+    .video-wrap:fullscreen video {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: contain;
+    }
     video {
       position: absolute;
       inset: 0;
