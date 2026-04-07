@@ -40,60 +40,49 @@ let reconnectTimer   = null;
 
 let audioCtx = null;
 
-function initAudio() {
+function playSound(type) {
   try {
-    if (!audioCtx) {
+    if (!audioCtx || audioCtx.state === 'closed') {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
-    return audioCtx;
-  } catch (e) {
-    console.error('[audio] init failed:', e);
-    return null;
-  }
-}
-
-function playSound(type) {
-  const ctx = initAudio();
-  if (!ctx) return;
-  
-  try {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
     
-    const now = ctx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    const now = audioCtx.currentTime;
     
     if (type === 'incoming') {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(880, now);
-      osc.frequency.exponentialRampToValueAtTime(440, now + 0.3);
-      gain.gain.setValueAtTime(0.5, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.frequency.exponentialRampToValueAtTime(440, now + 0.15);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
       osc.start(now);
-      osc.stop(now + 0.3);
+      osc.stop(now + 0.15);
     } else if (type === 'accepted') {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(523, now);
-      osc.frequency.setValueAtTime(659, now + 0.1);
-      gain.gain.setValueAtTime(0.5, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.frequency.setValueAtTime(659, now + 0.08);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
       osc.start(now);
-      osc.stop(now + 0.25);
+      osc.stop(now + 0.2);
     } else if (type === 'ended') {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(400, now);
-      osc.frequency.exponentialRampToValueAtTime(150, now + 0.15);
-      gain.gain.setValueAtTime(0.5, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
       osc.start(now);
-      osc.stop(now + 0.15);
+      osc.stop(now + 0.1);
     }
   } catch (e) {
-    console.error('[audio] playSound error:', e);
+    console.log('[playSound] error:', e.message);
   }
 }
 
@@ -199,22 +188,12 @@ async function startBroadcast() {
     return;
   }
   
+  localVideo.srcObject = localStream;
+  
   if (pc && pc.connectionState === 'connected' && currentPeerId) {
-    const videoSenders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
-    for (const sender of videoSenders) {
-      try { pc.removeTrack(sender); } catch (_) {}
-    }
-    
     await attachLocalTracks();
-    
-    const offer = await pc.createOffer({ offerToReceiveVideo: true });
-    const sdp = offer.sdp.replace(/a=group:BUNDLE [^\r\n]+/g, (match) => {
-      const parts = match.split(' ');
-      const uniqueParts = [...new Set(parts)];
-      return 'a=group:BUNDLE ' + uniqueParts.join(' ');
-    });
-    await pc.setLocalDescription({ type: offer.type, sdp: sdp });
-    
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
     send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
   }
   
@@ -260,15 +239,7 @@ changeSourceBtn.addEventListener('click', async () => {
   try {
     if (localStream) {
       localStream.getTracks().forEach(t => t.stop());
-    }
-    if (pc) {
-      const senders = pc.getSenders();
-      for (const sender of senders) {
-        if (sender.track && sender.track.kind === 'video') {
-          sender.track.stop();
-          pc.removeTrack(sender);
-        }
-      }
+      localStream = null;
     }
     
     await ensureLocalScreen();
