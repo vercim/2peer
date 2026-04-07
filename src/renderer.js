@@ -606,13 +606,10 @@ async function handleRenegotiate({ from, offer }) {
     return;
   }
   
-  if (pc.getSenders().some(s => s.track && s.track.kind === 'video')) {
-    pc.getSenders().forEach(s => {
-      if (s.track && s.track.kind === 'video') {
-        s.track.stop();
-        pc.removeTrack(s);
-      }
-    });
+  const existingSenders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
+  for (const sender of existingSenders) {
+    sender.track.stop();
+    pc.removeTrack(sender);
   }
   
   await pc.setRemoteDescription(offer);
@@ -627,19 +624,8 @@ async function handleRenegotiate({ from, offer }) {
 async function handleRenegotiateAnswer({ from, answer }) {
   console.log('[handleRenegotiateAnswer] from', from);
   if (!pc) return;
-  
-  if (pc.getSenders().some(s => s.track && s.track.kind === 'video')) {
-    pc.getSenders().forEach(s => {
-      if (s.track && s.track.kind === 'video') {
-        s.track.stop();
-        pc.removeTrack(s);
-      }
-    });
-  }
-  
   await pc.setRemoteDescription(answer);
   pc.getSenders().forEach(applyMaxQualityEncoding);
-  setStatus('Видеотрансляция началась.');
 }
 
 async function handleCandidate({ candidate }) {
@@ -689,12 +675,6 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
   fsWindowOpen = true;
   fsVideoType = 'remote';
   window.electronAPI.openFullscreen('remote');
-});
-
-document.getElementById('localFullscreenBtn').addEventListener('click', () => {
-  fsWindowOpen = true;
-  fsVideoType = 'local';
-  window.electronAPI.openFullscreen('local');
 });
 
 if (window.electronAPI.onFsClosed) {
