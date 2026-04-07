@@ -71,6 +71,50 @@ function showConfirm(message) {
   });
 }
 
+// ── Source Picker ─────────────────────────────────────────────────────────────
+async function showSourcePicker() {
+  const sources = await window.electronAPI.getSources();
+  sourcePickerContent.innerHTML = '';
+  const screens = sources.filter(s => s.isScreen);
+  const windows = sources.filter(s => !s.isScreen);
+
+  return new Promise((resolve) => {
+    function renderSection(label, items) {
+      if (!items.length) return;
+      const lbl = document.createElement('div');
+      lbl.className = 'source-section-label';
+      lbl.textContent = label;
+      sourcePickerContent.appendChild(lbl);
+      const grid = document.createElement('div');
+      grid.className = 'source-grid';
+      items.forEach(src => {
+        const item = document.createElement('div');
+        item.className = 'source-item';
+        item.innerHTML = `<img class="source-thumb" src="${src.thumbnail}" alt="" /><div class="source-name">${src.name}</div>`;
+        item.addEventListener('click', async () => {
+          await window.electronAPI.setPendingSource(src.id);
+          sourcePickerOverlay.classList.add('hidden');
+          resolve(src.id);
+        });
+        grid.appendChild(item);
+      });
+      sourcePickerContent.appendChild(grid);
+    }
+
+    renderSection('Экраны', screens);
+    renderSection('Окна', windows);
+    sourcePickerOverlay.classList.remove('hidden');
+
+    const closeBtn = document.getElementById('sourcePickerClose');
+    const onClose = () => {
+      sourcePickerOverlay.classList.add('hidden');
+      closeBtn.removeEventListener('click', onClose);
+      resolve(null);
+    };
+    closeBtn.addEventListener('click', onClose);
+  });
+}
+
 function cleanupLocalStream() {
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
   localVideo.srcObject = null;
@@ -627,6 +671,8 @@ document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement) {
     fsWindowOpen = false;
     clearTimeout(fsHideTimeout);
+    document.getElementById('fsControls').classList.remove('visible');
+    document.getElementById('fsCenterClose').classList.remove('visible');
   }
 });
 
@@ -634,6 +680,8 @@ document.addEventListener('webkitfullscreenchange', () => {
   if (!document.webkitFullscreenElement) {
     fsWindowOpen = false;
     clearTimeout(fsHideTimeout);
+    document.getElementById('fsControls').classList.remove('visible');
+    document.getElementById('fsCenterClose').classList.remove('visible');
   }
 });
 
@@ -648,6 +696,10 @@ document.addEventListener('keydown', (e) => {
 });
 
 
+
+// ── Window controls ───────────────────────────────────────────────────────────
+document.getElementById('btnMinimize').addEventListener('click', () => window.electronAPI.minimizeWindow());
+document.getElementById('btnClose').addEventListener('click', () => window.electronAPI.closeWindow());
 
 // ── Event listeners ───────────────────────────────────────────────────────────
 copyIdBtn.addEventListener('click', async () => {
