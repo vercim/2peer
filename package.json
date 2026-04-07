@@ -1,6 +1,6 @@
 {
   "name": "2peer",
-  "version": "04.1",
+  "version": "0.4.1",
   "description": "2peer",
   "main": "src/main.js",
   "scripts": {
@@ -16,8 +16,12 @@
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.2.2",
+    "@tailwindcss/vite": "^4.2.2",
+    "autoprefixer": "^10.4.27",
     "electron": "^35.0.0",
     "electron-builder": "^25.1.8",
+    "postcss": "^8.5.8",
+    "prettier": "^3.8.1",
     "tailwindcss": "^4.2.2"
   },
   "build": {

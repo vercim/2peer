@@ -1,172 +1,407 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>2peer</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-</head>
-<body class="bg-bg text-text font-sans text-[13px] antialiased">
-
-<!-- Titlebar -->
-<div class="h-[38px] flex items-center justify-between px-[8px_14px] bg-panel border-b border-border shrink-0" style="-webkit-app-region: drag;">
-  <div class="flex items-center gap-[8px] text-[13px] font-semibold text-muted">
-    <div class="w-[7px] h-[7px] rounded-full bg-[#444]"></div>
-    2peer
-  </div>
-  <div class="flex" style="-webkit-app-region: no-drag;">
-    <button class="w-[38px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]" id="btnMinimize" title="Minimize">
-      <svg width="11" height="2" viewBox="0 0 11 2" fill="currentColor"><rect width="11" height="1.5" rx="0.75"/></svg>
-    </button>
-    <button class="w-[38px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]" id="btnClose" title="Close">
-      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
-        <line x1="1" y1="1" x2="10" y2="10"/><line x1="10" y1="1" x2="1" y2="10"/>
-      </svg>
-    </button>
-  </div>
-</div>
-
-<!-- App -->
-<div class="h-[calc(100vh-38px)] grid grid-cols-[272px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden">
-
-  <!-- Sidebar -->
-  <aside class="flex flex-col gap-[8px] overflow-hidden min-h-0">
-
-    <div class="bg-panel border border-border rounded-[8px] p-[12px_14px] flex flex-col gap-[8px] shrink-0">
-      <span class="text-[10px] tracking-[0.09em] uppercase text-faint">Your ID</span>
-      <div class="bg-panel-2 border border-border rounded-[5px] p-[8px_10px] font-mono text-[14px] tracking-[0.04em] text-text break-all" id="selfId">—</div>
-      <div class="flex gap-[6px]">
-        <button class="bg-[rgba(255,255,255,0.06)] text-text border border-border rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap" id="copyIdBtn">Copy</button>
-        <button class="bg-[rgba(255,255,255,0.06)] text-text border border-border rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap" id="regenIdBtn">New ID</button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>2peer</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  </head>
+  <body class="bg-bg text-text font-sans text-[13px] antialiased">
+    <!-- Titlebar -->
+    <div
+      class="h-[38px] flex items-center justify-between px-[8px_14px] bg-panel border-b border-border shrink-0"
+      style="-webkit-app-region: drag"
+    >
+      <div
+        class="flex items-center gap-[8px] text-[13px] font-semibold text-muted pl-[4px]"
+      >
+        <div
+          class="w-[7px] h-[7px] rounded-full bg-[#444]"
+          id="statusDot"
+        ></div>
+        2peer
+      </div>
+      <div class="flex" style="-webkit-app-region: no-drag">
+        <button
+          class="w-[38px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
+          id="btnMinimize"
+          title="Minimize"
+        >
+          <svg width="11" height="2" viewBox="0 0 11 2" fill="currentColor">
+            <rect width="11" height="1.5" rx="0.75" />
+          </svg>
+        </button>
+        <button
+          class="w-[38px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
+          id="btnClose"
+          title="Close"
+        >
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 11 11"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+          >
+            <line x1="1" y1="1" x2="10" y2="10" />
+            <line x1="10" y1="1" x2="1" y2="10" />
+          </svg>
+        </button>
       </div>
     </div>
 
-    <div class="bg-panel border border-border rounded-[8px] p-[12px_14px] flex flex-col gap-[8px] shrink-0">
-      <span class="text-[10px] tracking-[0.09em] uppercase text-faint">Call</span>
-      <input class="w-full bg-panel-2 border border-border text-text rounded-[5px] p-[9px_10px] outline-none text-[13px] font-mono transition-colors duration-140 focus:border-[rgba(255,255,255,0.22)]" id="remoteIdInput" maxlength="64" placeholder="Peer ID"/>
-      <div class="flex gap-[6px]">
-        <button class="bg-[#d8d8d8] text-[#0a0a0a] border-none rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap" id="callBtn">Call</button>
-        <button class="bg-danger text-[#e8b4b4] border-[rgba(255,255,255,0.05)] rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h hover:opacity-100 active:opacity-[0.65] whitespace-nowrap" id="hangupBtn">Hang up</button>
-      </div>
-    </div>
-
-    <div class="hidden bg-panel border border-border rounded-[8px] p-[12px_14px] flex flex-col gap-[8px] shrink-0" id="incomingCall">
-      <span class="text-[10px] tracking-[0.09em] uppercase text-faint">Incoming Call</span>
-      <div class="text-[12px] text-muted">from <strong class="font-mono text-text" id="callerIdLabel">—</strong></div>
-      <div class="flex gap-[6px]">
-        <button class="bg-[#d8d8d8] text-[#0a0a0a] border-none rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap" id="acceptBtn">Accept</button>
-        <button class="bg-danger text-[#e8b4b4] border-[rgba(255,255,255,0.05)] rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h hover:opacity-100 active:opacity-[0.65] whitespace-nowrap" id="declineBtn">Decline</button>
-      </div>
-    </div>
-
-    <div class="flex-1 min-h-0 flex flex-col gap-[8px] overflow-hidden">
-      <span class="text-[10px] tracking-[0.09em] uppercase text-faint">Status</span>
-      <div class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-[4px] scrollbar-none" id="statusLog">
-        <div class="entry text-[12px] text-muted leading-[1.4] py-[2px] break-word"></div>
-      </div>
-    </div>
-
-    <div class="mt-auto flex flex-col gap-[10px]">
-      <div class="bg-panel border border-border rounded-[8px] p-[10px_14px]">
-        <div class="text-[11px] text-[#2e2e2e] font-mono overflow-hidden text-ellipsis whitespace-nowrap" id="versionTag">--</div>
-      </div>
-      <div class="bg-panel border border-border rounded-[8px] p-[10px_14px]">
-        <div class="text-[11px] text-[#2e2e2e] font-mono overflow-hidden text-ellipsis whitespace-nowrap" id="serverTag">--</div>
-      </div>
-    </div>
-
-  </aside>
-
-  <!-- Main -->
-  <main class="flex flex-col gap-[8px] min-h-0 overflow-hidden">
-    <div class="flex-1 min-h-0 flex flex-col gap-[8px]">
-
-      <div class="flex-1 min-h-0 bg-panel border border-border rounded-[8px] flex flex-col overflow-hidden">
-        <div class="flex items-center justify-between p-[8px_12px] border-b border-border shrink-0">
-          <span class="text-[11px] text-muted">Your Screen</span>
-          <div class="flex items-center gap-[5px]">
-            <span class="text-[10px] text-[#2e2e2e] font-mono" id="localMeta">—</span>
-            <button class="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap" id="broadcastBtn">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-              </svg>
-              Broadcast
+    <!-- App -->
+    <div
+      class="h-[calc(100vh-38px)] grid grid-cols-[272px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden"
+    >
+      <!-- Sidebar -->
+      <aside class="flex flex-col gap-[8px] overflow-hidden min-h-0">
+        <div
+          class="bg-panel border border-border rounded-[8px] p-[12px_14px] flex flex-col gap-[8px] shrink-0"
+        >
+          <span class="text-[10px] tracking-[0.09em] uppercase text-faint"
+            >Your ID</span
+          >
+          <div
+            class="bg-panel-2 border border-border rounded-[5px] p-[8px_10px] font-mono text-[14px] tracking-[0.04em] text-text break-all"
+            id="selfId"
+          >
+            —
+          </div>
+          <div class="flex gap-[6px]">
+            <button
+              class="flex-1 bg-[rgba(255,255,255,0.06)] text-text border border-border rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap"
+              id="copyIdBtn"
+            >
+              Copy
             </button>
-            <button class="hidden bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap" id="changeSourceBtn">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-              Change
+            <button
+              class="flex-1 bg-[rgba(255,255,255,0.06)] text-text border border-border rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap"
+              id="regenIdBtn"
+            >
+              New ID
             </button>
           </div>
         </div>
-        <div class="flex-1 min-h-0 relative bg-[#050505]" id="localVideoWrap">
-          <video class="absolute inset-0 w-full h-full object-contain" id="localVideo" autoplay playsinline muted></video>
+
+        <div
+          class="bg-panel border border-border rounded-[8px] p-[12px_14px] flex flex-col gap-[8px] shrink-0"
+        >
+          <span class="text-[10px] tracking-[0.09em] uppercase text-faint"
+            >Call</span
+          >
+          <input
+            class="w-full bg-panel-2 border border-border text-text rounded-[5px] p-[9px_10px] outline-none text-[13px] font-mono transition-colors duration-140 focus:border-[rgba(255,255,255,0.22)]"
+            id="remoteIdInput"
+            maxlength="64"
+            placeholder="Peer ID"
+          />
+          <div class="flex gap-[6px]">
+            <button
+              class="flex-1 bg-[#d8d8d8] text-[#0a0a0a] border-none rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap"
+              id="callBtn"
+            >
+              Call
+            </button>
+            <button
+              class="flex-1 bg-danger text-[#e8b4b4] border-[rgba(255,255,255,0.05)] rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h hover:opacity-100 active:opacity-[0.65] whitespace-nowrap"
+              id="hangupBtn"
+            >
+              Hang up
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="hidden bg-panel border border-border rounded-[8px] p-[12px_14px] flex flex-col gap-[8px] shrink-0"
+          id="incomingCall"
+        >
+          <span class="text-[10px] tracking-[0.09em] uppercase text-faint"
+            >Incoming Call</span
+          >
+          <div class="text-[12px] text-muted">
+            from
+            <strong class="font-mono text-text" id="callerIdLabel">—</strong>
+          </div>
+          <div class="flex gap-[6px]">
+            <button
+              class="bg-[#d8d8d8] text-[#0a0a0a] border-none rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap"
+              id="acceptBtn"
+            >
+              Accept
+            </button>
+            <button
+              class="bg-danger text-[#e8b4b4] border-[rgba(255,255,255,0.05)] rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h hover:opacity-100 active:opacity-[0.65] whitespace-nowrap"
+              id="declineBtn"
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-1 min-h-0 flex flex-col gap-[8px] overflow-hidden">
+          <span class="text-[10px] tracking-[0.09em] uppercase text-faint"
+            >Status</span
+          >
+          <div
+            class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-[4px] scrollbar-none"
+            id="statusLog"
+          >
+            <div
+              class="entry text-[12px] text-muted leading-[1.4] py-[2px] break-word"
+            ></div>
+          </div>
+        </div>
+
+        <div class="mt-auto flex flex-col gap-[10px]">
+          <div
+            class="bg-panel border border-border rounded-[8px] p-[10px_14px]"
+          >
+            <div
+              class="text-[11px] text-[#2e2e2e] font-mono overflow-hidden text-ellipsis whitespace-nowrap"
+              id="versionTag"
+            >
+              --
+            </div>
+          </div>
+          <div
+            class="bg-panel border border-border rounded-[8px] p-[10px_14px]"
+          >
+            <div
+              class="text-[11px] text-[#2e2e2e] font-mono overflow-hidden text-ellipsis whitespace-nowrap"
+              id="serverTag"
+            >
+              --
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="flex flex-col gap-[8px] min-h-0 overflow-hidden">
+        <div class="flex-1 min-h-0 flex flex-col gap-[8px]">
+          <div
+            class="flex-1 min-h-0 bg-panel border border-border rounded-[8px] flex flex-col overflow-hidden"
+          >
+            <div
+              class="flex items-center justify-between p-[8px_12px] border-b border-border shrink-0"
+            >
+              <span class="text-[11px] text-muted">Your Screen</span>
+              <div class="flex items-center gap-[5px]">
+                <span
+                  class="text-[10px] text-[#2e2e2e] font-mono"
+                  id="localMeta"
+                  >—</span
+                >
+                <button
+                  class="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap"
+                  id="broadcastBtn"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <path d="M8 21h8M12 17v4" />
+                  </svg>
+                  Broadcast
+                </button>
+                <button
+                  class="hidden bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap"
+                  id="changeSourceBtn"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                    />
+                    <path
+                      d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                    />
+                  </svg>
+                  Change
+                </button>
+              </div>
+            </div>
+            <div
+              class="flex-1 min-h-0 relative bg-[#050505]"
+              id="localVideoWrap"
+            >
+              <video
+                class="absolute inset-0 w-full h-full object-contain"
+                id="localVideo"
+                autoplay
+                playsinline
+                muted
+              ></video>
+            </div>
+          </div>
+
+          <div
+            class="flex-1 min-h-0 bg-panel border border-border rounded-[8px] flex flex-col overflow-hidden"
+          >
+            <div
+              class="flex items-center justify-between p-[8px_12px] border-b border-border shrink-0"
+            >
+              <span class="text-[11px] text-muted">Peer Screen</span>
+              <div class="flex items-center gap-[5px]">
+                <span
+                  class="text-[10px] text-[#2e2e2e] font-mono"
+                  id="remoteMeta"
+                  >—</span
+                >
+                <button
+                  class="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap"
+                  id="pipBtn"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <rect
+                      x="12"
+                      y="10"
+                      width="8"
+                      height="5"
+                      rx="1"
+                      fill="currentColor"
+                      stroke="none"
+                    />
+                  </svg>
+                  PiP
+                </button>
+                <button
+                  class="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap"
+                  id="fullscreenBtn"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+                    />
+                  </svg>
+                  Fullscreen
+                </button>
+              </div>
+            </div>
+            <div
+              class="flex-1 min-h-0 relative bg-[#050505]"
+              id="remoteVideoWrap"
+            >
+              <video
+                class="absolute inset-0 w-full h-full object-contain"
+                id="remoteVideo"
+                autoplay
+                playsinline
+              ></video>
+              <div
+                class="fixed bottom-0 left-0 right-0 h-[64px] fs-gradient flex items-center justify-between px-[20px] z-[10000] hidden"
+                id="fsControls"
+              >
+                <span class="text-[13px] text-[#bbb]">Peer Screen</span>
+                <button
+                  class="bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.15)] rounded-[6px] p-[8px_14px] text-[#ccc] text-[12px] cursor-pointer hover:bg-[rgba(255,255,255,0.15)] hover:text-white"
+                  id="fsExitBtn"
+                >
+                  Close (Esc)
+                </button>
+              </div>
+              <div
+                class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[rgba(0,0,0,0.7)] border border-[rgba(255,255,255,0.2)] rounded-[50%] w-[64px] h-[64px] flex items-center justify-center cursor-pointer z-[10000] hidden hover:bg-[rgba(180,40,40,0.6)]"
+                id="fsCenterClose"
+              >
+                <svg
+                  class="w-[28px] h-[28px] text-white"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Source Picker Overlay -->
+    <div
+      class="fixed inset-0 bg-[rgba(0,0,0,0.75)] backdrop-blur-[4px] z-[100] hidden items-center justify-center"
+      id="sourcePickerOverlay"
+    >
+      <div
+        class="bg-[#151515] border border-[rgba(255,255,255,0.12)] rounded-[10px] p-[18px] w-[min(820px,92vw)] max-h-[80vh] flex flex-col gap-[14px]"
+      >
+        <div class="flex items-center justify-between">
+          <span class="text-[13px] font-semibold text-text"
+            >Select Broadcast Source</span
+          >
+          <button
+            class="bg-[rgba(255,255,255,0.06)] text-text border border-border rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]"
+            id="sourcePickerClose"
+          >
+            Cancel
+          </button>
+        </div>
+        <div
+          class="overflow-y-auto flex-1 min-h-0"
+          id="sourcePickerContent"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Confirm Dialog Overlay -->
+    <div
+      class="fixed inset-0 bg-[rgba(0,0,0,0.75)] backdrop-blur-[4px] z-[100] hidden items-center justify-center"
+      id="confirmOverlay"
+    >
+      <div
+        class="bg-[#151515] border border-[rgba(255,255,255,0.12)] rounded-[10px] p-[20px_22px] w-[min(340px,90vw)] flex flex-col gap-[16px]"
+      >
+        <div class="text-[13px] text-text leading-[1.5]" id="confirmMsg"></div>
+        <div class="flex gap-[6px]">
+          <button
+            class="bg-[#d8d8d8] text-[#0a0a0a] border-none rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]"
+            id="confirmOk"
+          >
+            Confirm
+          </button>
+          <button
+            class="bg-[rgba(255,255,255,0.06)] text-text border border-border rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]"
+            id="confirmCancel"
+          >
+            Cancel
+          </button>
         </div>
       </div>
-
-      <div class="flex-1 min-h-0 bg-panel border border-border rounded-[8px] flex flex-col overflow-hidden">
-        <div class="flex items-center justify-between p-[8px_12px] border-b border-border shrink-0">
-          <span class="text-[11px] text-muted">Peer Screen</span>
-          <div class="flex items-center gap-[5px]">
-            <span class="text-[10px] text-[#2e2e2e] font-mono" id="remoteMeta">—</span>
-            <button class="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap" id="pipBtn">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/>
-                <rect x="12" y="10" width="8" height="5" rx="1" fill="currentColor" stroke="none"/>
-              </svg>
-              PiP
-            </button>
-            <button class="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap" id="fullscreenBtn">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-              </svg>
-              Fullscreen
-            </button>
-          </div>
-        </div>
-        <div class="flex-1 min-h-0 relative bg-[#050505]" id="remoteVideoWrap">
-          <video class="absolute inset-0 w-full h-full object-contain" id="remoteVideo" autoplay playsinline></video>
-          <div class="fixed bottom-0 left-0 right-0 h-[64px] fs-gradient flex items-center justify-between px-[20px] z-[10000] hidden" id="fsControls">
-            <span class="text-[13px] text-[#bbb]">Peer Screen</span>
-            <button class="bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.15)] rounded-[6px] p-[8px_14px] text-[#ccc] text-[12px] cursor-pointer hover:bg-[rgba(255,255,255,0.15)] hover:text-white" id="fsExitBtn">Close (Esc)</button>
-          </div>
-          <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[rgba(0,0,0,0.7)] border border-[rgba(255,255,255,0.2)] rounded-[50%] w-[64px] h-[64px] flex items-center justify-center cursor-pointer z-[10000] hidden hover:bg-[rgba(180,40,40,0.6)]" id="fsCenterClose">
-            <svg class="w-[28px] h-[28px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-
     </div>
-  </main>
-</div>
 
-<!-- Source Picker Overlay -->
-<div class="fixed inset-0 bg-[rgba(0,0,0,0.75)] backdrop-blur-[4px] z-[100] hidden items-center justify-center" id="sourcePickerOverlay">
-  <div class="bg-[#151515] border border-[rgba(255,255,255,0.12)] rounded-[10px] p-[18px] w-[min(820px,92vw)] max-h-[80vh] flex flex-col gap-[14px]">
-    <div class="flex items-center justify-between">
-      <span class="text-[13px] font-semibold text-text">Select Broadcast Source</span>
-      <button class="bg-[rgba(255,255,255,0.06)] text-text border border-border rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]" id="sourcePickerClose">Cancel</button>
-    </div>
-    <div class="overflow-y-auto flex-1 min-h-0" id="sourcePickerContent"></div>
-  </div>
-</div>
-
-<!-- Confirm Dialog Overlay -->
-<div class="fixed inset-0 bg-[rgba(0,0,0,0.75)] backdrop-blur-[4px] z-[100] hidden items-center justify-center" id="confirmOverlay">
-  <div class="bg-[#151515] border border-[rgba(255,255,255,0.12)] rounded-[10px] p-[20px_22px] w-[min(340px,90vw)] flex flex-col gap-[16px]">
-    <div class="text-[13px] text-text leading-[1.5]" id="confirmMsg"></div>
-    <div class="flex gap-[6px]">
-      <button class="bg-[#d8d8d8] text-[#0a0a0a] border-none rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]" id="confirmOk">Confirm</button>
-      <button class="bg-[rgba(255,255,255,0.06)] text-text border border-border rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]" id="confirmCancel">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<script src="./renderer.js"></script>
-</body>
+    <script src="./renderer.js"></script>
+  </body>
 </html>
