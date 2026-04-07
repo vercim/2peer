@@ -104,9 +104,17 @@ async function showSourcePicker() {
       const lbl = document.createElement("div");
       lbl.className = "source-section-label";
       lbl.textContent = label;
+      // Center section labels horizontally
+      lbl.style.display = "block";
+      lbl.style.width = "100%";
+      lbl.style.textAlign = "center";
       sourcePickerContent.appendChild(lbl);
       const grid = document.createElement("div");
       grid.className = "source-grid";
+      // Make the list of windows a responsive CSS grid
+      grid.style.display = "grid";
+      grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(120px, 1fr))";
+      grid.style.gap = "12px";
       items.forEach((src) => {
         const item = document.createElement("div");
         item.className = "source-item";
@@ -624,6 +632,9 @@ async function startCall() {
 
 function handleIncomingCall({ from, offer }) {
   incomingCallData = { from, offer };
+  // Show the incoming call widget: remove any hidden state and display it
+  incomingCallEl.classList.remove("hidden");
+  incomingCallEl.classList.add("flex");
   incomingCallEl.classList.add("active");
   callerIdLabel.textContent = from;
   setStatus(
@@ -635,7 +646,9 @@ async function acceptCall() {
   if (!incomingCallData) return;
   const { from, offer } = incomingCallData;
   incomingCallData = null;
+  // Hide the incoming call widget after accepting
   incomingCallEl.classList.remove("active");
+  incomingCallEl.classList.add("hidden");
   if (pc) {
     pc.getSenders().forEach((s) => s.track?.stop());
     pc.close();
@@ -658,7 +671,9 @@ function declineCall() {
   if (!incomingCallData) return;
   const { from } = incomingCallData;
   incomingCallData = null;
+  // Hide the incoming call widget after declining
   incomingCallEl.classList.remove("active");
+  incomingCallEl.classList.add("hidden");
   send({ type: "decline", to: from });
   setStatus(
     `Call from <strong style="font-family:monospace">${from}</strong> declined.`,
@@ -731,7 +746,9 @@ function hangup(notify = true) {
   currentPeerId = "";
   pendingIce = [];
   incomingCallData = null;
+  // Ensure incoming call widget is hidden when hangup occurs
   incomingCallEl.classList.remove("active");
+  incomingCallEl.classList.add("hidden");
   statusDot.style.backgroundColor = "#888";
   cleanupLocalStream();
   cleanupRemoteStream();

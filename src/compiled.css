@@ -215,6 +215,9 @@
   .mt-auto {
     margin-top: auto;
   }
+  .block {
+    display: block;
+  }
   .flex {
     display: flex;
   }
@@ -284,8 +287,8 @@
   .w-\[min\(340px\,90vw\)\] {
     width: min(340px, 90vw);
   }
-  .w-\[min\(820px\,92vw\)\] {
-    width: min(820px, 92vw);
+  .w-\[min\(700px\,92vw\)\] {
+    width: min(700px, 92vw);
   }
   .w-full {
     width: 100%;
