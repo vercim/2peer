@@ -166,6 +166,9 @@ broadcastBtn.addEventListener('click', async () => {
           pc.removeTrack(sender);
         }
       }
+      if (currentPeerId && pc.connectionState === 'connected') {
+        send({ type: 'stop-broadcast', to: currentPeerId });
+      }
     }
     isBroadcasting = false;
     broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -312,6 +315,9 @@ async function ensureLocalScreen() {
           sender.track.stop();
           pc.removeTrack(sender);
         }
+      }
+      if (currentPeerId && pc.connectionState === 'connected') {
+        send({ type: 'stop-broadcast', to: currentPeerId });
       }
     }
   };
@@ -502,6 +508,9 @@ async function handleSignal(msg) {
   if (msg.type === 'candidate') await handleCandidate(msg);
   if (msg.type === 'renegotiate') await handleRenegotiate(msg);
   if (msg.type === 'renegotiate-answer') await handleRenegotiateAnswer(msg);
+  if (msg.type === 'stop-broadcast') {
+    handleRemoteBroadcastStopped();
+  }
   if (msg.type === 'decline') {
     setStatus(`<strong style="font-family:monospace">${msg.from}</strong> отклонил звонок.`);
     hangup(false);
@@ -511,6 +520,22 @@ async function handleSignal(msg) {
     hangup(false);
   }
   if (msg.type === 'error') setStatus(msg.message, true);
+}
+
+function handleRemoteBroadcastStopped() {
+  console.log('[handleRemoteBroadcastStopped]');
+  remoteVideo.srcObject = null;
+  remoteMeta.textContent = '—';
+  if (pc) {
+    const senders = pc.getSenders();
+    for (const sender of senders) {
+      if (sender.track && sender.track.kind === 'video') {
+        sender.track.stop();
+        pc.removeTrack(sender);
+      }
+    }
+  }
+  setStatus('Трансляция собеседника завершена.');
 }
 
 // ── Call flow ─────────────────────────────────────────────────────────────────
@@ -580,6 +605,16 @@ async function handleRenegotiate({ from, offer }) {
     console.log('[handleRenegotiate] no pc or closed');
     return;
   }
+  
+  if (pc.getSenders().some(s => s.track && s.track.kind === 'video')) {
+    pc.getSenders().forEach(s => {
+      if (s.track && s.track.kind === 'video') {
+        s.track.stop();
+        pc.removeTrack(s);
+      }
+    });
+  }
+  
   await pc.setRemoteDescription(offer);
   for (const c of pendingIce) await pc.addIceCandidate(c);
   pendingIce = [];
@@ -592,6 +627,16 @@ async function handleRenegotiate({ from, offer }) {
 async function handleRenegotiateAnswer({ from, answer }) {
   console.log('[handleRenegotiateAnswer] from', from);
   if (!pc) return;
+  
+  if (pc.getSenders().some(s => s.track && s.track.kind === 'video')) {
+    pc.getSenders().forEach(s => {
+      if (s.track && s.track.kind === 'video') {
+        s.track.stop();
+        pc.removeTrack(s);
+      }
+    });
+  }
+  
   await pc.setRemoteDescription(answer);
   pc.getSenders().forEach(applyMaxQualityEncoding);
   setStatus('Видеотрансляция началась.');
