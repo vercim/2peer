@@ -5,7 +5,7 @@ const callBtn             = document.getElementById('callBtn');
 const hangupBtn           = document.getElementById('hangupBtn');
 const copyIdBtn           = document.getElementById('copyIdBtn');
 const regenIdBtn          = document.getElementById('regenIdBtn');
-const statusText          = document.getElementById('statusText');
+const statusLog           = document.getElementById('statusLog');
 const localVideo          = document.getElementById('localVideo');
 const remoteVideo         = document.getElementById('remoteVideo');
 const localMeta           = document.getElementById('localMeta');
@@ -19,6 +19,8 @@ const confirmOverlay      = document.getElementById('confirmOverlay');
 const confirmMsg          = document.getElementById('confirmMsg');
 const confirmOk           = document.getElementById('confirmOk');
 const confirmCancel       = document.getElementById('confirmCancel');
+const broadcastBtn        = document.getElementById('broadcastBtn');
+const changeSourceBtn     = document.getElementById('changeSourceBtn');
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let selfId           = '';
@@ -144,43 +146,108 @@ function showSourcePicker() {
   });
 }
 
-document.getElementById('pickSourceBtn').addEventListener('click', async () => {
-  const sourceId = await showSourcePicker();
-  if (!sourceId) return;
-  if (localStream) {
-    localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
-    localVideo.srcObject = null;
-  }
-  try {
-    await ensureLocalScreen();
+let isBroadcasting = false;
+
+broadcastBtn.addEventListener('click', async () => {
+  if (isBroadcasting) {
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+      localVideo.srcObject = null;
+    }
     if (pc) {
       const senders = pc.getSenders();
-      const [newTrack] = localStream.getVideoTracks();
       for (const sender of senders) {
         if (sender.track && sender.track.kind === 'video') {
-          await sender.replaceTrack(newTrack);
-          setTimeout(() => applyMaxQualityEncoding(sender), 400);
+          sender.track.stop();
+          pc.removeTrack(sender);
         }
       }
     }
-    setStatus('Источник трансляции изменён.');
+    isBroadcasting = false;
+    broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              Транслировать`;
+    changeSourceBtn.classList.add('hidden');
+    localMeta.textContent = '—';
+    setStatus('Трансляция остановлена.');
+    return;
+  }
+
+  const sourceId = await showSourcePicker();
+  if (!sourceId) return;
+
+  try {
+    await ensureLocalScreen();
+    if (pc) {
+      await attachLocalTracks();
+    }
+    isBroadcasting = true;
+    broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              Остановить`;
+    changeSourceBtn.classList.remove('hidden');
+    setStatus('Трансляция началась.');
   } catch(e) {
     setStatus(e.message || 'Не удалось захватить экран.', true);
   }
 });
 
+changeSourceBtn.addEventListener('click', async () => {
+  const sourceId = await showSourcePicker();
+  if (!sourceId) return;
+
+  try {
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+    }
+    if (pc) {
+      const senders = pc.getSenders();
+      for (const sender of senders) {
+        if (sender.track && sender.track.kind === 'video') {
+          sender.track.stop();
+          pc.removeTrack(sender);
+        }
+      }
+    }
+    
+    await ensureLocalScreen();
+    if (pc) {
+      await attachLocalTracks();
+    }
+    setStatus('Источник трансляции изменён.');
+  } catch(e) {
+    setStatus(e.message || 'Не удалось сменить источник.', true);
+  }
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function setStatus(msg, isErr = false) {
-  statusText.innerHTML = isErr
-    ? `<span style="color:#b44">${msg}</span>`
-    : msg;
+  const entry = document.createElement('div');
+  entry.className = 'entry' + (isErr ? ' error' : '');
+  entry.innerHTML = msg;
+  statusLog.appendChild(entry);
+  statusLog.scrollTop = statusLog.scrollHeight;
+  
+  while (statusLog.children.length > 50) {
+    statusLog.removeChild(statusLog.firstChild);
+  }
 }
 
 function cleanupLocalStream() {
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
   localVideo.srcObject = null;
   localMeta.textContent = '—';
+  if (isBroadcasting) {
+    isBroadcasting = false;
+    broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              Транслировать`;
+    changeSourceBtn.classList.add('hidden');
+  }
 }
 
 function cleanupRemoteStream() {
@@ -209,7 +276,30 @@ async function ensureLocalScreen() {
     width: { ideal: 7680 }, height: { ideal: 4320 }, frameRate: { ideal: 60, max: 60 }
   }).catch(() => {});
 
-  track.onended = () => { setStatus('Трансляция остановлена.'); hangup(false); };
+  track.onended = () => { 
+    setStatus('Трансляция остановлена.');
+    isBroadcasting = false;
+    broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              Транслировать`;
+    changeSourceBtn.classList.add('hidden');
+    localMeta.textContent = '—';
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+      localVideo.srcObject = null;
+    }
+    if (pc) {
+      const senders = pc.getSenders();
+      for (const sender of senders) {
+        if (sender.track && sender.track.kind === 'video') {
+          sender.track.stop();
+          pc.removeTrack(sender);
+        }
+      }
+    }
+  };
 
   localStream = stream;
   localVideo.srcObject = stream;
@@ -278,7 +368,8 @@ function createPeerConnection(peerId) {
 }
 
 async function attachLocalTracks() {
-  const stream = await ensureLocalScreen();
+  if (!localStream || !localStream.active) return;
+  const stream = localStream;
   const existing = new Set((pc.getSenders() || []).map(s => s.track?.id).filter(Boolean));
   for (const track of stream.getTracks()) {
     if (!existing.has(track.id)) {
@@ -487,6 +578,11 @@ function hangup(notify = true) {
 }
 
 // ── PiP & Fullscreen ──────────────────────────────────────────────────────────
+const fullscreenOverlay = document.getElementById('fullscreenOverlay');
+const fullscreenVideo = document.getElementById('fullscreenVideo');
+const fullscreenLabel = document.getElementById('fullscreenLabel');
+let fsControlsTimeout = null;
+
 document.getElementById('pipBtn').addEventListener('click', async () => {
   try {
     if (document.pictureInPictureElement) await document.exitPictureInPicture();
@@ -497,16 +593,47 @@ document.getElementById('pipBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('fullscreenBtn').addEventListener('click', () => {
-  if (remoteVideo.requestFullscreen) remoteVideo.requestFullscreen();
-  else if (remoteVideo.webkitRequestFullscreen) remoteVideo.webkitRequestFullscreen();
+  openFullscreen(remoteVideo, 'Экран собеседника');
 });
 
-remoteVideo.addEventListener('dblclick', () => {
-  if (remoteVideo.requestFullscreen) remoteVideo.requestFullscreen();
+document.getElementById('fsExitBtn').addEventListener('click', closeFullscreen);
+
+fullscreenOverlay.addEventListener('click', (e) => {
+  if (e.target === fullscreenOverlay || e.target.closest('.fullscreen-video-wrap')) {
+    closeFullscreen();
+  }
 });
-localVideo.addEventListener('dblclick', () => {
-  if (localVideo.requestFullscreen) localVideo.requestFullscreen();
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && fullscreenOverlay.classList.contains('active')) {
+    closeFullscreen();
+  }
 });
+
+function openFullscreen(videoEl, label) {
+  fullscreenVideo.srcObject = videoEl.srcObject;
+  fullscreenLabel.textContent = label;
+  fullscreenOverlay.classList.add('active');
+  
+  const showControls = () => {
+    fullscreenOverlay.classList.add('show-controls');
+    clearTimeout(fsControlsTimeout);
+    fsControlsTimeout = setTimeout(() => {
+      fullscreenOverlay.classList.remove('show-controls');
+    }, 2500);
+  };
+  
+  fullscreenOverlay.addEventListener('mousemove', showControls, { once: true });
+  showControls();
+}
+
+function closeFullscreen() {
+  fullscreenOverlay.classList.remove('active');
+  fullscreenVideo.srcObject = null;
+  clearTimeout(fsControlsTimeout);
+}
+
+
 
 // ── Event listeners ───────────────────────────────────────────────────────────
 copyIdBtn.addEventListener('click', async () => {
