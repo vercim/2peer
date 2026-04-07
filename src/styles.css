@@ -456,6 +456,9 @@
   .hidden {
     display: none;
   }
+  #incomingCall.active {
+    display: flex;
+  }
   .h-7 {
     height: calc(var(--spacing) * 7);
   }
