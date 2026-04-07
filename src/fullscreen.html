@@ -3,77 +3,19 @@
 <head>
   <meta charset="UTF-8"/>
   <title>2peer - fullscreen</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      width: 100vw; height: 100vh;
-      background: #000;
-      overflow: hidden;
-      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-    }
-    .wrap {
-      width: 100%; height: 100%;
-      display: flex; align-items: center; justify-content: center;
-      position: relative;
-    }
-    video {
-      max-width: 100%; max-height: 100%;
-      object-fit: contain;
-    }
-    .controls {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 64px;
-      background: linear-gradient(transparent, rgba(0,0,0,0.9));
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 20px;
-      opacity: 0;
-      transition: opacity 300ms ease;
-    }
-    body:hover .controls,
-    body.show-controls .controls { opacity: 1; }
-    .label { font-size: 13px; color: #bbb; }
-    .btn {
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 6px;
-      padding: 8px 14px;
-      color: #ccc;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    .btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
-    .center-close {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.7);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 50%;
-      width: 64px; height: 64px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      opacity: 0;
-      transition: opacity 300ms ease;
-    }
-    .center-close:hover { background: rgba(180,40,40,0.6); }
-    .center-close.visible { opacity: 1; }
-    .center-close svg { width: 28px; height: 28px; color: #fff; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <div class="wrap">
-    <video id="fsVideo" autoplay playsinline></video>
-    <div class="center-close" id="centerClose">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<body class="w-screen h-screen bg-black overflow-hidden font-sans">
+  <div class="w-full h-full flex items-center justify-center relative">
+    <video class="max-w-full max-h-full object-contain" id="fsVideo" autoplay playsinline></video>
+    <div class="fs-center-close absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[rgba(0,0,0,0.7)] border border-[rgba(255,255,255,0.2)] rounded-full w-16 h-16 flex items-center justify-center cursor-pointer hover:bg-[rgba(180,40,40,0.6)]" id="centerClose">
+      <svg class="w-7 h-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 6L6 18M6 6l12 12"/>
       </svg>
     </div>
-    <div class="controls">
-      <span class="label" id="videoLabel">Peer Screen</span>
-      <button class="btn" id="closeBtn">Close (Esc)</button>
+    <div class="fs-controls absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-between px-5">
+      <span class="text-[13px] text-[#bbb]" id="videoLabel">Peer Screen</span>
+      <button class="bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.15)] rounded-[6px] py-2 px-[14px] text-[#ccc] text-[12px] cursor-pointer hover:bg-[rgba(255,255,255,0.15)] hover:text-white" id="closeBtn">Close (Esc)</button>
     </div>
   </div>
   <script>

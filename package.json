@@ -1,6 +1,6 @@
 {
   "name": "2peer",
-  "version": "0.3.0",
+  "version": "04.1",
   "description": "2peer",
   "main": "src/main.js",
   "scripts": {
@@ -15,24 +15,34 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.2.2",
     "electron": "^35.0.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "tailwindcss": "^4.2.2"
   },
   "build": {
     "appId": "dev.vercim.2peer",
     "productName": "2peer",
     "mac": {
       "icon": "assets/icon.icns",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "category": "public.app-category.utilities"
     },
     "win": {
       "icon": "assets/icon.ico",
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "linux": {
       "icon": "assets/icon.png",
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     },
     "nsis": {
       "oneClick": false,
