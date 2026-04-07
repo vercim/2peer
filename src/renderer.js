@@ -38,246 +38,6 @@ let isPolite         = false;
 let incomingCallData = null;
 let reconnectTimer   = null;
 
-let audioCtx = null;
-let audioReady = false;
-
-async function initAudio() {
-  if (audioReady) return true;
-  try {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-      await audioCtx.resume();
-    }
-    audioReady = true;
-    return true;
-  } catch (e) {
-    console.log('[audio] init failed:', e);
-    return false;
-  }
-}
-
-document.addEventListener('click', () => initAudio(), { once: true });
-document.addEventListener('keydown', () => initAudio(), { once: true });
-
-function playSound(type) {
-  if (!audioReady && audioCtx && audioCtx.state === 'suspended') {
-    console.log('[audio] not ready, skipping');
-    return;
-  }
-  
-  try {
-    if (!audioCtx || audioCtx.state === 'closed') {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    
-    const now = audioCtx.currentTime;
-    
-    if (type === 'incoming') {
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, now);
-      osc.frequency.exponentialRampToValueAtTime(440, now + 0.15);
-      gain.gain.setValueAtTime(0.3, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-      osc.start(now);
-      osc.stop(now + 0.15);
-    } else if (type === 'accepted') {
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(523, now);
-      osc.frequency.setValueAtTime(659, now + 0.08);
-      gain.gain.setValueAtTime(0.3, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-      osc.start(now);
-      osc.stop(now + 0.2);
-    } else if (type === 'ended') {
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(400, now);
-      osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
-      gain.gain.setValueAtTime(0.3, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-      osc.start(now);
-      osc.stop(now + 0.1);
-    }
-  } catch (e) {
-    console.log('[playSound] error:', e.message);
-  }
-}
-
-const rtcConfig = {
-  iceServers: [
-    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-    { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-  ]
-};
-
-// ── Window controls ───────────────────────────────────────────────────────────
-document.getElementById('btnMinimize').addEventListener('click', () => window.electronAPI.minimizeWindow());
-document.getElementById('btnClose').addEventListener('click',    () => window.electronAPI.closeWindow());
-
-// ── Confirm dialog ────────────────────────────────────────────────────────────
-function showConfirm(message) {
-  return new Promise((resolve) => {
-    confirmMsg.innerHTML = message;
-    confirmOverlay.classList.remove('hidden');
-    const onOk     = () => { cleanup(); resolve(true);  };
-    const onCancel = () => { cleanup(); resolve(false); };
-    function cleanup() {
-      confirmOverlay.classList.add('hidden');
-      confirmOk.removeEventListener('click', onOk);
-      confirmCancel.removeEventListener('click', onCancel);
-    }
-    confirmOk.addEventListener('click', onOk);
-    confirmCancel.addEventListener('click', onCancel);
-  });
-}
-
-// ── Source picker ─────────────────────────────────────────────────────────────
-function showSourcePicker() {
-  return new Promise(async (resolve) => {
-    const sources = await window.electronAPI.getSources();
-    sourcePickerContent.innerHTML = '';
-    const screens = sources.filter(s => s.isScreen);
-    const windows = sources.filter(s => !s.isScreen);
-
-    function renderSection(label, items) {
-      if (!items.length) return;
-      const lbl = document.createElement('div');
-      lbl.className = 'source-section-label';
-      lbl.textContent = label;
-      sourcePickerContent.appendChild(lbl);
-      const grid = document.createElement('div');
-      grid.className = 'source-grid';
-      items.forEach(src => {
-        const item = document.createElement('div');
-        item.className = 'source-item';
-        item.innerHTML = `
-          <img class="source-thumb" src="${src.thumbnail}" alt="" />
-          <div class="source-name">${src.name}</div>
-        `;
-        item.addEventListener('click', async () => {
-          await window.electronAPI.setPendingSource(src.id);
-          sourcePickerOverlay.classList.add('hidden');
-          resolve(src.id);
-        });
-        grid.appendChild(item);
-      });
-      sourcePickerContent.appendChild(grid);
-    }
-
-    renderSection('Экраны', screens);
-    renderSection('Окна', windows);
-    sourcePickerOverlay.classList.remove('hidden');
-
-    const closeBtn = document.getElementById('sourcePickerClose');
-    const onClose = () => {
-      sourcePickerOverlay.classList.add('hidden');
-      closeBtn.removeEventListener('click', onClose);
-      resolve(null);
-    };
-    closeBtn.addEventListener('click', onClose);
-  });
-}
-
-let isBroadcasting = false;
-let isStoppingBroadcast = false;
-
-broadcastBtn.addEventListener('click', async () => {
-  if (isBroadcasting) {
-    stopBroadcast();
-    return;
-  }
-
-  const sourceId = await showSourcePicker();
-  if (!sourceId) return;
-
-  try {
-    await ensureLocalScreen();
-    await startBroadcast();
-  } catch(e) {
-    setStatus(e.message || 'Не удалось захватить экран.', true);
-  }
-});
-
-async function startBroadcast() {
-  if (!localStream || !localStream.active) {
-    setStatus('Нет трансляции для отправки.', true);
-    return;
-  }
-  
-  localVideo.srcObject = localStream;
-  
-  if (pc && pc.connectionState === 'connected' && currentPeerId) {
-    await attachLocalTracks();
-    await new Promise(r => setTimeout(r, 100));
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
-  }
-  
-  isBroadcasting = true;
-  broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-              </svg>
-              Остановить`;
-  changeSourceBtn.classList.remove('hidden');
-  setStatus('Трансляция началась.');
-}
-
-function stopBroadcast() {
-  if (isStoppingBroadcast) return;
-  isStoppingBroadcast = true;
-  
-  if (localStream) {
-    localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
-    localVideo.srcObject = null;
-  }
-  
-  isBroadcasting = false;
-  broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-              </svg>
-              Транслировать`;
-  changeSourceBtn.classList.add('hidden');
-  localMeta.textContent = '—';
-  setStatus('Трансляция остановлена.');
-  
-  if (currentPeerId && pc && pc.connectionState === 'connected') {
-    send({ type: 'stop-broadcast', to: currentPeerId });
-  }
-  
-  setTimeout(() => { isStoppingBroadcast = false; }, 100);
-}
-
-changeSourceBtn.addEventListener('click', async () => {
-  const sourceId = await showSourcePicker();
-  if (!sourceId) return;
-
-  try {
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
-    }
-    
-    await ensureLocalScreen();
-    await startBroadcast();
-    setStatus('Источник трансляции изменён.');
-  } catch(e) {
-    setStatus(e.message || 'Не удалось сменить источник.', true);
-  }
-});
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function setStatus(msg, isErr = false) {
   const entry = document.createElement('div');
   entry.className = 'entry' + (isErr ? ' error' : '');
@@ -376,6 +136,7 @@ function createPeerConnection(peerId) {
   remoteVideo.srcObject = remoteStream;
 
   pc.ontrack = (event) => {
+    document.getElementById('remoteVideoWrap').classList.remove('placeholder');
     event.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
     const s = event.track.getSettings ? event.track.getSettings() : {};
     remoteMeta.textContent = `${s.width||'?'}×${s.height||'?'} @${Math.round(s.frameRate||'?')}fps`;
@@ -574,6 +335,7 @@ function handleRemoteBroadcastStopped() {
     stream.getTracks().forEach(t => t.stop());
     remoteVideo.srcObject = null;
   }
+  document.getElementById('remoteVideoWrap').classList.add('placeholder');
   remoteMeta.textContent = '—';
   setStatus('Трансляция собеседника завершена.');
 }
@@ -598,7 +360,6 @@ function handleIncomingCall({ from, offer }) {
   incomingCallData = { from, offer };
   incomingCallEl.classList.add('active');
   callerIdLabel.textContent = from;
-  playSound('incoming');
   setStatus(`Входящий звонок от <strong style="font-family:monospace">${from}</strong>.`);
 }
 
@@ -616,7 +377,6 @@ async function acceptCall() {
   pendingIce = [];
   await pc.setLocalDescription(await pc.createAnswer());
   send({ type: 'answer', to: from, answer: pc.localDescription });
-  playSound('accepted');
   setStatus(`Звонок принят. Подключаемся к <strong style="font-family:monospace">${from}</strong>...`);
 }
 
@@ -625,7 +385,6 @@ function declineCall() {
   const { from } = incomingCallData;
   incomingCallData = null;
   incomingCallEl.classList.remove('active');
-  playSound('ended');
   send({ type: 'decline', to: from });
   setStatus(`Вызов от <strong style="font-family:monospace">${from}</strong> отклонён.`);
 }
@@ -671,7 +430,6 @@ async function handleCandidate({ candidate }) {
 function hangup(notify = true) {
   if (notify && currentPeerId) {
     send({ type: 'hangup', to: currentPeerId });
-    playSound('ended');
   }
   if (outChannel) {
     supabaseClient?.removeChannel(outChannel).catch(() => {});
@@ -703,6 +461,17 @@ document.getElementById('pipBtn').addEventListener('click', async () => {
 });
 
 let fsWindowOpen = false;
+let fsHideTimeout = null;
+
+function showFsControls() {
+  document.getElementById('fsControls').classList.add('visible');
+  document.getElementById('fsCenterClose').classList.add('visible');
+  clearTimeout(fsHideTimeout);
+  fsHideTimeout = setTimeout(() => {
+    document.getElementById('fsControls').classList.remove('visible');
+    document.getElementById('fsCenterClose').classList.remove('visible');
+  }, 3000);
+}
 
 document.getElementById('fullscreenBtn').addEventListener('click', async () => {
   const wrap = document.getElementById('remoteVideoWrap');
@@ -712,6 +481,11 @@ document.getElementById('fullscreenBtn').addEventListener('click', async () => {
     await wrap.webkitRequestFullscreen();
   }
   fsWindowOpen = true;
+  showFsControls();
+});
+
+document.addEventListener('mousemove', () => {
+  if (fsWindowOpen) showFsControls();
 });
 
 document.getElementById('fsExitBtn').addEventListener('click', () => {
@@ -733,12 +507,14 @@ document.getElementById('fsCenterClose').addEventListener('click', () => {
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement) {
     fsWindowOpen = false;
+    clearTimeout(fsHideTimeout);
   }
 });
 
 document.addEventListener('webkitfullscreenchange', () => {
   if (!document.webkitFullscreenElement) {
     fsWindowOpen = false;
+    clearTimeout(fsHideTimeout);
   }
 });
 
@@ -800,8 +576,6 @@ window.addEventListener('beforeunload', () => hangup(true));
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async function init() {
-  await initAudio();
-  
   const profile = await window.electronAPI.getProfile();
   const version = await window.electronAPI.getVersion();
   versionTag.textContent = 'v' + version;
