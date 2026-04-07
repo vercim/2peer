@@ -275,6 +275,57 @@
       height: 100vh;
       object-fit: contain;
     }
+    .fs-controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.9));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      opacity: 0;
+      transition: opacity 300ms ease;
+      z-index: 10000;
+      pointer-events: none;
+    }
+    .video-wrap:fullscreen:hover .fs-controls,
+    .fs-controls.visible { opacity: 1; pointer-events: auto; }
+    .fs-label { font-size: 13px; color: #bbb; }
+    .fs-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      padding: 8px 14px;
+      color: #ccc;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .fs-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .fs-center-close {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.7);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50%;
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 300ms ease;
+      z-index: 10000;
+    }
+    .fs-center-close:hover { background: rgba(180,40,40,0.6); }
+    .video-wrap:fullscreen:hover .fs-center-close,
+    .fs-center-close.visible { opacity: 1; }
+    .fs-center-close svg { width: 28px; height: 28px; color: #fff; }
     video {
       position: absolute;
       inset: 0;
@@ -503,6 +554,15 @@
         </div>
         <div class="video-wrap" id="remoteVideoWrap">
           <video id="remoteVideo" autoplay playsinline></video>
+          <div class="fs-controls" id="fsControls">
+            <span class="fs-label">Экран собеседника</span>
+            <button class="fs-btn" id="fsExitBtn">Закрыть (Esc)</button>
+          </div>
+          <div class="fs-center-close" id="fsCenterClose">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </div>
         </div>
       </div>
 

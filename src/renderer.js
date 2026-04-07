@@ -39,8 +39,34 @@ let incomingCallData = null;
 let reconnectTimer   = null;
 
 let audioCtx = null;
+let audioReady = false;
+
+async function initAudio() {
+  if (audioReady) return true;
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
+    audioReady = true;
+    return true;
+  } catch (e) {
+    console.log('[audio] init failed:', e);
+    return false;
+  }
+}
+
+document.addEventListener('click', () => initAudio(), { once: true });
+document.addEventListener('keydown', () => initAudio(), { once: true });
 
 function playSound(type) {
+  if (!audioReady && audioCtx && audioCtx.state === 'suspended') {
+    console.log('[audio] not ready, skipping');
+    return;
+  }
+  
   try {
     if (!audioCtx || audioCtx.state === 'closed') {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -688,6 +714,22 @@ document.getElementById('fullscreenBtn').addEventListener('click', async () => {
   fsWindowOpen = true;
 });
 
+document.getElementById('fsExitBtn').addEventListener('click', () => {
+  if (document.exitFullscreen) {
+    document.exitFullscreen();
+  } else if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  }
+});
+
+document.getElementById('fsCenterClose').addEventListener('click', () => {
+  if (document.exitFullscreen) {
+    document.exitFullscreen();
+  } else if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  }
+});
+
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement) {
     fsWindowOpen = false;
@@ -697,6 +739,16 @@ document.addEventListener('fullscreenchange', () => {
 document.addEventListener('webkitfullscreenchange', () => {
   if (!document.webkitFullscreenElement) {
     fsWindowOpen = false;
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && fsWindowOpen) {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
   }
 });
 
@@ -748,6 +800,8 @@ window.addEventListener('beforeunload', () => hangup(true));
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async function init() {
+  await initAudio();
+  
   const profile = await window.electronAPI.getProfile();
   const version = await window.electronAPI.getVersion();
   versionTag.textContent = 'v' + version;
