@@ -1,40 +1,40 @@
 # 2peer
 
-Приложение для прямого пирингового стриминга экрана между двумя компьютерами. Без серверов, без регистрации — просто подключись к другому пользователю по ID и начни демонстрацию.
+A peer-to-peer screen streaming application that connects two computers directly. No servers, no accounts — just share your ID with another user and start sharing.
 
-## Возможности
+## Features
 
-- **Прямое соединение** — P2P между двумя участниками без посредников
-- **Демонстрация экрана** — транслируй свой экран или отдельное окно
-- **Полноэкранный режим** — смотри экран партнёра на весь монитор
-- **Picture-in-Picture** — держи экран партнёра в углу
-- **Минимализм** — никаких аккаунтов, сложных настроек, подписок
+- **Direct connection** — P2P between two participants with no intermediaries
+- **Screen sharing** — broadcast your entire screen or individual windows
+- **Fullscreen mode** — view peer's screen on your entire monitor
+- **Picture-in-Picture** — keep peer's screen in the corner
+- **Minimalist** — no accounts, complex settings, or subscriptions
 
-## Установка
+## Installation
 
-Скачай и установи последнюю версию со [страницы релизов](https://github.com/vercim/2peer/releases).
+Download and install the latest version from the [releases page](https://github.com/vercim/2peer/releases).
 
-## Как использовать
+## How to use
 
-1. Запусти приложение
-2. Скопируй свой ID (кнопка «Copy») и отправь партнёру
-3. Введи ID партнёра в поле «Peer ID» и нажми «Call»
-4. Партнёр увидит входящий звонок и нажмёт «Accept»
-5. Нажми «Broadcast» чтобы начать трансляцию
+1. Launch the app
+2. Copy your ID (click "Copy") and send it to your peer
+3. Enter peer's ID in the "Peer ID" field and click "Call"
+4. The peer will see an incoming call — have them click "Accept"
+5. Click "Broadcast" to start sharing your screen
 
-### Управление
+### Controls
 
-- **Broadcast** — начать показ своего экрана
-- **Change** — сменить источник (экран или окно)
-- **PiP** — включить картинку-в-картинке
-- **Fullscreen** — развернуть экран партнёра на весь монитор
+- **Broadcast** — start sharing your screen
+- **Change** — switch source (screen or window)
+- **PiP** — enable picture-in-picture
+- **Fullscreen** — expand peer's screen to full monitor
 
-## Требования
+## Requirements
 
-- Windows 10+, macOS 10.14+ или Linux
-- Доступ к интернету (для сигналинг-сервера)
-- Разрешение на захват экрана
+- Windows 10+, macOS 10.14+, or Linux
+- Internet access (for signaling server)
+- Screen capture permission
 
-## Технические детали
+## Technical details
 
-Приложение использует WebRTC для прямого P2P соединения. Supabase выступает только в качестве сигналинг-сервера для установки соединения — никакие данные через него не передаются.
+The app uses WebRTC for direct P2P connection. Supabase is only used as a signaling server to establish the connection — no data passes through it.
