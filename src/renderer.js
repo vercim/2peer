@@ -202,6 +202,104 @@ async function attachLocalTracks() {
   }
 }
 
+// ── Broadcast ─────────────────────────────────────────────────────────────────
+broadcastBtn.addEventListener('click', async () => {
+  if (isBroadcasting) {
+    stopBroadcast();
+    return;
+  }
+
+  const sourceId = await showSourcePicker();
+  if (!sourceId) return;
+
+  try {
+    await ensureLocalScreen();
+    await startBroadcast();
+  } catch(e) {
+    setStatus(e.message || 'Не удалось захватить экран.', true);
+  }
+});
+
+async function startBroadcast() {
+  if (!localStream || !localStream.active) {
+    setStatus('Нет трансляции для отправки.', true);
+    return;
+  }
+  
+  document.getElementById('localVideoWrap').classList.remove('placeholder');
+  localVideo.srcObject = localStream;
+  
+  if (pc && pc.connectionState === 'connected' && currentPeerId) {
+    await attachLocalTracks();
+    await new Promise(r => setTimeout(r, 100));
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
+  }
+  
+  isBroadcasting = true;
+  broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              Остановить`;
+  changeSourceBtn.classList.remove('hidden');
+  setStatus('Трансляция началась.');
+}
+
+function stopBroadcast() {
+  if (isStoppingBroadcast) return;
+  isStoppingBroadcast = true;
+  
+  if (pc && pc.connectionState === 'connected') {
+    pc.getSenders().forEach(sender => {
+      if (sender.track && sender.track.kind === 'video') {
+        try { pc.removeTrack(sender); } catch (_) {}
+      }
+    });
+  }
+  
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+  }
+  
+  document.getElementById('localVideoWrap').classList.add('placeholder');
+  localVideo.srcObject = null;
+  
+  isBroadcasting = false;
+  broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              Транслировать`;
+  changeSourceBtn.classList.add('hidden');
+  localMeta.textContent = '—';
+  setStatus('Трансляция остановлена.');
+  
+  if (currentPeerId && pc && pc.connectionState === 'connected') {
+    send({ type: 'stop-broadcast', to: currentPeerId });
+  }
+  
+  setTimeout(() => { isStoppingBroadcast = false; }, 100);
+}
+
+changeSourceBtn.addEventListener('click', async () => {
+  const sourceId = await showSourcePicker();
+  if (!sourceId) return;
+
+  try {
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+    }
+    
+    await ensureLocalScreen();
+    await startBroadcast();
+    setStatus('Источник трансляции изменён.');
+  } catch(e) {
+    setStatus(e.message || 'Не удалось сменить источник.', true);
+  }
+});
+
 // ── Supabase Signaling ────────────────────────────────────────────────────────
 // ── Supabase Signaling ────────────────────────────────────────────────────────
 let outChannel = null; // постоянный канал для отправки текущему пиру
