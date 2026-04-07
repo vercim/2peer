@@ -50,6 +50,17 @@ function setStatus(msg, isErr = false) {
   }
 }
 
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    confirmMsg.innerHTML = message;
+    confirmOverlay.classList.remove('hidden');
+    const onOk     = () => { confirmOverlay.classList.add('hidden'); confirmOk.removeEventListener('click', onOk); confirmCancel.removeEventListener('click', onCancel); resolve(true); };
+    const onCancel = () => { confirmOverlay.classList.add('hidden'); confirmOk.removeEventListener('click', onOk); confirmCancel.removeEventListener('click', onCancel); resolve(false); };
+    confirmOk.addEventListener('click', onOk);
+    confirmCancel.addEventListener('click', onCancel);
+  });
+}
+
 function cleanupLocalStream() {
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
   localVideo.srcObject = null;
