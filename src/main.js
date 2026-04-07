@@ -25,8 +25,11 @@ function setProfile(profile) {
 
 let pendingSourceId = null;
 
+let mainWindow = null;
+let fullscreenWindow = null;
+
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1100, height: 770, minWidth: 800, minHeight: 600,
     frame: false, backgroundColor: '#0a0a0a', autoHideMenuBar: true,
     webPreferences: {
@@ -34,9 +37,37 @@ function createWindow() {
       contextIsolation: true, nodeIntegration: false, sandbox: false
     }
   });
-  win.loadFile(path.join(__dirname, 'renderer.html'));
-  // win.webContents.openDevTools(); // раскомментируй для отладки
-  return win;
+  mainWindow.loadFile(path.join(__dirname, 'renderer.html'));
+  // mainWindow.webContents.openDevTools();
+  return mainWindow;
+}
+
+function createFullscreenWindow(videoType) {
+  if (fullscreenWindow) {
+    fullscreenWindow.focus();
+    fullscreenWindow.webContents.send('fs:set-type', videoType);
+    return fullscreenWindow;
+  }
+  fullscreenWindow = new BrowserWindow({
+    fullscreen: true,
+    frame: false,
+    backgroundColor: '#000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true, nodeIntegration: false, sandbox: false
+    }
+  });
+  fullscreenWindow.loadFile(path.join(__dirname, 'fullscreen.html'));
+  fullscreenWindow.webContents.once('did-finish-load', () => {
+    fullscreenWindow.webContents.send('fs:set-type', videoType);
+  });
+  fullscreenWindow.on('closed', () => {
+    fullscreenWindow = null;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fs:closed');
+    }
+  });
+  return fullscreenWindow;
 }
 
 function registerIpcHandlers() {
@@ -68,6 +99,14 @@ function registerIpcHandlers() {
   ipcMain.handle('sources:set-pending', (_, sourceId) => { pendingSourceId = sourceId; });
   ipcMain.handle('window:minimize', (event) => { BrowserWindow.fromWebContents(event.sender)?.minimize(); });
   ipcMain.handle('window:close',    (event) => { BrowserWindow.fromWebContents(event.sender)?.close(); });
+  ipcMain.handle('window:fullscreen-open', (_, videoType) => { 
+    createFullscreenWindow(videoType); 
+  });
+  ipcMain.on('fs:video-update', (event, data) => {
+    if (fullscreenWindow && !fullscreenWindow.isDestroyed()) {
+      fullscreenWindow.webContents.send('fs:video-update', data);
+    }
+  });
   ipcMain.handle('app:version', () => APP_VERSION);
 }
 

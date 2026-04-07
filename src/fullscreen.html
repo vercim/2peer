@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>2peer - Fullscreen</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100vw; height: 100vh;
+      background: #000;
+      overflow: hidden;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      user-select: none;
+    }
+    .wrap {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    video {
+      max-width: 100%; max-height: 100%;
+      object-fit: contain;
+    }
+    .controls {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 64px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.9));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      opacity: 0;
+      transition: opacity 300ms ease;
+    }
+    body:hover .controls,
+    body.show-controls .controls { opacity: 1; }
+    .label {
+      font-size: 13px;
+      color: #bbb;
+      font-weight: 500;
+    }
+    .actions { display: flex; gap: 10px; }
+    .btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      padding: 8px 14px;
+      color: #ccc;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 150ms ease, color 150ms ease;
+    }
+    .btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .btn svg { width: 16px; height: 16px; }
+    .btn-close { background: rgba(180,40,40,0.15); border-color: rgba(180,40,40,0.3); }
+    .btn-close:hover { background: rgba(180,40,40,0.3); color: #fff; }
+
+    .center-close {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.7);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50%;
+      width: 64px; height: 64px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 300ms ease, background 150ms ease;
+    }
+    .center-close:hover { background: rgba(180,40,40,0.6); }
+    .center-close.visible { opacity: 1; }
+    .center-close svg { width: 28px; height: 28px; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <video id="fullscreenVideo" autoplay playsinline></video>
+    
+    <div class="center-close" id="centerClose">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 6L6 18M6 6l12 12"/>
+      </svg>
+    </div>
+
+    <div class="controls">
+      <span class="label" id="videoLabel">Экран собеседника</span>
+      <div class="actions">
+        <button class="btn btn-close" id="closeBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+          Закрыть
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fsVideo = document.getElementById('fullscreenVideo');
+    const videoLabel = document.getElementById('videoLabel');
+    const closeBtn = document.getElementById('closeBtn');
+    const centerClose = document.getElementById('centerClose');
+
+    let hideTimeout = null;
+    let isHovering = false;
+    let videoType = 'remote';
+
+    function showControls() {
+      document.body.classList.add('show-controls');
+      centerClose.classList.add('visible');
+      clearTimeout(hideTimeout);
+      hideTimeout = setTimeout(() => {
+        if (!isHovering) {
+          document.body.classList.remove('show-controls');
+          centerClose.classList.remove('visible');
+        }
+      }, 3500);
+    }
+
+    document.body.addEventListener('mousemove', showControls);
+    document.body.addEventListener('mouseenter', () => { isHovering = true; showControls(); });
+    document.body.addEventListener('mouseleave', () => {
+      isHovering = false;
+      hideTimeout = setTimeout(() => {
+        document.body.classList.remove('show-controls');
+        centerClose.classList.remove('visible');
+      }, 1500);
+    });
+
+    function closeFullscreen() {
+      window.close();
+    }
+
+    closeBtn.addEventListener('click', closeFullscreen);
+    centerClose.addEventListener('click', closeFullscreen);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeFullscreen();
+    });
+
+    if (window.electronAPI?.onFsSetType) {
+      window.electronAPI.onFsSetType((type) => {
+        videoType = type;
+        videoLabel.textContent = type === 'local' ? 'Ваш экран' : 'Экран собеседника';
+      });
+    }
+
+    if (window.electronAPI?.onFsVideoUpdate) {
+      window.electronAPI.onFsVideoUpdate((data) => {
+        if (data) fsVideo.srcObject = data;
+      });
+    }
+  </script>
+</body>
+</html>

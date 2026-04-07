@@ -247,6 +247,16 @@
       position: relative;
       background: #050505;
     }
+    .video-wrap:fullscreen {
+      background: #000;
+    }
+    .video-wrap:fullscreen video {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: contain;
+    }
     video {
       position: absolute;
       inset: 0;
@@ -338,61 +348,6 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-
-    /* ── Fullscreen Overlay ──────────────────────────────────────────── */
-    .fullscreen-overlay {
-      position: fixed;
-      inset: 0;
-      background: #000;
-      z-index: 200;
-      display: none;
-      flex-direction: column;
-    }
-    .fullscreen-overlay.active { display: flex; }
-    .fullscreen-video-wrap {
-      flex: 1;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-    .fullscreen-video-wrap video {
-      position: absolute;
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-    }
-    .fullscreen-controls {
-      height: 56px;
-      background: linear-gradient(transparent, rgba(0,0,0,0.85));
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      flex-shrink: 0;
-      opacity: 0;
-      transition: opacity 200ms ease;
-    }
-    .fullscreen-overlay:hover .fullscreen-controls,
-    .fullscreen-overlay.show-controls .fullscreen-controls { opacity: 1; }
-    .fullscreen-label { font-size: 12px; color: #aaa; }
-    .fullscreen-actions { display: flex; align-items: center; gap: 8px; }
-    .fs-btn {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 6px;
-      padding: 8px 12px;
-      color: #ccc;
-      font-size: 11px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: background 120ms ease, color 120ms ease;
-    }
-    .fs-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
-    .fs-btn svg { width: 14px; height: 14px; }
 
     /* ── Confirm Dialog ──────────────────────────────────────────── */
     .confirm-modal {
@@ -501,9 +456,15 @@
               </svg>
               Сменить
             </button>
+            <button class="icon-btn" id="localFullscreenBtn">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+              Fullscreen
+            </button>
           </div>
         </div>
-        <div class="video-wrap">
+        <div class="video-wrap" id="localVideoWrap">
           <video id="localVideo" autoplay playsinline muted></video>
         </div>
       </div>
@@ -528,7 +489,7 @@
             </button>
           </div>
         </div>
-        <div class="video-wrap">
+        <div class="video-wrap" id="remoteVideoWrap">
           <video id="remoteVideo" autoplay playsinline></video>
         </div>
       </div>
@@ -545,24 +506,6 @@
       <button class="btn-secondary btn-sm" id="sourcePickerClose">Отмена</button>
     </div>
     <div id="sourcePickerContent" style="overflow-y:auto; flex:1; min-height:0;"></div>
-  </div>
-</div>
-
-<!-- Fullscreen Overlay -->
-<div class="fullscreen-overlay" id="fullscreenOverlay">
-  <div class="fullscreen-video-wrap">
-    <video id="fullscreenVideo" playsinline></video>
-  </div>
-  <div class="fullscreen-controls">
-    <span class="fullscreen-label" id="fullscreenLabel">Экран собеседника</span>
-    <div class="fullscreen-actions">
-      <button class="fs-btn" id="fsExitBtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 6L6 18M6 6l12 12"/>
-        </svg>
-        Выход
-      </button>
-    </div>
   </div>
 </div>
 

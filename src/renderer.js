@@ -6,21 +6,24 @@ const hangupBtn           = document.getElementById('hangupBtn');
 const copyIdBtn           = document.getElementById('copyIdBtn');
 const regenIdBtn          = document.getElementById('regenIdBtn');
 const statusLog           = document.getElementById('statusLog');
-const localVideo          = document.getElementById('localVideo');
-const remoteVideo         = document.getElementById('remoteVideo');
-const localMeta           = document.getElementById('localMeta');
-const remoteMeta          = document.getElementById('remoteMeta');
-const serverTag           = document.getElementById('serverTag');
-const incomingCallEl      = document.getElementById('incomingCall');
-const callerIdLabel       = document.getElementById('callerIdLabel');
+const localVideoEl       = document.getElementById('localVideo');
+const remoteVideoEl      = document.getElementById('remoteVideo');
+const localMeta          = document.getElementById('localMeta');
+const remoteMeta         = document.getElementById('remoteMeta');
+const serverTag          = document.getElementById('serverTag');
+const incomingCallEl     = document.getElementById('incomingCall');
+const callerIdLabel      = document.getElementById('callerIdLabel');
 const sourcePickerOverlay = document.getElementById('sourcePickerOverlay');
 const sourcePickerContent = document.getElementById('sourcePickerContent');
-const confirmOverlay      = document.getElementById('confirmOverlay');
-const confirmMsg          = document.getElementById('confirmMsg');
-const confirmOk           = document.getElementById('confirmOk');
-const confirmCancel       = document.getElementById('confirmCancel');
-const broadcastBtn        = document.getElementById('broadcastBtn');
-const changeSourceBtn     = document.getElementById('changeSourceBtn');
+const confirmOverlay     = document.getElementById('confirmOverlay');
+const confirmMsg         = document.getElementById('confirmMsg');
+const confirmOk          = document.getElementById('confirmOk');
+const confirmCancel      = document.getElementById('confirmCancel');
+const broadcastBtn       = document.getElementById('broadcastBtn');
+const changeSourceBtn    = document.getElementById('changeSourceBtn');
+
+const localVideo = localVideoEl;
+const remoteVideo = remoteVideoEl;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let selfId           = '';
@@ -180,7 +183,13 @@ broadcastBtn.addEventListener('click', async () => {
 
   try {
     await ensureLocalScreen();
-    if (pc) {
+    if (pc && pc.connectionState === 'connected' && currentPeerId) {
+      await attachLocalTracks();
+      const newOffer = await pc.createOffer({ offerToReceiveVideo: true });
+      await pc.setLocalDescription(newOffer);
+      send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
+      setStatus('Отправка видео...');
+    } else if (pc) {
       await attachLocalTracks();
     }
     isBroadcasting = true;
@@ -214,10 +223,16 @@ changeSourceBtn.addEventListener('click', async () => {
     }
     
     await ensureLocalScreen();
-    if (pc) {
+    if (pc && pc.connectionState === 'connected' && currentPeerId) {
       await attachLocalTracks();
+      const newOffer = await pc.createOffer({ offerToReceiveVideo: true });
+      await pc.setLocalDescription(newOffer);
+      send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
+      setStatus('Источник трансляции изменён.');
+    } else if (pc) {
+      await attachLocalTracks();
+      setStatus('Источник трансляции изменён.');
     }
-    setStatus('Источник трансляции изменён.');
   } catch(e) {
     setStatus(e.message || 'Не удалось сменить источник.', true);
   }
@@ -368,10 +383,15 @@ function createPeerConnection(peerId) {
 }
 
 async function attachLocalTracks() {
-  if (!localStream || !localStream.active) return;
+  if (!localStream || !localStream.active) {
+    console.log('[attachLocalTracks] no stream or not active');
+    return;
+  }
   const stream = localStream;
   const existing = new Set((pc.getSenders() || []).map(s => s.track?.id).filter(Boolean));
+  console.log('[attachLocalTracks] existing senders:', existing.size);
   for (const track of stream.getTracks()) {
+    console.log('[attachLocalTracks] adding track:', track.kind, track.id);
     if (!existing.has(track.id)) {
       const sender = pc.addTrack(track, stream);
       setTimeout(() => applyMaxQualityEncoding(sender), 500);
@@ -480,6 +500,8 @@ async function handleSignal(msg) {
   if (msg.type === 'call')      handleIncomingCall(msg);
   if (msg.type === 'answer')    await handleAnswer(msg);
   if (msg.type === 'candidate') await handleCandidate(msg);
+  if (msg.type === 'renegotiate') await handleRenegotiate(msg);
+  if (msg.type === 'renegotiate-answer') await handleRenegotiateAnswer(msg);
   if (msg.type === 'decline') {
     setStatus(`<strong style="font-family:monospace">${msg.from}</strong> отклонил звонок.`);
     hangup(false);
@@ -552,6 +574,29 @@ async function handleAnswer({ from, answer }) {
   console.log('[handleAnswer] done, pc.connectionState:', pc.connectionState);
 }
 
+async function handleRenegotiate({ from, offer }) {
+  console.log('[handleRenegotiate] from', from);
+  if (!pc || pc.signalingState === 'closed') {
+    console.log('[handleRenegotiate] no pc or closed');
+    return;
+  }
+  await pc.setRemoteDescription(offer);
+  for (const c of pendingIce) await pc.addIceCandidate(c);
+  pendingIce = [];
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  send({ type: 'renegotiate-answer', to: from, answer: pc.localDescription });
+  console.log('[handleRenegotiate] sent answer');
+}
+
+async function handleRenegotiateAnswer({ from, answer }) {
+  console.log('[handleRenegotiateAnswer] from', from);
+  if (!pc) return;
+  await pc.setRemoteDescription(answer);
+  pc.getSenders().forEach(applyMaxQualityEncoding);
+  setStatus('Видеотрансляция началась.');
+}
+
 async function handleCandidate({ candidate }) {
   if (!candidate) return;
   if (!pc || !pc.remoteDescription) { pendingIce.push(candidate); return; }
@@ -592,46 +637,42 @@ document.getElementById('pipBtn').addEventListener('click', async () => {
   }
 });
 
+let fsWindowOpen = false;
+let fsVideoType = 'remote';
+
 document.getElementById('fullscreenBtn').addEventListener('click', () => {
-  openFullscreen(remoteVideo, 'Экран собеседника');
+  fsWindowOpen = true;
+  fsVideoType = 'remote';
+  window.electronAPI.openFullscreen('remote');
 });
 
-document.getElementById('fsExitBtn').addEventListener('click', closeFullscreen);
-
-fullscreenOverlay.addEventListener('click', (e) => {
-  if (e.target === fullscreenOverlay || e.target.closest('.fullscreen-video-wrap')) {
-    closeFullscreen();
-  }
+document.getElementById('localFullscreenBtn').addEventListener('click', () => {
+  fsWindowOpen = true;
+  fsVideoType = 'local';
+  window.electronAPI.openFullscreen('local');
 });
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && fullscreenOverlay.classList.contains('active')) {
-    closeFullscreen();
-  }
-});
-
-function openFullscreen(videoEl, label) {
-  fullscreenVideo.srcObject = videoEl.srcObject;
-  fullscreenLabel.textContent = label;
-  fullscreenOverlay.classList.add('active');
-  
-  const showControls = () => {
-    fullscreenOverlay.classList.add('show-controls');
-    clearTimeout(fsControlsTimeout);
-    fsControlsTimeout = setTimeout(() => {
-      fullscreenOverlay.classList.remove('show-controls');
-    }, 2500);
-  };
-  
-  fullscreenOverlay.addEventListener('mousemove', showControls, { once: true });
-  showControls();
+if (window.electronAPI.onFsClosed) {
+  window.electronAPI.onFsClosed(() => {
+    fsWindowOpen = false;
+  });
 }
 
-function closeFullscreen() {
-  fullscreenOverlay.classList.remove('active');
-  fullscreenVideo.srcObject = null;
-  clearTimeout(fsControlsTimeout);
+if (window.electronAPI.onFsVideoUpdate) {
+  window.electronAPI.onFsVideoUpdate((data) => {
+    const fsVideo = document.getElementById('fullscreenVideo');
+    if (fsVideo && data) {
+      fsVideo.srcObject = data;
+    }
+  });
 }
+
+setInterval(() => {
+  if (window.electronAPI?.sendVideoUpdate && fsWindowOpen) {
+    const stream = fsVideoType === 'local' ? localVideo.srcObject : remoteVideo.srcObject;
+    window.electronAPI.sendVideoUpdate(stream);
+  }
+}, 200);
 
 
 
