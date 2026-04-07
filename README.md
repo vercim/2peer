@@ -10,10 +10,6 @@ A peer-to-peer screen streaming application that connects two computers directly
 - **Picture-in-Picture** — keep peer's screen in the corner
 - **Minimalist** — no accounts, complex settings, or subscriptions
 
-## Installation
-
-Download and install the latest version from the [releases page](https://github.com/vercim/2peer/releases).
-
 ## How to use
 
 1. Launch the app
