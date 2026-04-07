@@ -1,6 +1,6 @@
 {
   "name": "2peer",
-  "version": "1.0",
+  "version": "1.0.0",
   "description": "2peer",
   "main": "src/main.js",
   "scripts": {
