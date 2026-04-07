@@ -150,34 +150,11 @@ function showSourcePicker() {
 }
 
 let isBroadcasting = false;
+let isStoppingBroadcast = false;
 
 broadcastBtn.addEventListener('click', async () => {
   if (isBroadcasting) {
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
-      localVideo.srcObject = null;
-    }
-    if (pc) {
-      const senders = pc.getSenders();
-      for (const sender of senders) {
-        if (sender.track && sender.track.kind === 'video') {
-          sender.track.stop();
-          pc.removeTrack(sender);
-        }
-      }
-      if (currentPeerId && pc.connectionState === 'connected') {
-        send({ type: 'stop-broadcast', to: currentPeerId });
-      }
-    }
-    isBroadcasting = false;
-    broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-              </svg>
-              Транслировать`;
-    changeSourceBtn.classList.add('hidden');
-    localMeta.textContent = '—';
-    setStatus('Трансляция остановлена.');
+    stopBroadcast();
     return;
   }
 
@@ -186,26 +163,59 @@ broadcastBtn.addEventListener('click', async () => {
 
   try {
     await ensureLocalScreen();
-    if (pc && pc.connectionState === 'connected' && currentPeerId) {
-      await attachLocalTracks();
-      const newOffer = await pc.createOffer({ offerToReceiveVideo: true });
-      await pc.setLocalDescription(newOffer);
-      send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
-      setStatus('Отправка видео...');
-    } else if (pc) {
-      await attachLocalTracks();
-    }
-    isBroadcasting = true;
-    broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-              </svg>
-              Остановить`;
-    changeSourceBtn.classList.remove('hidden');
-    setStatus('Трансляция началась.');
+    await startBroadcast();
   } catch(e) {
     setStatus(e.message || 'Не удалось захватить экран.', true);
   }
 });
+
+async function startBroadcast() {
+  if (!localStream || !localStream.active) {
+    setStatus('Нет трансляции для отправки.', true);
+    return;
+  }
+  
+  if (pc && pc.connectionState === 'connected' && currentPeerId) {
+    await attachLocalTracks();
+    const newOffer = await pc.createOffer({ offerToReceiveVideo: true });
+    await pc.setLocalDescription(newOffer);
+    send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
+  }
+  
+  isBroadcasting = true;
+  broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              Остановить`;
+  changeSourceBtn.classList.remove('hidden');
+  setStatus('Трансляция началась.');
+}
+
+function stopBroadcast() {
+  if (isStoppingBroadcast) return;
+  isStoppingBroadcast = true;
+  
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+    localVideo.srcObject = null;
+  }
+  
+  isBroadcasting = false;
+  broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              Транслировать`;
+  changeSourceBtn.classList.add('hidden');
+  localMeta.textContent = '—';
+  setStatus('Трансляция остановлена.');
+  
+  if (currentPeerId && pc && pc.connectionState === 'connected') {
+    send({ type: 'stop-broadcast', to: currentPeerId });
+  }
+  
+  setTimeout(() => { isStoppingBroadcast = false; }, 100);
+}
 
 changeSourceBtn.addEventListener('click', async () => {
   const sourceId = await showSourcePicker();
@@ -226,16 +236,8 @@ changeSourceBtn.addEventListener('click', async () => {
     }
     
     await ensureLocalScreen();
-    if (pc && pc.connectionState === 'connected' && currentPeerId) {
-      await attachLocalTracks();
-      const newOffer = await pc.createOffer({ offerToReceiveVideo: true });
-      await pc.setLocalDescription(newOffer);
-      send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
-      setStatus('Источник трансляции изменён.');
-    } else if (pc) {
-      await attachLocalTracks();
-      setStatus('Источник трансляции изменён.');
-    }
+    await startBroadcast();
+    setStatus('Источник трансляции изменён.');
   } catch(e) {
     setStatus(e.message || 'Не удалось сменить источник.', true);
   }
@@ -295,30 +297,9 @@ async function ensureLocalScreen() {
   }).catch(() => {});
 
   track.onended = () => { 
-    setStatus('Трансляция остановлена.');
-    isBroadcasting = false;
-    broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-              </svg>
-              Транслировать`;
-    changeSourceBtn.classList.add('hidden');
-    localMeta.textContent = '—';
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
-      localVideo.srcObject = null;
-    }
-    if (pc) {
-      const senders = pc.getSenders();
-      for (const sender of senders) {
-        if (sender.track && sender.track.kind === 'video') {
-          sender.track.stop();
-          pc.removeTrack(sender);
-        }
-      }
-      if (currentPeerId && pc.connectionState === 'connected') {
-        send({ type: 'stop-broadcast', to: currentPeerId });
-      }
+    stopBroadcast();
+    if (currentPeerId && pc && pc.connectionState === 'connected') {
+      send({ type: 'stop-broadcast', to: currentPeerId });
     }
   };
 
