@@ -41,46 +41,59 @@ let reconnectTimer   = null;
 let audioCtx = null;
 
 function initAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  } catch (e) {
+    console.error('[audio] init failed:', e);
+    return null;
   }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-  return audioCtx;
 }
 
 function playSound(type) {
   const ctx = initAudio();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
+  if (!ctx) return;
   
-  if (type === 'incoming') {
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-  } else if (type === 'accepted') {
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(523, ctx.currentTime);
-    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.08);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.2);
-  } else if (type === 'ended') {
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(400, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.1);
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    const now = ctx.currentTime;
+    
+    if (type === 'incoming') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(440, now + 0.3);
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } else if (type === 'accepted') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523, now);
+      osc.frequency.setValueAtTime(659, now + 0.1);
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } else if (type === 'ended') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(400, now);
+      osc.frequency.exponentialRampToValueAtTime(150, now + 0.15);
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.start(now);
+      osc.stop(now + 0.15);
+    }
+  } catch (e) {
+    console.error('[audio] playSound error:', e);
   }
 }
 
@@ -187,9 +200,21 @@ async function startBroadcast() {
   }
   
   if (pc && pc.connectionState === 'connected' && currentPeerId) {
+    const videoSenders = pc.getSenders().filter(s => s.track && s.track.kind === 'video');
+    for (const sender of videoSenders) {
+      try { pc.removeTrack(sender); } catch (_) {}
+    }
+    
     await attachLocalTracks();
-    const newOffer = await pc.createOffer({ offerToReceiveVideo: true });
-    await pc.setLocalDescription(newOffer);
+    
+    const offer = await pc.createOffer({ offerToReceiveVideo: true });
+    const sdp = offer.sdp.replace(/a=group:BUNDLE [^\r\n]+/g, (match) => {
+      const parts = match.split(' ');
+      const uniqueParts = [...new Set(parts)];
+      return 'a=group:BUNDLE ' + uniqueParts.join(' ');
+    });
+    await pc.setLocalDescription({ type: offer.type, sdp: sdp });
+    
     send({ type: 'renegotiate', to: currentPeerId, offer: pc.localDescription });
   }
   
