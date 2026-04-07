@@ -234,6 +234,31 @@ function applyMaxQualityEncoding(sender) {
   sender.setParameters(params).catch(console.error);
 }
 
+// Helpers to manage remote stream placeholder UI
+function streamHasVideo(stream) {
+  try {
+    return (
+      stream &&
+      stream.getVideoTracks &&
+      stream.getVideoTracks().length > 0 &&
+      stream.getVideoTracks().some((t) => t.readyState === "live")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function showRemotePlaceholder() {
+  const wrap = document.getElementById("remoteVideoWrap");
+  if (wrap) wrap.classList.add("placeholder");
+}
+
+function hideRemotePlaceholder() {
+  const wrap = document.getElementById("remoteVideoWrap");
+  if (wrap && streamHasVideo(remoteVideo.srcObject))
+    wrap.classList.remove("placeholder");
+}
+
 // ── PeerConnection ────────────────────────────────────────────────────────────
 function createPeerConnection(peerId) {
   currentPeerId = peerId;
@@ -243,7 +268,23 @@ function createPeerConnection(peerId) {
 
   pc.ontrack = (event) => {
     document.getElementById("remoteVideoWrap").classList.remove("placeholder");
-    event.streams[0].getTracks().forEach((t) => remoteStream.addTrack(t));
+    const stream = event?.streams?.[0];
+    if (stream) {
+      stream.getTracks().forEach((t) => remoteStream.addTrack(t));
+      // Attach per-track state listeners for remote video
+      stream.getVideoTracks().forEach((track) => {
+        track.onmute = () => {
+          if (!streamHasVideo(stream)) showRemotePlaceholder();
+        };
+        track.onunmute = () => {
+          if (streamHasVideo(stream)) hideRemotePlaceholder();
+        };
+        track.onended = () => showRemotePlaceholder();
+      });
+      if (!streamHasVideo(stream)) {
+        showRemotePlaceholder();
+      }
+    }
     const s = event.track.getSettings ? event.track.getSettings() : {};
     remoteMeta.textContent = `${s.width || "?"}×${s.height || "?"} @${Math.round(s.frameRate || "?")}fps`;
     setStatus(
