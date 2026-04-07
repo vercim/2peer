@@ -172,7 +172,7 @@
       color: var(--text);
     }
 
-    .server-tag {
+    .info-tag {
       font-size: 11px;
       color: #2e2e2e;
       font-family: ui-monospace, Menlo, Consolas, monospace;
@@ -336,7 +336,7 @@
 <div class="titlebar">
   <div class="titlebar-left">
     <div class="titlebar-dot"></div>
-    Screen Call
+    2peer
   </div>
   <div class="titlebar-controls">
     <button class="wbtn" id="btnMinimize" title="Свернуть">
@@ -388,8 +388,14 @@
       <div class="status-text" id="statusText">Инициализация...</div>
     </div>
 
-    <div class="card" style="margin-top:auto; padding: 10px 14px;">
-      <div class="server-tag" id="serverTag">—</div>
+    <div style="margin-top:auto; display: flex; flex-direction: column; gap: 10px;">
+      <div class="card" style="padding: 10px 14px;">
+        <div class="info-tag" id="versionTag">--</div>
+      </div>
+
+      <div class="card" style="padding: 10px 14px;">
+        <div class="info-tag" id="serverTag">--</div>
+      </div>
     </div>
 
   </aside>
@@ -467,6 +473,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./renderer.js"></script>
 </body>
 </html>

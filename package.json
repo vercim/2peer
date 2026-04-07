@@ -1,49 +1,40 @@
 {
   "name": "2peer",
   "version": "0.3.0",
-  "description": "P2P call app using WebRTC",
+  "description": "2peer",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win --x64",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
+    "electron-updater": "^6.8.3",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "electron-builder": "^25.1.8",
-    "electron": "^35.0.0"
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
   },
   "build": {
     "appId": "dev.vercim.2peer",
     "productName": "2peer",
-    "copyright": "Copyright © 2026",
-    "files": [
-      "src/**/*",
-      "signal/**/*",
-      "node_modules/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.ico"
-    },
     "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.icns",
+      "target": ["dmg", "zip"],
       "category": "public.app-category.utilities"
     },
-    "extraMetadata": {
-      "main": "src/main.js"
+    "win": {
+      "target": ["nsis"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
   "author": "vercim"
