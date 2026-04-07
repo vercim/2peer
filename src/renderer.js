@@ -101,8 +101,8 @@ async function showSourcePicker() {
       sourcePickerContent.appendChild(grid);
     }
 
-    renderSection('Экраны', screens);
-    renderSection('Окна', windows);
+    renderSection('Screens', screens);
+    renderSection('Windows', windows);
     sourcePickerOverlay.classList.remove('hidden');
 
     const closeBtn = document.getElementById('sourcePickerClose');
@@ -124,8 +124,8 @@ function cleanupLocalStream() {
     broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
               </svg>
-              Транслировать`;
-    changeSourceBtn.classList.add('hidden');
+              Broadcast`;
+  changeSourceBtn.classList.add('hidden');
   }
 }
 
@@ -210,7 +210,7 @@ function createPeerConnection(peerId) {
     event.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
     const s = event.track.getSettings ? event.track.getSettings() : {};
     remoteMeta.textContent = `${s.width||'?'}×${s.height||'?'} @${Math.round(s.frameRate||'?')}fps`;
-    setStatus(`Подключено к <strong style="font-family:monospace">${peerId}</strong>.`);
+    setStatus(`Connected to <strong style="font-family:monospace">${peerId}</strong>.`);
   };
 
   pc.onicecandidate = ({ candidate }) => {
@@ -220,10 +220,10 @@ function createPeerConnection(peerId) {
   pc.onconnectionstatechange = () => {
     const st = pc?.connectionState;
     console.log('[connectionState]', st);
-    if (st === 'connected')    setStatus(`Соединение активно с <strong style="font-family:monospace">${currentPeerId}</strong>.`);
-    if (st === 'failed')       setStatus('P2P соединение не удалось.', true);
-    if (st === 'disconnected') setStatus('Соединение потеряно.');
-    if (st === 'closed')       setStatus('Соединение закрыто.');
+    if (st === 'connected')    setStatus(`Connection active with <strong style="font-family:monospace">${currentPeerId}</strong>.`);
+    if (st === 'failed')       setStatus('P2P connection failed.', true);
+    if (st === 'disconnected') setStatus('Connection lost.');
+    if (st === 'closed')       setStatus('Connection closed.');
   };
 
   pc.oniceconnectionstatechange = () => {
@@ -270,13 +270,13 @@ broadcastBtn.addEventListener('click', async () => {
     await ensureLocalScreen();
     await startBroadcast();
   } catch(e) {
-    setStatus(e.message || 'Не удалось захватить экран.', true);
+    setStatus(e.message || 'Failed to capture screen.', true);
   }
 });
 
 async function startBroadcast() {
   if (!localStream || !localStream.active) {
-    setStatus('Нет трансляции для отправки.', true);
+    setStatus('No broadcast to send.', true);
     return;
   }
   
@@ -295,9 +295,9 @@ async function startBroadcast() {
   broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
               </svg>
-              Остановить`;
+              Stop`;
   changeSourceBtn.classList.remove('hidden');
-  setStatus('Трансляция началась.');
+  setStatus('Broadcast started.');
 }
 
 function stopBroadcast() {
@@ -324,10 +324,10 @@ function stopBroadcast() {
   broadcastBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
               </svg>
-              Транслировать`;
+              Broadcast`;
   changeSourceBtn.classList.add('hidden');
   localMeta.textContent = '—';
-  setStatus('Трансляция остановлена.');
+  setStatus('Broadcast stopped.');
   
   if (currentPeerId && pc && pc.connectionState === 'connected') {
     send({ type: 'stop-broadcast', to: currentPeerId });
@@ -348,22 +348,22 @@ changeSourceBtn.addEventListener('click', async () => {
     
     await ensureLocalScreen();
     await startBroadcast();
-    setStatus('Источник трансляции изменён.');
+    setStatus('Broadcast source changed.');
   } catch(e) {
-    setStatus(e.message || 'Не удалось сменить источник.', true);
+    setStatus(e.message || 'Failed to change source.', true);
   }
 });
 
 // ── Supabase Signaling ────────────────────────────────────────────────────────
 // ── Supabase Signaling ────────────────────────────────────────────────────────
-let outChannel = null; // постоянный канал для отправки текущему пиру
+let outChannel = null; // persistent channel for sending to current peer
 
 async function connectSupabase(url, key) {
   console.log('[Supabase] connecting to:', url);
   console.log('[Supabase] supabase lib available:', typeof window.supabase);
   
   if (!window.supabase) {
-    setStatus('Ошибка: библиотека Supabase не загружена.', true);
+    setStatus('Error: Supabase library not loaded.', true);
     return;
   }
   
@@ -375,7 +375,7 @@ async function connectSupabase(url, key) {
       serverTag.textContent = 'Supabase Realtime';
     } catch (e) {
       console.log('[Supabase] createClient error:', e);
-      setStatus('Ошибка инициализации Supabase: ' + e.message, true);
+      setStatus('Supabase initialization error: ' + e.message, true);
       return;
     }
   }
@@ -392,17 +392,17 @@ async function connectSupabase(url, key) {
 
   myChannel
     .on('broadcast', { event: 'signal' }, ({ payload }) => {
-      handleSignal(payload).catch(e => setStatus(e.message || 'Ошибка сигналинга.', true));
+      handleSignal(payload).catch(e => setStatus(e.message || 'Signaling error.', true));
     })
     .subscribe((status) => {
       console.log('[Supabase] status:', status);
       if (status === 'SUBSCRIBED') {
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-        setStatus('Готово. Поделитесь ID и нажмите «Позвонить».');
+        setStatus('Ready. Share your ID and click "Call".');
       }
       if (status === 'CHANNEL_ERROR') {
         console.log('[Supabase] CHANNEL_ERROR - checking connection...');
-        setStatus('Ошибка канала. Пробуем переподключиться...');
+        setStatus('Channel error. Attempting to reconnect...');
         if (!reconnectTimer && supabaseConfig) {
           reconnectTimer = setTimeout(async () => {
             reconnectTimer = null;
@@ -413,7 +413,7 @@ async function connectSupabase(url, key) {
         }
       }
       if (status === 'TIMED_OUT') {
-        setStatus('Таймаут подключения. Пробуем снова...');
+        setStatus('Connection timeout. Retrying...');
         if (!reconnectTimer && supabaseConfig) {
           reconnectTimer = setTimeout(async () => {
             reconnectTimer = null;
@@ -423,12 +423,12 @@ async function connectSupabase(url, key) {
       }
       if (status === 'CLOSED') {
         console.log('[Supabase] connection closed');
-        setStatus('Подключение закрыто.');
+        setStatus('Connection closed.');
       }
     });
 }
 
-// Создаём исходящий канал к пиру один раз и переиспользуем
+// Create outgoing channel to peer once and reuse
 async function ensureOutChannel(peerId) {
   if (outChannel && outChannel._topic === `realtime:peer:${peerId}`) return;
 
@@ -448,21 +448,21 @@ async function ensureOutChannel(peerId) {
         console.log('[ensureOutChannel] timeout but channel exists, using it');
         resolve();
       } else {
-        reject(new Error('Не удалось подключиться к собеседнику (timeout)'));
+        reject(new Error('Failed to connect to peer (timeout)'));
       }
     }, 8000);
     ch.subscribe((status) => {
       console.log('[ensureOutChannel] subscribe status:', status);
       clearTimeout(timer);
       if (status === 'SUBSCRIBED')   { outChannel = ch; resolve(); }
-      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { reject(new Error('Не удалось подключиться к собеседнику (' + status + ')')); }
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { reject(new Error('Failed to connect to peer (' + status + ')')); }
       else { outChannel = ch; resolve(); }
     });
   });
 }
 
 async function send(payload) {
-  if (!supabaseClient) { setStatus('Нет подключения к Supabase.', true); return; }
+  if (!supabaseClient) { setStatus('No connection to Supabase.', true); return; }
   try {
     console.log('[send] ensuring channel to', payload.to);
     await ensureOutChannel(payload.to);
@@ -475,7 +475,7 @@ async function send(payload) {
     console.log('[send] done');
   } catch (e) {
     console.error('[send error]', e.message);
-    setStatus('Ошибка отправки: ' + e.message, true);
+    setStatus('Send error: ' + e.message, true);
   }
 }
 
@@ -491,11 +491,11 @@ async function handleSignal(msg) {
     handleRemoteBroadcastStopped();
   }
   if (msg.type === 'decline') {
-    setStatus(`<strong style="font-family:monospace">${msg.from}</strong> отклонил звонок.`);
+    setStatus(`<strong style="font-family:monospace">${msg.from}</strong> declined the call.`);
     hangup(false);
   }
   if (msg.type === 'hangup') {
-    setStatus(`<strong style="font-family:monospace">${msg.from}</strong> завершил звонок.`);
+    setStatus(`<strong style="font-family:monospace">${msg.from}</strong> ended the call.`);
     hangup(false);
   }
   if (msg.type === 'error') setStatus(msg.message, true);
@@ -510,15 +510,15 @@ function handleRemoteBroadcastStopped() {
   }
   document.getElementById('remoteVideoWrap').classList.add('placeholder');
   remoteMeta.textContent = '—';
-  setStatus('Трансляция собеседника завершена.');
+  setStatus('Peer broadcast ended.');
 }
 
 // ── Call flow ─────────────────────────────────────────────────────────────────
 async function startCall() {
   const peerId = remoteIdInput.value.trim();
-  if (!peerId) { setStatus('Введите ID собеседника.', true); return; }
-  if (peerId === selfId) { setStatus('Нельзя звонить себе.', true); return; }
-  const ok = await showConfirm(`Позвонить <strong>${peerId}</strong>?`);
+  if (!peerId) { setStatus('Enter peer ID.', true); return; }
+  if (peerId === selfId) { setStatus('Cannot call yourself.', true); return; }
+  const ok = await showConfirm(`Call <strong>${peerId}</strong>?`);
   if (!ok) return;
   hangup(false);
   isPolite = false;
@@ -526,14 +526,14 @@ async function startCall() {
   await attachLocalTracks();
   await pc.setLocalDescription(await pc.createOffer({ offerToReceiveVideo: true }));
   send({ type: 'call', to: peerId, offer: pc.localDescription });
-  setStatus(`Вызываем <strong style="font-family:monospace">${peerId}</strong>...`);
+  setStatus(`Calling <strong style="font-family:monospace">${peerId}</strong>...`);
 }
 
 function handleIncomingCall({ from, offer }) {
   incomingCallData = { from, offer };
   incomingCallEl.classList.add('active');
   callerIdLabel.textContent = from;
-  setStatus(`Входящий звонок от <strong style="font-family:monospace">${from}</strong>.`);
+  setStatus(`Incoming call from <strong style="font-family:monospace">${from}</strong>.`);
 }
 
 async function acceptCall() {
@@ -550,7 +550,7 @@ async function acceptCall() {
   pendingIce = [];
   await pc.setLocalDescription(await pc.createAnswer());
   send({ type: 'answer', to: from, answer: pc.localDescription });
-  setStatus(`Звонок принят. Подключаемся к <strong style="font-family:monospace">${from}</strong>...`);
+  setStatus(`Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`);
 }
 
 function declineCall() {
@@ -559,7 +559,7 @@ function declineCall() {
   incomingCallData = null;
   incomingCallEl.classList.remove('active');
   send({ type: 'decline', to: from });
-  setStatus(`Вызов от <strong style="font-family:monospace">${from}</strong> отклонён.`);
+  setStatus(`Call from <strong style="font-family:monospace">${from}</strong> declined.`);
 }
 
 async function handleAnswer({ from, answer }) {
@@ -567,7 +567,7 @@ async function handleAnswer({ from, answer }) {
   if (!pc) return;
   await pc.setRemoteDescription(answer);
   pc.getSenders().forEach(applyMaxQualityEncoding);
-  setStatus(`<strong style="font-family:monospace">${from}</strong> принял звонок.`);
+  setStatus(`<strong style="font-family:monospace">${from}</strong> accepted the call.`);
   console.log('[handleAnswer] done, pc.connectionState:', pc.connectionState);
 }
 
@@ -629,7 +629,7 @@ document.getElementById('pipBtn').addEventListener('click', async () => {
     if (document.pictureInPictureElement) await document.exitPictureInPicture();
     else await remoteVideo.requestPictureInPicture();
   } catch(e) {
-    setStatus('PiP не поддерживается для этого источника.', true);
+    setStatus('PiP not supported for this source.', true);
   }
 });
 
@@ -714,11 +714,11 @@ document.getElementById('btnClose').addEventListener('click', () => window.elect
 // ── Event listeners ───────────────────────────────────────────────────────────
 copyIdBtn.addEventListener('click', async () => {
   await navigator.clipboard.writeText(selfId);
-  setStatus('ID скопирован.');
+  setStatus('ID copied.');
 });
 
 regenIdBtn.addEventListener('click', async () => {
-  const ok = await showConfirm('Сбросить ID? Текущий ID станет недоступен.');
+  const ok = await showConfirm('Reset ID? Current ID will become unavailable.');
   if (!ok) return;
   try {
     if (myChannel) {
@@ -730,26 +730,26 @@ regenIdBtn.addEventListener('click', async () => {
     selfId = profile.id;
     selfIdEl.textContent = selfId;
     await connectSupabase(supabaseConfig.supabaseUrl, supabaseConfig.supabaseKey);
-    setStatus('Создан новый ID.');
+    setStatus('New ID created.');
   } catch (e) {
-    setStatus(e.message || 'Не удалось сменить ID.', true);
+    setStatus(e.message || 'Failed to change ID.', true);
   }
 });
 
 callBtn.addEventListener('click', () => {
-  startCall().catch(e => setStatus(e.message || 'Ошибка вызова.', true));
+  startCall().catch(e => setStatus(e.message || 'Call error.', true));
 });
 
 hangupBtn.addEventListener('click', async () => {
-  if (!currentPeerId && !pc) { setStatus('Нет активного звонка.'); return; }
-  const ok = await showConfirm('Завершить звонок?');
+  if (!currentPeerId && !pc) { setStatus('No active call.'); return; }
+  const ok = await showConfirm('End call?');
   if (!ok) return;
   hangup(true);
-  setStatus('Звонок завершён.');
+  setStatus('Call ended.');
 });
 
 document.getElementById('acceptBtn').addEventListener('click', () => {
-  acceptCall().catch(e => setStatus(e.message || 'Ошибка принятия звонка.', true));
+  acceptCall().catch(e => setStatus(e.message || 'Call accept error.', true));
 });
 document.getElementById('declineBtn').addEventListener('click', declineCall);
 
