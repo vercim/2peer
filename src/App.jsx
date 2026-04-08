@@ -596,12 +596,24 @@ export default function App() {
     pc.ontrack = (event) => {
       console.log("[PC] ontrack fired!", event);
       setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
-      const stream = event?.streams?.[0] || null;
+      // Robust handling: get streams[0] if available, otherwise construct a stream from the track
+      let stream = event?.streams?.[0] || null;
+      if (!stream && event?.track) {
+        stream = new MediaStream([event.track]);
+      }
       console.log("[PC] Stream received:", stream);
-      if (stream && remoteVideoRef.current?.srcObject !== stream) {
-        remoteVideoRef.current.srcObject = stream;
-        setRemoteStream(stream);
-        console.log("[PC] Stream assigned to remote video element");
+      const videoEl =
+        remoteVideoRef.current || document.getElementById("remoteVideo");
+      if (stream) {
+        if (videoEl && videoEl.srcObject !== stream) {
+          if (videoEl) videoEl.srcObject = stream;
+          setRemoteStream(stream);
+          console.log("[PC] Stream assigned to remote video element");
+        } else {
+          setRemoteStream(stream);
+        }
+      } else {
+        console.log("[PC] No remote stream available in ontrack");
       }
       const s = event.track.getSettings ? event.track.getSettings() : {};
       setRemoteMeta(

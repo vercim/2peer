@@ -136,6 +136,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
             if (ref) ref.current = el;
             if (videoRef) videoRef.current = el;
           }}
+          id={isLocal ? undefined : "remoteVideo"}
           className="absolute inset-0 w-full h-full object-contain"
           autoPlay
           playsInline
