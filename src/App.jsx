@@ -94,6 +94,7 @@ export default function App() {
   const reconnectTimerRef = useRef(null);
   const isPoliteRef = useRef(false);
   const bitrateIntervalRef = useRef(null);
+  const answerProcessedRef = useRef(false);
 
   const monitorBitrate = useCallback(() => {
     if (!pcRef.current || pcRef.current.connectionState !== "connected") {
@@ -395,6 +396,10 @@ export default function App() {
         console.warn("[Signal] No peer connection to set answer");
         return;
       }
+      if (answerProcessedRef.current) {
+        console.log("[Signal] Answer already processed, skipping");
+        return;
+      }
       if (pcRef.current.signalingState !== "have-local-offer") {
         console.warn(
           "[Signal] Answer received in wrong state:",
@@ -402,6 +407,7 @@ export default function App() {
         );
         return;
       }
+      answerProcessedRef.current = true;
       await pcRef.current.setRemoteDescription(msg.answer);
       console.log("[Signal] Remote description set successfully");
       pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
@@ -698,6 +704,7 @@ export default function App() {
     isPoliteRef.current = false;
 
     console.log("[Call] Creating peer connection...");
+    answerProcessedRef.current = false;
     createPeerConnection(peerId);
 
     console.log("[Call] Attaching local tracks...");
