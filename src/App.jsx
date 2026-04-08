@@ -203,19 +203,28 @@ export default function App() {
     }
     if (myChannelRef.current) {
       try {
+        console.log("[Supabase] Removing old channel...");
         await client.removeChannel(myChannelRef.current);
       } catch (_) {}
       myChannelRef.current = null;
-      await new Promise((r) => setTimeout(r, 200));
+      // Ждем больше времени для полного закрытия канала
+      await new Promise((r) => setTimeout(r, 500));
     }
+
+    console.log("[Supabase] Creating new channel for:", id);
     const ch = client.channel(`peer:${id}`, {
       config: { broadcast: { self: false } },
     });
     ch.on("broadcast", { event: "signal" }, ({ payload }) =>
       handleSignal(payload),
     );
+
+    let retryCount = 0;
+    const maxRetries = 3;
+
     ch.subscribe((status) => {
-      console.log("[Supabase] status:", status);
+      console.log("[Supabase] Channel status:", status);
+
       if (status === "SUBSCRIBED") {
         if (reconnectTimerRef.current) {
           clearTimeout(reconnectTimerRef.current);
@@ -223,14 +232,76 @@ export default function App() {
         }
         addStatus('Ready. Share your ID and click "Call".');
       }
-      if (status === "CHANNEL_ERROR")
-        addStatus("Channel error. Attempting to reconnect...");
-      if (status === "TIMED_OUT") addStatus("Connection timeout. Retrying...");
-      if (status === "CLOSED") addStatus("Connection closed.");
-    });
-    myChannelRef.current = ch;
-  };
+      if (status === "CHANNEL_ERROR") {
+        addStatus("Channel error. Attempting to reconnect...", true);
 
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(
+            `[Supabase] Retrying connection (${retryCount}/${maxRetries})...`,
+          );
+          setTimeout(() => {
+            console.log(`[Supabase] Reconnecting (attempt ${retryCount})...`);
+            ch.subscribe();
+          }, 1000);
+        } else {
+          addStatus("Connection failed. Please try again.", true);
+          retryCount = 0;
+        }
+      }
+      if (status === "TIMED_OUT") {
+        addStatus("Connection timeout. Retrying...", true);
+
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(() => {
+            console.log(
+              `[Supabase] Retry after timeout (${retryCount}/${maxRetries})...`,
+            );
+            ch.subscribe();
+          }, 1500);
+        }
+      }
+      if (status === "CLOSED") {
+        addStatus("Connection closed.");
+        retryCount = 0;
+      }
+    });
+
+    myChannelRef.current = ch;
+
+    // Возвращаем промис, который резолвится при успешном подключении
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (ch.state !== "joined") {
+          reject(new Error("Connection timeout"));
+        }
+      }, 10000);
+
+      const originalSubscribe = ch.subscribe.bind(ch);
+      ch.subscribe = function (...args) {
+        const result = originalSubscribe(...args);
+        return result;
+      };
+
+      // Мониторим состояние канала
+      const checkInterval = setInterval(() => {
+        if (ch.state === "joined" || ch.state === "subscribed") {
+          clearTimeout(timeout);
+          clearInterval(checkInterval);
+          resolve(ch);
+        }
+      }, 100);
+
+      // Также срабатываем при статусе SUBSCRIBED
+      ch.on("broadcast", { event: "signal" }, ({ payload }) => {
+        handleSignal(payload);
+        clearTimeout(timeout);
+        clearInterval(checkInterval);
+        resolve(ch);
+      });
+    });
+  };
   const ensureOutChannel = async (peerId) => {
     if (
       outChannelRef.current &&
@@ -923,21 +994,42 @@ export default function App() {
       }),
     );
     if (!ok) return;
+
+    addStatus("Regenerating ID...");
+
     try {
+      console.log("[RegenID] Starting ID regeneration...");
+
+      // Полностью удаляем старый канал и ждем
       if (myChannelRef.current) {
+        console.log("[RegenID] Removing old channel...");
         await supabaseClientRef.current
           .removeChannel(myChannelRef.current)
           .catch(() => {});
         myChannelRef.current = null;
-        await new Promise((r) => setTimeout(r, 200));
       }
+
+      // Ждем достаточно времени для полного закрытия
+      console.log("[RegenID] Waiting for channel cleanup...");
+      await new Promise((r) => setTimeout(r, 500));
+
+      // Генерируем новый профиль
+      console.log("[RegenID] Generating new profile...");
       const profile = await window.electronAPI.regenerateProfile();
+      console.log("[RegenID] New profile:", profile.id);
+
       setSelfId(profile.id);
       window.__SELF_ID__ = profile.id;
+
+      // Подключаемся с новым ID
+      console.log("[RegenID] Connecting with new ID...");
       await connectSupabase(config.supabaseUrl, config.supabaseKey, profile.id);
+
+      console.log("[RegenID] ID regeneration complete");
       addStatus("New ID created.");
     } catch (e) {
-      addStatus(e.message || "Failed to change ID.", true);
+      console.error("[RegenID] Error:", e);
+      addStatus("Failed to change ID: " + (e.message || "Unknown error"), true);
     }
   };
 
