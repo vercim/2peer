@@ -960,6 +960,10 @@ export default function App() {
   };
 
   const handleSourceSelected = async (sourceId) => {
+    console.log(
+      "[Broadcast] handleSourceSelected called with sourceId:",
+      sourceId,
+    );
     setSourcePickerOpen(false);
     if (localStream) {
       localStream.getTracks().forEach((t) => t.stop());
@@ -967,8 +971,10 @@ export default function App() {
     }
     try {
       if (window.electronAPI?.setPendingSource) {
+        console.log("[Broadcast] Setting pending source:", sourceId);
         await window.electronAPI.setPendingSource(sourceId);
       }
+      console.log("[Broadcast] Calling getDisplayMedia...");
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           width: { ideal: 2560, max: 2560 },
@@ -979,6 +985,7 @@ export default function App() {
         audio: false,
         selfBrowserSurface: "exclude",
       });
+      console.log("[Broadcast] getDisplayMedia succeeded, stream:", stream);
       const [track] = stream.getVideoTracks();
       track.onended = () => {
         stopBroadcast();
@@ -986,7 +993,13 @@ export default function App() {
           sendSignal({ type: "stop-broadcast", to: currentPeerId });
       };
       setLocalStream(stream);
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      console.log("[Broadcast] localStream set to:", stream);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        console.log("[Broadcast] localVideoRef srcObject set to:", stream);
+      } else {
+        console.log("[Broadcast] ERROR: localVideoRef.current is null!");
+      }
       const s = track.getSettings ? track.getSettings() : {};
       setLocalMeta(
         `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
