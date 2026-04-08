@@ -82,9 +82,9 @@ function streamHasVideo(stream) {
   try {
     return (
       stream &&
-      stream.active &&
       stream.getVideoTracks &&
-      stream.getVideoTracks().length > 0
+      stream.getVideoTracks().length > 0 &&
+      stream.getVideoTracks().some((t) => t.readyState === "live")
     );
   } catch {
     return false;
@@ -1010,20 +1010,28 @@ export default function App() {
       } else {
         console.log("[Broadcast] ERROR: localVideoRef.current is null!");
       }
-
-      setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
       const s = track.getSettings ? track.getSettings() : {};
       setLocalMeta(
         `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
       );
-      addStatus("Broadcast started.");
-      console.log("[Broadcast] Broadcast started successfully");
+      if (
+        pcRef.current &&
+        pcRef.current.connectionState === "connected" &&
+        currentPeerId
+      ) {
+        await attachLocalTracks();
+        await new Promise((r) => setTimeout(r, 100));
+        const offer = await pcRef.current.createOffer();
+        await pcRef.current.setLocalDescription(offer);
+        sendSignal({
+          type: "renegotiate",
+          to: currentPeerId,
+          offer: pcRef.current.localDescription,
+        });
+      }
+      addStatus("Broadcast source changed.");
     } catch (e) {
-      console.error("[Broadcast] Error:", e);
-      addStatus(
-        "Failed to capture screen: " + (e.message || "Unknown error"),
-        true,
-      );
+      addStatus(e.message || "Failed to change source.", true);
     }
   };
 
