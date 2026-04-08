@@ -930,84 +930,7 @@ export default function App() {
   };
 
   const handleBroadcast = async () => {
-    addStatus("Attempting to start broadcast...");
-    console.log("[Broadcast] Starting broadcast...");
-
-    if (localStream) {
-      localStream.getTracks().forEach((t) => t.stop());
-      setLocalStream(null);
-    }
-    if (localVideoRef.current) localVideoRef.current.srcObject = null;
-
-    try {
-      console.log("[Broadcast] Requesting screen capture...");
-
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          width: { ideal: 2560, max: 2560 },
-          height: { ideal: 1440, max: 1440 },
-          frameRate: { ideal: 60, max: 60 },
-          displaySurface: "monitor",
-        },
-        audio: false,
-        selfBrowserSurface: "exclude",
-      });
-
-      console.log("[Broadcast] Screen captured, tracks:", stream.getTracks());
-
-      const [track] = stream.getVideoTracks();
-      console.log("[Broadcast] Video track:", track);
-
-      track.contentHint = "detail";
-      track.onended = () => {
-        console.log("[Broadcast] Track ended by user");
-        stopBroadcast();
-        if (currentPeerId && pcRef.current?.connectionState === "connected")
-          sendSignal({ type: "stop-broadcast", to: currentPeerId });
-      };
-
-      setLocalStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        console.log("[Broadcast] Video assigned to local video element");
-      }
-      setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
-      const s = track.getSettings ? track.getSettings() : {};
-      setLocalMeta(
-        `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
-      );
-
-      console.log("[Broadcast] Current peer state:", {
-        pcExists: !!pcRef.current,
-        connectionState: pcRef.current?.connectionState,
-        currentPeerId,
-      });
-
-      if (
-        pcRef.current &&
-        pcRef.current.connectionState === "connected" &&
-        currentPeerId
-      ) {
-        console.log("[Broadcast] Re-negotiating with peer...");
-        await attachLocalTracks();
-        await new Promise((r) => setTimeout(r, 100));
-        const offer = await pcRef.current.createOffer();
-        await pcRef.current.setLocalDescription(offer);
-        sendSignal({
-          type: "renegotiate",
-          to: currentPeerId,
-          offer: pcRef.current.localDescription,
-        });
-      }
-      addStatus("Broadcast started.");
-      console.log("[Broadcast] Broadcast started successfully");
-    } catch (e) {
-      console.error("[Broadcast] Error:", e);
-      addStatus(
-        "Failed to capture screen: " + (e.message || "Unknown error"),
-        true,
-      );
-    }
+    setSourcePickerOpen(true);
   };
 
   const stopBroadcast = () => {
@@ -1037,11 +960,15 @@ export default function App() {
   };
 
   const handleSourceSelected = async (sourceId) => {
+    setSourcePickerOpen(false);
     if (localStream) {
       localStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
     }
     try {
+      if (window.electronAPI?.setPendingSource) {
+        await window.electronAPI.setPendingSource(sourceId);
+      }
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           width: { ideal: 2560, max: 2560 },
