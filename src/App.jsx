@@ -82,9 +82,9 @@ function streamHasVideo(stream) {
   try {
     return (
       stream &&
+      stream.active &&
       stream.getVideoTracks &&
-      stream.getVideoTracks().length > 0 &&
-      stream.getVideoTracks().some((t) => t.readyState === "live")
+      stream.getVideoTracks().length > 0
     );
   } catch {
     return false;
@@ -149,6 +149,7 @@ export default function App() {
   const isPoliteRef = useRef(false);
   const bitrateIntervalRef = useRef(null);
   const answerProcessedRef = useRef(false);
+  const hangupProcessedRef = useRef(false);
 
   const monitorBitrate = useCallback(() => {
     if (!pcRef.current || pcRef.current.connectionState !== "connected") {
@@ -344,12 +345,6 @@ export default function App() {
         }
       }, 10000);
 
-      const originalSubscribe = ch.subscribe.bind(ch);
-      ch.subscribe = function (...args) {
-        const result = originalSubscribe(...args);
-        return result;
-      };
-
       // Мониторим состояние канала
       const checkInterval = setInterval(() => {
         if (ch.state === "joined" || ch.state === "subscribed") {
@@ -358,14 +353,6 @@ export default function App() {
           resolve(ch);
         }
       }, 100);
-
-      // Также срабатываем при статусе SUBSCRIBED
-      ch.on("broadcast", { event: "signal" }, ({ payload }) => {
-        handleSignal(payload);
-        clearTimeout(timeout);
-        clearInterval(checkInterval);
-        resolve(ch);
-      });
     });
   };
   const ensureOutChannel = async (peerId) => {
@@ -559,6 +546,11 @@ export default function App() {
     }
 
     if (msg.type === "hangup") {
+      if (hangupProcessedRef.current) {
+        console.log("[Signal] Hangup already processed, skipping");
+        return;
+      }
+      hangupProcessedRef.current = true;
       addStatus(
         `<strong style="font-family:monospace">${msg.from}</strong> ended the call.`,
       );
@@ -758,13 +750,15 @@ export default function App() {
   const attachLocalTracks = async () => {
     if (!localStream || !localStream.active || !pcRef.current) return;
     const stream = localStream;
-    const existing = new Set(
-      (pcRef.current.getSenders() || [])
-        .map((s) => s.track?.id)
-        .filter(Boolean),
-    );
-    for (const track of stream.getTracks()) {
-      if (!existing.has(track.id)) {
+    const senders = pcRef.current.getSenders() || [];
+    const tracks = stream.getTracks();
+
+    for (const track of tracks) {
+      const existingSender = senders.find((s) => s.track?.kind === track.kind);
+      if (existingSender) {
+        await existingSender.replaceTrack(track);
+        applyMaxQualityEncoding(existingSender);
+      } else {
         const sender = pcRef.current.addTrack(track, stream);
         setTimeout(() => applyMaxQualityEncoding(sender), 500);
       }
@@ -793,6 +787,7 @@ export default function App() {
     console.log("[Call] User confirmed, hanging up existing connection...");
     hangup(false);
     isPoliteRef.current = false;
+    hangupProcessedRef.current = false;
 
     console.log("[Call] Creating peer connection...");
     answerProcessedRef.current = false;
@@ -851,6 +846,7 @@ export default function App() {
     }
 
     isPoliteRef.current = true;
+    hangupProcessedRef.current = false;
     console.log("[Accept] Creating peer connection...");
     await createPeerConnection(from);
 
@@ -1010,28 +1006,26 @@ export default function App() {
       } else {
         console.log("[Broadcast] ERROR: localVideoRef.current is null!");
       }
+
+      if (pcRef.current?.connectionState === "connected") {
+        console.log("[Broadcast] Attaching new tracks to peer connection...");
+        await attachLocalTracks();
+        pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+      }
+
+      setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
       const s = track.getSettings ? track.getSettings() : {};
       setLocalMeta(
         `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
       );
-      if (
-        pcRef.current &&
-        pcRef.current.connectionState === "connected" &&
-        currentPeerId
-      ) {
-        await attachLocalTracks();
-        await new Promise((r) => setTimeout(r, 100));
-        const offer = await pcRef.current.createOffer();
-        await pcRef.current.setLocalDescription(offer);
-        sendSignal({
-          type: "renegotiate",
-          to: currentPeerId,
-          offer: pcRef.current.localDescription,
-        });
-      }
-      addStatus("Broadcast source changed.");
+      addStatus("Broadcast started.");
+      console.log("[Broadcast] Broadcast started successfully");
     } catch (e) {
-      addStatus(e.message || "Failed to change source.", true);
+      console.error("[Broadcast] Error:", e);
+      addStatus(
+        "Failed to capture screen: " + (e.message || "Unknown error"),
+        true,
+      );
     }
   };
 

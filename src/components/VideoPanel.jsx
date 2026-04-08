@@ -129,7 +129,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
       <div
         id="remoteVideoWrap"
         ref={containerRef}
-        className={`flex-1 min-h-0 relative bg-[#050505] ${showPlaceholder ? "placeholder" : ""}`}
+        className="flex-1 min-h-0 relative bg-[#050505]"
       >
         <video
           ref={(el) => {
