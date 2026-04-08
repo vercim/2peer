@@ -466,6 +466,7 @@ export default function App() {
       await pcRef.current.setRemoteDescription(msg.answer);
       console.log("[Signal] Remote description set successfully");
       pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+      pcRef.current.addIceCandidate(null);
       setStatusDotColor("#4ade80");
       addStatus(
         `<strong style="font-family:monospace">${msg.from}</strong> accepted the call.`,
@@ -606,7 +607,7 @@ export default function App() {
 
     pc.onicecandidate = ({ candidate }) => {
       console.log("[PC] ICE candidate:", candidate);
-      if (candidate && currentPeerId) {
+      if (candidate && peerId) {
         sendSignal({ type: "candidate", to: peerId, candidate });
       }
     };
