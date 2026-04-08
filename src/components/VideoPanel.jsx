@@ -4,6 +4,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
   {
     title,
     meta,
+    bitrate = 0,
     showControls = true,
     isLocal = false,
     onBroadcast,
@@ -18,6 +19,11 @@ export const VideoPanel = forwardRef(function VideoPanel(
   },
   ref,
 ) {
+  const formatBitrate = (bps) => {
+    if (bps >= 8_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
+    if (bps >= 1_000) return `${(bps / 1_000).toFixed(0)} Kbps`;
+    return `${bps} bps`;
+  };
   return (
     <div
       className={`flex-1 min-h-0 bg-panel border border-border rounded-[8px] flex flex-col overflow-hidden ${className}`}
@@ -26,6 +32,11 @@ export const VideoPanel = forwardRef(function VideoPanel(
         <span className="text-[11px] text-muted">{title}</span>
         <div className="flex items-center gap-[5px]">
           <span className="text-[10px] text-[#2e2e2e] font-mono">{meta}</span>
+          {bitrate > 0 && (
+            <span className="text-[10px] text-[#888] font-mono">
+              {formatBitrate(bitrate)}
+            </span>
+          )}
           {showControls && isLocal && (
             <>
               <button

@@ -10,17 +10,9 @@ import { useSupabase } from "./hooks/useSupabase.js";
 
 const rtcConfig = {
   iceServers: [
-    {
-      urls: [
-        "stun:stun1.l.google.com:19302",
-        "stun:stun2.l.google.com:19302",
-        "stun:stun3.l.google.com:19302",
-        "stun:stun4.l.google.com:19302",
-      ],
-    },
-    { urls: ["stun:stun.cloudflare.com:3478"] },
-    { urls: ["stun:stun.miwifi.com:3478"] },
-    { urls: ["stun:stun.synergy-it.pl:3478"] },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
     {
       urls: "turn:openrelay.metered.ca:80",
       username: "openrelayproject",
@@ -30,11 +22,6 @@ const rtcConfig = {
       urls: "turn:openrelay.metered.ca:443",
       username: "openrelayproject",
       credential: "openrelayproject",
-    },
-    {
-      urls: "turn:turn1.ihscr.com:443",
-      username: "guest",
-      credential: "guest",
     },
   ],
 };
@@ -58,11 +45,8 @@ function applyMaxQualityEncoding(sender) {
   params.encodings ??= [{}];
   const s = sender.track?.getSettings?.() || {};
   const pixels = (s.width || 1920) * (s.height || 1080);
-  let maxBitrate;
-  if (pixels >= 3840 * 2160) maxBitrate = 80_000_000;
-  else if (pixels >= 2560 * 1440) maxBitrate = 40_000_000;
-  else if (pixels >= 1920 * 1080) maxBitrate = 20_000_000;
-  else maxBitrate = 15_000_000;
+  let maxBitrate = 15_000_000;
+
   params.encodings.forEach((enc) => {
     enc.maxBitrate = maxBitrate;
     enc.maxFramerate = 60;
@@ -87,6 +71,7 @@ export default function App() {
   const [incomingCall, setIncomingCall] = useState(null);
   const [localMeta, setLocalMeta] = useState("—");
   const [remoteMeta, setRemoteMeta] = useState("—");
+  const [remoteBitrate, setRemoteBitrate] = useState(0);
   const [currentPeerId, setCurrentPeerId] = useState("");
   const [hasActiveCall, setHasActiveCall] = useState(false);
   const [localStream, setLocalStream] = useState(null);
@@ -110,6 +95,37 @@ export default function App() {
   const myChannelRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const isPoliteRef = useRef(false);
+  const bitrateIntervalRef = useRef(null);
+
+  const monitorBitrate = useCallback(() => {
+    if (!pcRef.current || pcRef.current.connectionState !== "connected") {
+      setRemoteBitrate(0);
+      setRemoteMeta("—");
+      return;
+    }
+    pcRef.current.getStats().then((report) => {
+      let bytesReceived = 0;
+      let frameRate = 0;
+      let width = 0;
+      let height = 0;
+      report.forEach((item) => {
+        if (item.type === "inbound-rtp" && item.kind === "video") {
+          bytesReceived += item.bytesReceived || 0;
+          frameRate = item.framesPerSecond || frameRate;
+          width = item.frameWidth || width;
+          height = item.frameHeight || height;
+        }
+      });
+      if (width > 0 && height > 0) {
+        setRemoteMeta(`${width}×${height} @${Math.round(frameRate || 60)}fps`);
+      }
+      window._prevBytesReceived = window._prevBytesReceived || bytesReceived;
+      const bytesDiff = bytesReceived - window._prevBytesReceived;
+      window._prevBytesReceived = bytesReceived;
+      const bitsPerSecond = bytesDiff * 8;
+      setRemoteBitrate(bitsPerSecond);
+    });
+  }, []);
 
   const addStatus = useCallback((msg, isError = false) => {
     setStatusLog((prev) => [...prev.slice(-49), { text: msg, isError }]);
@@ -472,6 +488,12 @@ export default function App() {
       console.log("[PC] Closing existing connection");
       pcRef.current.getSenders().forEach((s) => s.track?.stop());
       pcRef.current.close();
+      if (bitrateIntervalRef.current) {
+        clearInterval(bitrateIntervalRef.current);
+        bitrateIntervalRef.current = null;
+      }
+      setRemoteBitrate(0);
+      window._prevBytesReceived = 0;
     }
 
     console.log("[PC] Creating new RTCPeerConnection with config:", rtcConfig);
@@ -501,24 +523,15 @@ export default function App() {
       console.log("[PC] ICE candidate:", candidate);
       if (candidate && currentPeerId) {
         sendSignal({ type: "candidate", to: peerId, candidate });
-
-        // Показываем тип ICE candidate пользователю (только первый раз)
-        if (candidate.type && !pc.iceConnectionState) {
-          const typeLabel =
-            {
-              host: "Local",
-              srflx: "STUN",
-              relay: "TURN",
-              prflx: "Peer Reflexive",
-            }[candidate.type] || candidate.type;
-          addStatus(`ICE candidate: ${typeLabel}`);
-        }
       }
     };
 
     pc.onicecandidateerror = (event) => {
-      console.error("[PC] ICE candidate error:", event);
-      addStatus(`ICE error: ${event.errorText || event.errorCode}`, true);
+      // Только в консоль, не спамим пользователя
+      console.warn(
+        "[PC] ICE candidate error:",
+        event.errorText || event.errorCode,
+      );
     };
 
     pc.onconnectionstatechange = () => {
@@ -565,6 +578,9 @@ export default function App() {
                 addStatus(`Connection type: ${connectionType}`);
               }
             });
+            if (bitrateIntervalRef.current)
+              clearInterval(bitrateIntervalRef.current);
+            bitrateIntervalRef.current = setInterval(monitorBitrate, 1000);
           } catch (e) {
             console.log("[PC] Could not determine connection type:", e);
           }
@@ -611,13 +627,12 @@ export default function App() {
       }
     };
 
-    // Устанавливаем таймаут для gathering candidates
+    // Таймаут для gathering - если не собрались candidates за 8 секунд, продолжаем с тем что есть
     const gatheringTimeout = setTimeout(() => {
-      console.log("[PC] ICE gathering timeout - checking gathered candidates");
-      if (pc.iceGatheringState === "gathering") {
-        console.log("[PC] Still gathering, will continue in background");
-      }
-    }, 5000);
+      console.log(
+        "[PC] ICE gathering timeout - proceeding with available candidates",
+      );
+    }, 8000);
 
     pc.onicegatheringstatechange = () => {
       console.log("[PC] ICE gathering state:", pc.iceGatheringState);
@@ -715,6 +730,12 @@ export default function App() {
       console.log("[Accept] Closing existing connection...");
       pcRef.current.getSenders().forEach((s) => s.track?.stop());
       pcRef.current.close();
+      if (bitrateIntervalRef.current) {
+        clearInterval(bitrateIntervalRef.current);
+        bitrateIntervalRef.current = null;
+      }
+      setRemoteBitrate(0);
+      window._prevBytesReceived = 0;
     }
 
     isPoliteRef.current = true;
@@ -778,6 +799,12 @@ export default function App() {
     if (pcRef.current) {
       pcRef.current.getSenders().forEach((s) => s.track?.stop());
       pcRef.current.close();
+      if (bitrateIntervalRef.current) {
+        clearInterval(bitrateIntervalRef.current);
+        bitrateIntervalRef.current = null;
+      }
+      setRemoteBitrate(0);
+      window._prevBytesReceived = 0;
     }
     pcRef.current = null;
     setCurrentPeerId("");
@@ -810,7 +837,6 @@ export default function App() {
 
     try {
       console.log("[Broadcast] Requesting screen capture...");
-      addStatus("Requesting screen access...");
 
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
@@ -823,11 +849,7 @@ export default function App() {
         selfBrowserSurface: "exclude",
       });
 
-      console.log(
-        "[Broadcast] Screen capture successful, tracks:",
-        stream.getTracks(),
-      );
-      addStatus("Screen captured successfully!");
+      console.log("[Broadcast] Screen captured, tracks:", stream.getTracks());
 
       const [track] = stream.getVideoTracks();
       console.log("[Broadcast] Video track:", track);
@@ -1088,6 +1110,7 @@ export default function App() {
               ref={remoteVideoRef}
               title="Peer Screen"
               meta={remoteMeta}
+              bitrate={remoteBitrate}
               onPiP={handlePiP}
               onFullscreen={handleFullscreen}
               showPlaceholder={!streamHasVideo(remoteStream)}

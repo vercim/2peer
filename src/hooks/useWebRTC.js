@@ -35,11 +35,7 @@ function applyMaxQualityEncoding(sender) {
   params.encodings ??= [{}];
   const s = sender.track?.getSettings?.() || {};
   const pixels = (s.width || 1920) * (s.height || 1080);
-  let maxBitrate;
-  if (pixels >= 3840 * 2160) maxBitrate = 80_000_000;
-  else if (pixels >= 2560 * 1440) maxBitrate = 40_000_000;
-  else if (pixels >= 1920 * 1080) maxBitrate = 20_000_000;
-  else maxBitrate = 15_000_000;
+  let maxBitrate = 15_000_000;
 
   params.encodings.forEach((enc) => {
     enc.maxBitrate = maxBitrate;
@@ -218,8 +214,8 @@ export function useBroadcast({ onMetaChange, onStatusChange, onStreamChange }) {
 
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: {
-        width: { ideal: 7680, max: 7680 },
-        height: { ideal: 4320, max: 4320 },
+        width: { ideal: 2560, max: 2560 },
+        height: { ideal: 1440, max: 1440 },
         frameRate: { ideal: 60, max: 60 },
         displaySurface: "monitor",
       },
@@ -231,8 +227,8 @@ export function useBroadcast({ onMetaChange, onStatusChange, onStreamChange }) {
     track.contentHint = "detail";
     await track
       .applyConstraints({
-        width: { ideal: 7680 },
-        height: { ideal: 4320 },
+        width: { ideal: 2560 },
+        height: { ideal: 1440 },
         frameRate: { ideal: 60, max: 60 },
       })
       .catch(() => {});
