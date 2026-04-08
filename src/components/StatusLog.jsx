@@ -1,5 +1,4 @@
 import { useRef, useEffect, useState } from "react";
-import { TextMorph } from "torph/react";
 
 export function StatusLog({ messages = [] }) {
   const containerRef = useRef(null);

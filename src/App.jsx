@@ -135,7 +135,7 @@ function setMaxBandwidthInSDP(sdp) {
 
 export default function App() {
   const [selfId, setSelfId] = useState("");
-  const [serverInfo, setServerInfo] = useState("");
+  const [supabaseStatus, setSupabaseStatus] = useState("disconnected");
   const [statusDotColor, setStatusDotColor] = useState("#444");
   const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
@@ -281,8 +281,9 @@ export default function App() {
           auth: { persistSession: false, autoRefreshToken: false },
         });
         supabaseClientRef.current = client;
-        setServerInfo("⚡ Supabase Realtime");
+        setSupabaseStatus("connected");
       } catch (e) {
+        setSupabaseStatus("error");
         addStatus("Supabase init error: " + e.message, true);
         return;
       }
@@ -1063,6 +1064,7 @@ export default function App() {
           callerId={incomingCall?.from || ""}
           hasActiveCall={hasActiveCall}
           connectionStatus={callStatus}
+          supabaseStatus={supabaseStatus}
           statusMessages={statusLog}
         />
         <main className="flex flex-col gap-[8px] min-h-0 overflow-hidden">
