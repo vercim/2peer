@@ -59,7 +59,9 @@ async function gatherLocalCandidates(pc) {
 
     pc2.onicecandidate = (e) => {
       if (e.candidate?.candidate) {
-        const match = e.candidate.candidate.match(/([0-9.]+)/);
+        const match = e.candidate.candidate.match(
+          /([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/,
+        );
         if (match) localIPs.push(match[1]);
       }
     };
