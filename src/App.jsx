@@ -10,7 +10,17 @@ import { useSupabase } from "./hooks/useSupabase.js";
 
 const rtcConfig = {
   iceServers: [
-    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+    {
+      urls: [
+        "stun:stun1.l.google.com:19302",
+        "stun:stun2.l.google.com:19302",
+        "stun:stun3.l.google.com:19302",
+        "stun:stun4.l.google.com:19302",
+      ],
+    },
+    { urls: ["stun:stun.cloudflare.com:3478"] },
+    { urls: ["stun:stun.miwifi.com:3478"] },
+    { urls: ["stun:stun.synergy-it.pl:3478"] },
     {
       urls: "turn:openrelay.metered.ca:80",
       username: "openrelayproject",
@@ -20,6 +30,11 @@ const rtcConfig = {
       urls: "turn:openrelay.metered.ca:443",
       username: "openrelayproject",
       credential: "openrelayproject",
+    },
+    {
+      urls: "turn:turn1.ihscr.com:443",
+      username: "guest",
+      credential: "guest",
     },
   ],
 };
@@ -253,50 +268,85 @@ export default function App() {
   };
 
   const sendSignal = async (payload) => {
+    console.log("[Signal] Sending signal:", payload.type, "to:", payload.to);
+
     if (!supabaseClientRef.current) {
+      console.error("[Signal] No Supabase client");
       addStatus("No connection to Supabase.", true);
       return;
     }
+
     try {
+      console.log("[Signal] Ensuring out channel...");
       await ensureOutChannel(payload.to);
+      console.log("[Signal] Out channel ready, sending broadcast...");
+
+      const signalPayload = { ...payload, from: selfId };
+      console.log("[Signal] Signal payload:", signalPayload);
+
       await outChannelRef.current.send({
         type: "broadcast",
         event: "signal",
-        payload: { ...payload, from: selfId },
+        payload: signalPayload,
       });
+
+      console.log("[Signal] Signal sent successfully");
     } catch (e) {
+      console.error("[Signal] Send error:", e);
       addStatus("Send error: " + e.message, true);
     }
   };
 
   const handleSignal = async (msg) => {
-    console.log("[signal]", msg.type, "from", msg.from);
+    console.log("[Signal] Received:", msg.type, "from", msg.from);
+
     if (msg.type === "call") {
+      console.log("[Signal] Incoming call from:", msg.from);
       setIncomingCall({ from: msg.from, offer: msg.offer });
       addStatus(
         `Incoming call from <strong style="font-family:monospace">${msg.from}</strong>.`,
       );
     }
+
     if (msg.type === "answer") {
-      if (!pcRef.current) return;
+      console.log("[Signal] Received answer from:", msg.from);
+      console.log("[Signal] Answer:", msg.answer);
+      if (!pcRef.current) {
+        console.warn("[Signal] No peer connection to set answer");
+        return;
+      }
       await pcRef.current.setRemoteDescription(msg.answer);
+      console.log("[Signal] Remote description set successfully");
       pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
       setStatusDotColor("#4ade80");
       addStatus(
         `<strong style="font-family:monospace">${msg.from}</strong> accepted the call.`,
       );
     }
+
     if (msg.type === "candidate") {
-      if (!msg.candidate) return;
+      console.log("[Signal] Received ICE candidate:", msg.candidate);
+      if (!msg.candidate) {
+        console.warn("[Signal] Empty candidate");
+        return;
+      }
       if (!pcRef.current || !pcRef.current.remoteDescription) {
+        console.log(
+          "[Signal] Queuing candidate for later (no remote description)",
+        );
         pendingIceRef.current.push(msg.candidate);
         return;
       }
       try {
         await pcRef.current.addIceCandidate(msg.candidate);
-      } catch (_) {}
+        console.log("[Signal] ICE candidate added successfully");
+      } catch (e) {
+        console.error("[Signal] Failed to add ICE candidate:", e);
+      }
     }
+
     if (msg.type === "renegotiate") {
+      console.log("[Signal] Received renegotiation request");
       if (!pcRef.current || pcRef.current.signalingState === "closed") return;
       await pcRef.current.setRemoteDescription(msg.offer);
       for (const c of pendingIceRef.current)
@@ -310,12 +360,16 @@ export default function App() {
         answer: pcRef.current.localDescription,
       });
     }
+
     if (msg.type === "renegotiate-answer") {
+      console.log("[Signal] Received renegotiation answer");
       if (!pcRef.current) return;
       await pcRef.current.setRemoteDescription(msg.answer);
       pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
     }
+
     if (msg.type === "stop-broadcast") {
+      console.log("[Signal] Peer stopped broadcast");
       if (remoteVideoRef.current?.srcObject) {
         remoteVideoRef.current.srcObject.getTracks().forEach((t) => t.stop());
         remoteVideoRef.current.srcObject = null;
@@ -324,12 +378,14 @@ export default function App() {
       setRemoteMeta("—");
       addStatus("Peer broadcast ended.");
     }
+
     if (msg.type === "decline") {
       addStatus(
         `<strong style="font-family:monospace">${msg.from}</strong> declined the call.`,
       );
       hangup(false);
     }
+
     if (msg.type === "hangup") {
       addStatus(
         `<strong style="font-family:monospace">${msg.from}</strong> ended the call.`,
@@ -339,18 +395,26 @@ export default function App() {
   };
 
   const createPeerConnection = (peerId) => {
+    console.log("[PC] Creating peer connection for:", peerId);
     setCurrentPeerId(peerId);
     if (pcRef.current) {
+      console.log("[PC] Closing existing connection");
       pcRef.current.getSenders().forEach((s) => s.track?.stop());
       pcRef.current.close();
     }
+
+    console.log("[PC] Creating new RTCPeerConnection with config:", rtcConfig);
     const pc = new RTCPeerConnection(rtcConfig);
+
     pc.ontrack = (event) => {
+      console.log("[PC] ontrack fired!", event);
       setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
       const stream = event?.streams?.[0] || null;
+      console.log("[PC] Stream received:", stream);
       if (stream && remoteVideoRef.current?.srcObject !== stream) {
         remoteVideoRef.current.srcObject = stream;
         setRemoteStream(stream);
+        console.log("[PC] Stream assigned to remote video element");
       }
       const s = event.track.getSettings ? event.track.getSettings() : {};
       setRemoteMeta(
@@ -361,36 +425,137 @@ export default function App() {
         `Connected to <strong style="font-family:monospace">${peerId}</strong>.`,
       );
     };
+
     pc.onicecandidate = ({ candidate }) => {
-      if (candidate && currentPeerId)
+      console.log("[PC] ICE candidate:", candidate);
+      if (candidate && currentPeerId) {
         sendSignal({ type: "candidate", to: peerId, candidate });
+
+        // Показываем тип ICE candidate пользователю (только первый раз)
+        if (candidate.type && !pc.iceConnectionState) {
+          const typeLabel =
+            {
+              host: "Local",
+              srflx: "STUN",
+              relay: "TURN",
+              prflx: "Peer Reflexive",
+            }[candidate.type] || candidate.type;
+          addStatus(`ICE candidate: ${typeLabel}`);
+        }
+      }
     };
+
+    pc.onicecandidateerror = (event) => {
+      console.error("[PC] ICE candidate error:", event);
+      addStatus(`ICE error: ${event.errorText || event.errorCode}`, true);
+    };
+
     pc.onconnectionstatechange = () => {
       const st = pc?.connectionState;
-      console.log("[connectionState]", st);
+      console.log("[PC] Connection state changed to:", st);
       if (st === "connected") {
         setStatusDotColor("#4ade80");
         addStatus(
-          `Connection active with <strong style="font-family:monospace">${peerId}</strong>.`,
+          `Connected to <strong style="font-family:monospace">${peerId}</strong>.`,
         );
+
+        // Проверяем тип соединения после подключения
+        setTimeout(() => {
+          try {
+            const stats = pc.getStats();
+            stats.then((report) => {
+              let connectionType = "Unknown";
+              report.forEach((item) => {
+                if (
+                  item.type === "candidate-pair" &&
+                  item.state === "succeeded"
+                ) {
+                  const localCandidate = report.get(item.localCandidateId);
+                  const remoteCandidate = report.get(item.remoteCandidateId);
+
+                  if (localCandidate && remoteCandidate) {
+                    if (
+                      localCandidate.candidateType === "relay" ||
+                      remoteCandidate.candidateType === "relay"
+                    ) {
+                      connectionType = "TURN (Relay)";
+                    } else if (
+                      localCandidate.candidateType === "srflx" ||
+                      remoteCandidate.candidateType === "srflx"
+                    ) {
+                      connectionType = "STUN (Public IP)";
+                    } else if (localCandidate.candidateType === "host") {
+                      connectionType = "Local (Same Network)";
+                    }
+                  }
+                }
+              });
+              if (connectionType !== "Unknown") {
+                addStatus(`Connection type: ${connectionType}`);
+              }
+            });
+          } catch (e) {
+            console.log("[PC] Could not determine connection type:", e);
+          }
+        }, 1000);
       }
       if (st === "failed") {
         setStatusDotColor("#f87171");
         addStatus("P2P connection failed.", true);
+        console.error("[PC] Connection failed!");
+
+        // Попытка перезапуска ICE
+        console.log("[PC] Attempting ICE restart...");
+        pc.restartIce();
       }
       if (st === "disconnected") {
         setStatusDotColor("#facc15");
-        addStatus("Connection lost.");
+        addStatus("Connection lost. Attempting to reconnect...", true);
+        // Автоматическая попытка переподключения
+        setTimeout(() => {
+          if (pc.connectionState === "disconnected") {
+            console.log("[PC] Still disconnected, attempting ICE restart...");
+            pc.restartIce();
+          }
+        }, 3000);
       }
       if (st === "closed") {
         setStatusDotColor("#888");
         addStatus("Connection closed.");
       }
     };
+
     pc.oniceconnectionstatechange = () => {
-      console.log("[iceConnectionState]", pc?.iceConnectionState);
-      if (pc?.iceConnectionState === "failed") pc.restartIce();
+      const iceState = pc?.iceConnectionState;
+      console.log("[PC] ICE connection state:", iceState);
+
+      if (iceState === "failed") {
+        console.warn("[PC] ICE connection failed, attempting restart...");
+        addStatus("ICE failed. Attempting to reconnect...", true);
+        pc.restartIce();
+      }
+      if (iceState === "disconnected") {
+        console.warn("[PC] ICE disconnected");
+        addStatus("ICE disconnected.");
+      }
     };
+
+    // Устанавливаем таймаут для gathering candidates
+    const gatheringTimeout = setTimeout(() => {
+      console.log("[PC] ICE gathering timeout - checking gathered candidates");
+      if (pc.iceGatheringState === "gathering") {
+        console.log("[PC] Still gathering, will continue in background");
+      }
+    }, 5000);
+
+    pc.onicegatheringstatechange = () => {
+      console.log("[PC] ICE gathering state:", pc.iceGatheringState);
+      if (pc.iceGatheringState === "complete") {
+        clearTimeout(gatheringTimeout);
+        console.log("[PC] ICE gathering complete");
+      }
+    };
+
     pcRef.current = pc;
     return pc;
   };
@@ -412,10 +577,14 @@ export default function App() {
   };
 
   const handleCall = async (peerId) => {
+    console.log("[Call] Initiating call to:", peerId);
+    console.log("[Call] Self ID:", selfId);
+
     if (peerId === selfId) {
       addStatus("Cannot call yourself.", true);
       return;
     }
+
     const ok = await new Promise((r) =>
       setConfirmDialog({
         isOpen: true,
@@ -425,47 +594,95 @@ export default function App() {
       }),
     );
     if (!ok) return;
+
+    console.log("[Call] User confirmed, hanging up existing connection...");
     hangup(false);
     isPoliteRef.current = false;
+
+    console.log("[Call] Creating peer connection...");
     createPeerConnection(peerId);
+
+    console.log("[Call] Attaching local tracks...");
     await attachLocalTracks();
-    await pcRef.current.setLocalDescription(
-      await pcRef.current.createOffer({ offerToReceiveVideo: true }),
-    );
+
+    console.log("[Call] Creating offer...");
+    const offer = await pcRef.current.createOffer({
+      offerToReceiveVideo: true,
+    });
+    console.log("[Call] Offer created:", offer);
+
+    console.log("[Call] Setting local description...");
+    await pcRef.current.setLocalDescription(offer);
+
+    console.log("[Call] Sending signal...");
     sendSignal({
       type: "call",
       to: peerId,
       offer: pcRef.current.localDescription,
     });
+
     addStatus(
       `Calling <strong style="font-family:monospace">${peerId}</strong>...`,
     );
+    console.log("[Call] Call initiated successfully");
   };
 
   const handleAcceptCall = async () => {
-    if (!incomingCall) return;
+    console.log("[Accept] Accepting incoming call...");
+    if (!incomingCall) {
+      console.warn("[Accept] No incoming call to accept");
+      return;
+    }
+
     const { from, offer } = incomingCall;
+    console.log("[Accept] Call from:", from);
+    console.log("[Accept] Offer:", offer);
+
     setIncomingCall(null);
+
     if (pcRef.current) {
+      console.log("[Accept] Closing existing connection...");
       pcRef.current.getSenders().forEach((s) => s.track?.stop());
       pcRef.current.close();
     }
+
     isPoliteRef.current = true;
+    console.log("[Accept] Creating peer connection...");
     createPeerConnection(from);
+
+    console.log("[Accept] Attaching local tracks...");
     await attachLocalTracks();
+
+    console.log("[Accept] Setting remote description...");
     await pcRef.current.setRemoteDescription(offer);
-    for (const c of pendingIceRef.current)
+    console.log("[Accept] Remote description set");
+
+    console.log("[Accept] Adding pending ICE candidates...");
+    for (const c of pendingIceRef.current) {
+      console.log("[Accept] Adding candidate:", c);
       await pcRef.current.addIceCandidate(c);
+    }
     pendingIceRef.current = [];
-    await pcRef.current.setLocalDescription(await pcRef.current.createAnswer());
+    console.log("[Accept] All pending candidates added");
+
+    console.log("[Accept] Creating answer...");
+    const answer = await pcRef.current.createAnswer();
+    console.log("[Accept] Answer created:", answer);
+
+    console.log("[Accept] Setting local description...");
+    await pcRef.current.setLocalDescription(answer);
+
+    console.log("[Accept] Sending answer...");
     sendSignal({
       type: "answer",
       to: from,
       answer: pcRef.current.localDescription,
     });
+
     addStatus(
       `Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`,
     );
+    console.log("[Accept] Answer sent successfully");
   };
 
   const handleDeclineCall = () => {
@@ -511,12 +728,19 @@ export default function App() {
   };
 
   const handleBroadcast = async () => {
+    addStatus("Attempting to start broadcast...");
+    console.log("[Broadcast] Starting broadcast...");
+
     if (localStream) {
       localStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
+
     try {
+      console.log("[Broadcast] Requesting screen capture...");
+      addStatus("Requesting screen access...");
+
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           width: { ideal: 7680, max: 7680 },
@@ -527,25 +751,47 @@ export default function App() {
         audio: false,
         selfBrowserSurface: "exclude",
       });
+
+      console.log(
+        "[Broadcast] Screen capture successful, tracks:",
+        stream.getTracks(),
+      );
+      addStatus("Screen captured successfully!");
+
       const [track] = stream.getVideoTracks();
+      console.log("[Broadcast] Video track:", track);
+
       track.contentHint = "detail";
       track.onended = () => {
+        console.log("[Broadcast] Track ended by user");
         stopBroadcast();
         if (currentPeerId && pcRef.current?.connectionState === "connected")
           sendSignal({ type: "stop-broadcast", to: currentPeerId });
       };
+
       setLocalStream(stream);
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        console.log("[Broadcast] Video assigned to local video element");
+      }
       setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
       const s = track.getSettings ? track.getSettings() : {};
       setLocalMeta(
         `${s.width || "?"}×${s.height || "?"} @${Math.round(s.frameRate || 60)}fps`,
       );
+
+      console.log("[Broadcast] Current peer state:", {
+        pcExists: !!pcRef.current,
+        connectionState: pcRef.current?.connectionState,
+        currentPeerId,
+      });
+
       if (
         pcRef.current &&
         pcRef.current.connectionState === "connected" &&
         currentPeerId
       ) {
+        console.log("[Broadcast] Re-negotiating with peer...");
         await attachLocalTracks();
         await new Promise((r) => setTimeout(r, 100));
         const offer = await pcRef.current.createOffer();
@@ -557,8 +803,13 @@ export default function App() {
         });
       }
       addStatus("Broadcast started.");
+      console.log("[Broadcast] Broadcast started successfully");
     } catch (e) {
-      addStatus(e.message || "Failed to capture screen.", true);
+      console.error("[Broadcast] Error:", e);
+      addStatus(
+        "Failed to capture screen: " + (e.message || "Unknown error"),
+        true,
+      );
     }
   };
 
