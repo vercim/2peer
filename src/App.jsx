@@ -105,6 +105,16 @@ function applyMaxQualityEncoding(sender) {
     enc.networkPriority = "high";
   });
   sender.setParameters(params).catch(console.error);
+
+  if (sender.track) {
+    sender.track.contentHint = "screen";
+  }
+}
+
+function setMaxBandwidthInSDP(sdp) {
+  return sdp
+    .replace(/b=AS:[0-9]+/g, "b=AS:15000")
+    .replace(/b=TIAS:[0-9]+/g, "b=TIAS:15000000");
 }
 
 export default function App() {
@@ -150,13 +160,21 @@ export default function App() {
 
   // --- ИСПРАВЛЕНИЕ: Эффекты для удержания стримов в DOM при ререндере ---
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream && remoteVideoRef.current.srcObject !== remoteStream) {
+    if (
+      remoteVideoRef.current &&
+      remoteStream &&
+      remoteVideoRef.current.srcObject !== remoteStream
+    ) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream, remoteVideoWrapClass]);
 
   useEffect(() => {
-    if (localVideoRef.current && localStream && localVideoRef.current.srcObject !== localStream) {
+    if (
+      localVideoRef.current &&
+      localStream &&
+      localVideoRef.current.srcObject !== localStream
+    ) {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream, localVideoWrapClass]);
@@ -384,12 +402,16 @@ export default function App() {
       if (!pcRef.current) return;
       if (answerProcessedRef.current) return;
       if (pcRef.current.signalingState !== "have-local-offer") return;
-      
+
       // ИСПРАВЛЕНИЕ: Добавление кандидатов и удаление пустого addIceCandidate(null)
       answerProcessedRef.current = true;
-      await pcRef.current.setRemoteDescription(msg.answer);
+      const modifiedAnswer = {
+        ...msg.answer,
+        sdp: setMaxBandwidthInSDP(msg.answer.sdp),
+      };
+      await pcRef.current.setRemoteDescription(modifiedAnswer);
       pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
-      
+
       for (const c of pendingIceRef.current) {
         await pcRef.current.addIceCandidate(c).catch(console.error);
       }
@@ -422,7 +444,11 @@ export default function App() {
           await pcRef.current.addIceCandidate(c).catch(() => {});
         pendingIceRef.current = [];
         const answer = await pcRef.current.createAnswer();
-        await pcRef.current.setLocalDescription(answer);
+        const modifiedAnswer = {
+          ...answer,
+          sdp: setMaxBandwidthInSDP(answer.sdp),
+        };
+        await pcRef.current.setLocalDescription(modifiedAnswer);
         sendSignal({
           type: "renegotiate-answer",
           to: msg.from,
@@ -437,7 +463,11 @@ export default function App() {
       if (!pcRef.current || pcRef.current.signalingState === "closed") return;
       if (pcRef.current.signalingState === "stable") return;
       try {
-        await pcRef.current.setRemoteDescription(msg.answer);
+        const modifiedAnswer = {
+          ...msg.answer,
+          sdp: setMaxBandwidthInSDP(msg.answer.sdp),
+        };
+        await pcRef.current.setRemoteDescription(modifiedAnswer);
         pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
       } catch (e) {
         console.warn("[Signal] Failed to set remote answer:", e.message);
@@ -506,10 +536,11 @@ export default function App() {
       if (!stream && event?.track) {
         stream = new MediaStream([event.track]);
       }
-      
+
       setRemoteStream(stream);
 
-      const videoEl = remoteVideoRef.current || document.getElementById("remoteVideo");
+      const videoEl =
+        remoteVideoRef.current || document.getElementById("remoteVideo");
       if (videoEl && stream && videoEl.srcObject !== stream) {
         videoEl.srcObject = stream;
       }
@@ -531,7 +562,10 @@ export default function App() {
     };
 
     pc.onicecandidateerror = (event) => {
-      console.warn("[PC] ICE candidate error:", event.errorText || event.errorCode);
+      console.warn(
+        "[PC] ICE candidate error:",
+        event.errorText || event.errorCode,
+      );
     };
 
     pc.onconnectionstatechange = () => {
@@ -547,13 +581,22 @@ export default function App() {
             stats.then((report) => {
               let connectionType = "Unknown";
               report.forEach((item) => {
-                if (item.type === "candidate-pair" && item.state === "succeeded") {
+                if (
+                  item.type === "candidate-pair" &&
+                  item.state === "succeeded"
+                ) {
                   const localCandidate = report.get(item.localCandidateId);
                   const remoteCandidate = report.get(item.remoteCandidateId);
                   if (localCandidate && remoteCandidate) {
-                    if (localCandidate.candidateType === "relay" || remoteCandidate.candidateType === "relay") {
+                    if (
+                      localCandidate.candidateType === "relay" ||
+                      remoteCandidate.candidateType === "relay"
+                    ) {
                       connectionType = "TURN (Relay)";
-                    } else if (localCandidate.candidateType === "srflx" || remoteCandidate.candidateType === "srflx") {
+                    } else if (
+                      localCandidate.candidateType === "srflx" ||
+                      remoteCandidate.candidateType === "srflx"
+                    ) {
                       connectionType = "STUN (Public IP)";
                     } else if (localCandidate.candidateType === "host") {
                       connectionType = "Local (Same Network)";
@@ -565,7 +608,8 @@ export default function App() {
                 addStatus(`Connection type: ${connectionType}`);
               }
             });
-            if (bitrateIntervalRef.current) clearInterval(bitrateIntervalRef.current);
+            if (bitrateIntervalRef.current)
+              clearInterval(bitrateIntervalRef.current);
             bitrateIntervalRef.current = setInterval(monitorBitrate, 1000);
           } catch (e) {
             console.log("[PC] Could not determine connection type:", e);
@@ -625,7 +669,7 @@ export default function App() {
         applyMaxQualityEncoding(existingSender);
       } else {
         const sender = pcRef.current.addTrack(track, streamToAttach);
-        setTimeout(() => applyMaxQualityEncoding(sender), 500);
+        applyMaxQualityEncoding(sender);
       }
     }
   };
@@ -654,8 +698,14 @@ export default function App() {
     await createPeerConnection(peerId);
     await attachLocalTracks();
 
-    const offer = await pcRef.current.createOffer({ offerToReceiveVideo: true });
-    await pcRef.current.setLocalDescription(offer);
+    const offer = await pcRef.current.createOffer({
+      offerToReceiveVideo: true,
+    });
+    const modifiedOffer = {
+      ...offer,
+      sdp: setMaxBandwidthInSDP(offer.sdp),
+    };
+    await pcRef.current.setLocalDescription(modifiedOffer);
 
     sendSignal({
       type: "call",
@@ -663,7 +713,9 @@ export default function App() {
       offer: pcRef.current.localDescription,
     });
 
-    addStatus(`Calling <strong style="font-family:monospace">${peerId}</strong>...`);
+    addStatus(
+      `Calling <strong style="font-family:monospace">${peerId}</strong>...`,
+    );
     setStatusDotColor("#f97316");
     setCallStatus("connecting");
   };
@@ -696,7 +748,11 @@ export default function App() {
     pendingIceRef.current = [];
 
     const answer = await pcRef.current.createAnswer();
-    await pcRef.current.setLocalDescription(answer);
+    const modifiedAnswer = {
+      ...answer,
+      sdp: setMaxBandwidthInSDP(answer.sdp),
+    };
+    await pcRef.current.setLocalDescription(modifiedAnswer);
 
     sendSignal({
       type: "answer",
@@ -704,7 +760,9 @@ export default function App() {
       answer: pcRef.current.localDescription,
     });
 
-    addStatus(`Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`);
+    addStatus(
+      `Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`,
+    );
     setStatusDotColor("#f97316");
     setCallStatus("connecting");
   };
@@ -714,13 +772,18 @@ export default function App() {
     const { from } = incomingCall;
     setIncomingCall(null);
     sendSignal({ type: "decline", to: from });
-    addStatus(`Call from <strong style="font-family:monospace">${from}</strong> declined.`);
+    addStatus(
+      `Call from <strong style="font-family:monospace">${from}</strong> declined.`,
+    );
   };
 
   const hangup = (notify = true) => {
-    if (notify && currentPeerId) sendSignal({ type: "hangup", to: currentPeerId });
+    if (notify && currentPeerId)
+      sendSignal({ type: "hangup", to: currentPeerId });
     if (outChannelRef.current) {
-      supabaseClientRef.current?.removeChannel(outChannelRef.current).catch(() => {});
+      supabaseClientRef.current
+        ?.removeChannel(outChannelRef.current)
+        .catch(() => {});
       outChannelRef.current = null;
     }
     if (pcRef.current) {
@@ -753,11 +816,33 @@ export default function App() {
 
   const stopBroadcast = () => {
     if (pcRef.current && pcRef.current.connectionState === "connected") {
-      pcRef.current.getSenders().forEach((sender) => {
+      const senders = pcRef.current.getSenders();
+      for (const sender of senders) {
         if (sender.track && sender.track.kind === "video") {
-          try { pcRef.current.removeTrack(sender); } catch (_) {}
+          try {
+            pcRef.current.removeTrack(sender);
+          } catch (_) {}
         }
-      });
+      }
+      setTimeout(async () => {
+        try {
+          if (pcRef.current?.signalingState === "stable") {
+            const offer = await pcRef.current.createOffer();
+            const modifiedOffer = {
+              ...offer,
+              sdp: setMaxBandwidthInSDP(offer.sdp),
+            };
+            await pcRef.current.setLocalDescription(modifiedOffer);
+            sendSignal({
+              type: "renegotiate",
+              to: currentPeerId,
+              offer: pcRef.current.localDescription,
+            });
+          }
+        } catch (err) {
+          console.error("[StopBroadcast] Renegotiation error:", err);
+        }
+      }, 100);
     }
     if (localStream) {
       localStream.getTracks().forEach((t) => t.stop());
@@ -800,7 +885,7 @@ export default function App() {
         if (currentPeerId && pcRef.current?.connectionState === "connected")
           sendSignal({ type: "stop-broadcast", to: currentPeerId });
       };
-      
+
       setLocalStream(stream);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
@@ -809,15 +894,19 @@ export default function App() {
       if (pcRef.current?.connectionState === "connected") {
         await attachLocalTracks(stream);
         pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
-        
+
         try {
           if (pcRef.current.signalingState === "stable") {
             const offer = await pcRef.current.createOffer();
-            await pcRef.current.setLocalDescription(offer);
+            const modifiedOffer = {
+              ...offer,
+              sdp: setMaxBandwidthInSDP(offer.sdp),
+            };
+            await pcRef.current.setLocalDescription(modifiedOffer);
             sendSignal({
               type: "renegotiate",
               to: currentPeerId,
-              offer: pcRef.current.localDescription
+              offer: pcRef.current.localDescription,
             });
           }
         } catch (err) {
@@ -832,7 +921,10 @@ export default function App() {
       );
       addStatus("Broadcast started.");
     } catch (e) {
-      addStatus("Failed to capture screen: " + (e.message || "Unknown error"), true);
+      addStatus(
+        "Failed to capture screen: " + (e.message || "Unknown error"),
+        true,
+      );
     }
   };
 
@@ -850,7 +942,7 @@ export default function App() {
   const handleFullscreen = async () => {
     const videoElement = remoteVideoRef.current;
     if (!videoElement) return;
-  
+
     try {
       if (videoElement.requestFullscreen) {
         await videoElement.requestFullscreen();
@@ -860,7 +952,10 @@ export default function App() {
         await videoElement.msRequestFullscreen();
       }
     } catch (e) {
-      console.error("[Fullscreen] Ошибка при переходе в полноэкранный режим:", e);
+      console.error(
+        "[Fullscreen] Ошибка при переходе в полноэкранный режим:",
+        e,
+      );
     }
   };
 
@@ -883,7 +978,9 @@ export default function App() {
     addStatus("Regenerating ID...");
     try {
       if (myChannelRef.current) {
-        await supabaseClientRef.current.removeChannel(myChannelRef.current).catch(() => {});
+        await supabaseClientRef.current
+          .removeChannel(myChannelRef.current)
+          .catch(() => {});
         myChannelRef.current = null;
       }
       await new Promise((r) => setTimeout(r, 500));
