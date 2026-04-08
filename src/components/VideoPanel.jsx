@@ -1,4 +1,5 @@
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
+import { FullscreenPlayer } from "./FullscreenPlayer.jsx";
 
 export const VideoPanel = forwardRef(function VideoPanel(
   {
@@ -20,11 +21,34 @@ export const VideoPanel = forwardRef(function VideoPanel(
   },
   ref,
 ) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const formatBitrate = (bps) => {
     if (bps >= 8_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
     if (bps >= 1_000) return `${(bps / 1_000).toFixed(0)} Kbps`;
     return `${bps} bps`;
   };
+
+  const handleFullscreen = (e) => {
+    e.stopPropagation();
+    if (!isLocal) {
+      setIsFullscreen(true);
+    }
+  };
+
+  const handleCloseFullscreen = () => {
+    setIsFullscreen(false);
+  };
+
+  if (isFullscreen && !isLocal) {
+    return (
+      <FullscreenPlayer
+        videoRef={videoRef}
+        meta={meta}
+        bitrate={bitrate}
+        onClose={handleCloseFullscreen}
+      />
+    );
+  }
   return (
     <div
       className={`flex-1 min-h-0 bg-panel border border-border rounded-[8px] flex flex-col overflow-hidden ${className}`}
@@ -108,7 +132,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
               </button>
               <button
                 className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap"
-                onClick={onFullscreen}
+                onClick={handleFullscreen}
               >
                 <svg
                   width="11"

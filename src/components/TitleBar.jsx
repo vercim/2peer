@@ -1,4 +1,10 @@
-export function TitleBar({ statusDotColor = "#444" }) {
+import { TextMorph } from "torph/react";
+
+export function TitleBar({
+  statusDotColor = "#444",
+  connectionStatus = "idle",
+  hasActiveCall = false,
+}) {
   const handleMinimize = () => {
     if (window.electronAPI?.minimizeWindow) {
       window.electronAPI.minimizeWindow();
@@ -8,6 +14,20 @@ export function TitleBar({ statusDotColor = "#444" }) {
   const handleClose = () => {
     if (window.electronAPI?.closeWindow) {
       window.electronAPI.closeWindow();
+    }
+  };
+
+  const getStatusText = () => {
+    if (hasActiveCall) {
+      return "2peer - in call";
+    }
+    switch (connectionStatus) {
+      case "connected":
+        return "2peer";
+      case "connecting":
+        return "2peer - connecting";
+      default:
+        return "2peer";
     }
   };
 
@@ -22,11 +42,13 @@ export function TitleBar({ statusDotColor = "#444" }) {
           style={{ backgroundColor: statusDotColor }}
           id="statusDot"
         />
-        2peer
+        <TextMorph ease={{ stiffness: 200, damping: 20 }}>
+          {getStatusText()}
+        </TextMorph>
       </div>
       <div className="flex" style={{ WebkitAppRegion: "no-drag" }}>
         <button
-          className="w-[40px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
+          className="w-[36px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
           onClick={handleMinimize}
           title="Minimize"
         >
@@ -35,7 +57,7 @@ export function TitleBar({ statusDotColor = "#444" }) {
           </svg>
         </button>
         <button
-          className="w-[50px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
+          className="w-[44px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,62,62,0.07)] hover:text-text rounded-[0]"
           onClick={handleClose}
           title="Close"
         >

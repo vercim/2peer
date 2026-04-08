@@ -59,6 +59,7 @@
     line-height: 1.4;
     padding: 2px 0;
     word-break: break-word;
+    animation: fadeIn 0.3s ease-out;
   }
 
   .entry:last-child {
@@ -185,5 +186,16 @@
   body:has(.fs-center-close.visible) .fs-center-close,
   .fs-center-close.visible {
     opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }

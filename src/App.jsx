@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar.jsx";
 import { VideoPanel } from "./components/VideoPanel.jsx";
 import { SourcePicker } from "./components/SourcePicker.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
+import { soundManager } from "./utils/SoundManager.js";
 
 const rtcConfig = {
   iceServers: [
@@ -95,7 +96,20 @@ function applyMaxQualityEncoding(sender) {
   if (!sender || sender.track?.kind !== "video") return;
   const params = sender.getParameters();
   params.encodings ??= [{}];
-  let maxBitrate = 15_000_000;
+
+  const settings = sender.track.getSettings();
+  const width = settings.width || 1920;
+  const height = settings.height || 1080;
+  const pixels = width * height;
+
+  let maxBitrate;
+  if (pixels >= 3840 * 2160) {
+    maxBitrate = 30_000_000;
+  } else if (pixels >= 2560 * 1440) {
+    maxBitrate = 12_000_000;
+  } else {
+    maxBitrate = 6_000_000;
+  }
 
   params.encodings.forEach((enc) => {
     enc.maxBitrate = maxBitrate;
@@ -103,6 +117,7 @@ function applyMaxQualityEncoding(sender) {
     enc.scaleResolutionDownBy = 1.0;
     enc.priority = "high";
     enc.networkPriority = "high";
+    enc.bitratePriority = 10;
   });
   sender.setParameters(params).catch(console.error);
 
@@ -112,9 +127,10 @@ function applyMaxQualityEncoding(sender) {
 }
 
 function setMaxBandwidthInSDP(sdp) {
-  return sdp
-    .replace(/b=AS:[0-9]+/g, "b=AS:15000")
-    .replace(/b=TIAS:[0-9]+/g, "b=TIAS:15000000");
+  let bandwidth = 15000;
+  sdp = sdp.replace(/b=AS:[0-9]+/g, `b=AS:${bandwidth}`);
+  sdp = sdp.replace(/b=TIAS:[0-9]+/g, `b=TIAS:${bandwidth * 1000}`);
+  return sdp;
 }
 
 export default function App() {
@@ -129,8 +145,8 @@ export default function App() {
   });
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
-  const [localMeta, setLocalMeta] = useState("—");
-  const [remoteMeta, setRemoteMeta] = useState("—");
+  const [localMeta, setLocalMeta] = useState("—-");
+  const [remoteMeta, setRemoteMeta] = useState("—-");
   const [remoteBitrate, setRemoteBitrate] = useState(0);
   const [currentPeerId, setCurrentPeerId] = useState("");
   const [hasActiveCall, setHasActiveCall] = useState(false);
@@ -213,7 +229,8 @@ export default function App() {
   }, []);
 
   const addStatus = useCallback((msg, isError = false) => {
-    setStatusLog((prev) => [...prev.slice(-49), { text: msg, isError }]);
+    const id = Date.now() + Math.random();
+    setStatusLog((prev) => [...prev.slice(-49), { id, text: msg, isError }]);
   }, []);
 
   useEffect(() => {
@@ -377,8 +394,12 @@ export default function App() {
       addStatus("No connection to Supabase.", true);
       return;
     }
+    if (!outChannelRef.current) {
+      return;
+    }
     try {
       await ensureOutChannel(payload.to);
+      if (!outChannelRef.current) return;
       const signalPayload = { ...payload, from: selfId };
       await outChannelRef.current.send({
         type: "broadcast",
@@ -386,13 +407,16 @@ export default function App() {
         payload: signalPayload,
       });
     } catch (e) {
-      addStatus("Send error: " + e.message, true);
+      if (outChannelRef.current) {
+        addStatus("Send error: " + e.message, true);
+      }
     }
   };
 
   const handleSignal = async (msg) => {
     if (msg.type === "call") {
       setIncomingCall({ from: msg.from, offer: msg.offer });
+      soundManager.playIncoming();
       addStatus(
         `Incoming call from <strong style="font-family:monospace">${msg.from}</strong>.`,
       );
@@ -417,7 +441,6 @@ export default function App() {
       }
       pendingIceRef.current = [];
 
-      setStatusDotColor("#4ade80");
       addStatus(
         `<strong style="font-family:monospace">${msg.from}</strong> accepted the call.`,
       );
@@ -574,6 +597,7 @@ export default function App() {
         setHasActiveCall(true);
         setStatusDotColor("#4ade80");
         setCallStatus("connected");
+        soundManager.playConnect();
 
         setTimeout(() => {
           try {
@@ -680,16 +704,6 @@ export default function App() {
       return;
     }
 
-    const ok = await new Promise((r) =>
-      setConfirmDialog({
-        isOpen: true,
-        message: `Call <strong>${peerId}</strong>?`,
-        onConfirm: () => r(true),
-        onCancel: () => r(false),
-      }),
-    );
-    if (!ok) return;
-
     hangup(false);
     isPoliteRef.current = false;
     hangupProcessedRef.current = false;
@@ -716,6 +730,7 @@ export default function App() {
     addStatus(
       `Calling <strong style="font-family:monospace">${peerId}</strong>...`,
     );
+    soundManager.playCall();
     setStatusDotColor("#f97316");
     setCallStatus("connecting");
   };
@@ -763,6 +778,7 @@ export default function App() {
     addStatus(
       `Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`,
     );
+    soundManager.playConnecting();
     setStatusDotColor("#f97316");
     setCallStatus("connecting");
   };
@@ -780,6 +796,7 @@ export default function App() {
   const hangup = (notify = true) => {
     if (notify && currentPeerId)
       sendSignal({ type: "hangup", to: currentPeerId });
+    soundManager.playDisconnect();
     if (outChannelRef.current) {
       supabaseClientRef.current
         ?.removeChannel(outChannelRef.current)
@@ -804,11 +821,11 @@ export default function App() {
       setLocalStream(null);
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    setLocalMeta("—");
+    setLocalMeta("—-");
     setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     setRemoteStream(null);
-    setRemoteMeta("—");
+    setRemoteMeta("—-");
     setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
   };
 
@@ -850,7 +867,7 @@ export default function App() {
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
-    setLocalMeta("—");
+    setLocalMeta("—-");
     addStatus("Broadcast stopped.");
     if (currentPeerId && pcRef.current?.connectionState === "connected")
       sendSignal({ type: "stop-broadcast", to: currentPeerId });
@@ -961,7 +978,6 @@ export default function App() {
 
   const handleCopyId = async () => {
     await navigator.clipboard.writeText(selfId);
-    addStatus("ID copied.");
   };
 
   const handleRegenId = async () => {
@@ -976,6 +992,7 @@ export default function App() {
     if (!ok) return;
 
     addStatus("Regenerating ID...");
+    soundManager.playIdChange();
     try {
       if (myChannelRef.current) {
         await supabaseClientRef.current
@@ -1012,9 +1029,26 @@ export default function App() {
     addStatus("Call ended.");
   };
 
+  const handleCancelCall = () => {
+    if (outChannelRef.current) {
+      supabaseClientRef.current
+        ?.removeChannel(outChannelRef.current)
+        .catch(() => {});
+      outChannelRef.current = null;
+    }
+    setCallStatus("idle");
+    setStatusDotColor("#888");
+    soundManager.playCancel();
+    addStatus("Call cancelled.");
+  };
+
   return (
     <div className="h-screen flex flex-col bg-bg text-text font-sans text-[13px] antialiased overflow-hidden">
-      <TitleBar statusDotColor={statusDotColor} />
+      <TitleBar
+        statusDotColor={statusDotColor}
+        connectionStatus={callStatus}
+        hasActiveCall={hasActiveCall}
+      />
       <div className="h-[calc(100vh-38px)] grid grid-cols-[272px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden">
         <Sidebar
           selfId={selfId}
@@ -1022,6 +1056,7 @@ export default function App() {
           onRegenId={handleRegenId}
           onCall={handleCall}
           onHangup={handleHangup}
+          onCancelCall={handleCancelCall}
           onAccept={handleAcceptCall}
           onDecline={handleDeclineCall}
           hasIncomingCall={!!incomingCall}

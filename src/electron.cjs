@@ -23,7 +23,13 @@ function ensureProfile() {
     if (parsed && typeof parsed.id === "string" && parsed.id.length >= 8)
       return parsed;
   } catch (_) {}
-  const profile = { id: crypto.randomBytes(6).toString("hex") };
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let id = "";
+  const bytes = crypto.randomBytes(12);
+  for (let i = 0; i < 12; i++) {
+    id += chars[bytes[i] % chars.length];
+  }
+  const profile = { id };
   fs.mkdirSync(path.dirname(getSettingsFile()), { recursive: true });
   fs.writeFileSync(getSettingsFile(), JSON.stringify(profile, null, 2));
   return profile;
@@ -73,10 +79,9 @@ function createWindow() {
 
   mainWindow.loadFile(indexPath);
 
-  // Открываем devtools только в development режиме
-  if (isDev) {
-    mainWindow.webContents.openDevTools();
-  }
+  // if (isDev) {
+  //   mainWindow.webContents.openDevTools();
+  // }
 
   return mainWindow;
 }
@@ -84,7 +89,13 @@ function createWindow() {
 function registerIpcHandlers() {
   ipcMain.handle("profile:get", () => ensureProfile());
   ipcMain.handle("profile:regen", () => {
-    const profile = { id: crypto.randomBytes(6).toString("hex") };
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let id = "";
+    const bytes = crypto.randomBytes(12);
+    for (let i = 0; i < 12; i++) {
+      id += chars[bytes[i] % chars.length];
+    }
+    const profile = { id };
     setProfile(profile);
     return profile;
   });
