@@ -133,7 +133,6 @@ export default function App() {
   const [localVideoWrapClass, setLocalVideoWrapClass] = useState(
     "flex-1 min-h-0 relative bg-[#050505] placeholder",
   );
-  const [remoteVideoWrapRef, setRemoteVideoWrapRef] = useState(null);
   const [isElectronReady, setIsElectronReady] = useState(false);
 
   const localVideoRef = useRef(null);
@@ -234,10 +233,6 @@ export default function App() {
       })();
     }
   }, [isElectronReady]);
-
-  useEffect(() => {
-    setRemoteVideoWrapRef(remoteVideoRef.current);
-  }, [remoteVideoRef]);
 
   const connectSupabase = async (url, key, id) => {
     if (!window.supabase) {
@@ -853,11 +848,19 @@ export default function App() {
   };
 
   const handleFullscreen = async () => {
-    if (remoteVideoWrapRef.current) {
-      const wrap = remoteVideoWrapRef.current;
-      if (wrap?.requestFullscreen) await wrap.requestFullscreen();
-      else if (wrap?.webkitRequestFullscreen)
-        await wrap.webkitRequestFullscreen();
+    const videoElement = remoteVideoRef.current;
+    if (!videoElement) return;
+  
+    try {
+      if (videoElement.requestFullscreen) {
+        await videoElement.requestFullscreen();
+      } else if (videoElement.webkitRequestFullscreen) {
+        await videoElement.webkitRequestFullscreen();
+      } else if (videoElement.msRequestFullscreen) {
+        await videoElement.msRequestFullscreen();
+      }
+    } catch (e) {
+      console.error("[Fullscreen] Ошибка при переходе в полноэкранный режим:", e);
     }
   };
 
