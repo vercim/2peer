@@ -12,6 +12,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
     onPiP,
     onFullscreen,
     isBroadcasting = false,
+    canBroadcast = false,
     showPlaceholder = false,
     className = "",
     videoRef,
@@ -40,8 +41,9 @@ export const VideoPanel = forwardRef(function VideoPanel(
           {showControls && isLocal && (
             <>
               <button
-                className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 whitespace-nowrap ${isBroadcasting ? "text-green-400 hover:text-text" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)]"}`}
+                className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 whitespace-nowrap ${!canBroadcast ? "opacity-40 cursor-not-allowed" : isBroadcasting ? "text-green-400 hover:text-text cursor-pointer" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
                 onClick={onBroadcast}
+                disabled={!canBroadcast}
               >
                 <svg
                   width="11"

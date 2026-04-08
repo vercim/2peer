@@ -5,8 +5,6 @@ import { VideoPanel } from "./components/VideoPanel.jsx";
 import { SourcePicker } from "./components/SourcePicker.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
 import { StatusLog } from "./components/StatusLog.jsx";
-import { useWebRTC, useBroadcast } from "./hooks/useWebRTC.js";
-import { useSupabase } from "./hooks/useSupabase.js";
 
 const rtcConfig = {
   iceServers: [
@@ -1105,6 +1103,7 @@ export default function App() {
               showPlaceholder={!streamHasVideo(localStream)}
               videoRef={localVideoRef}
               containerRef={localVideoRef}
+              canBroadcast={pcRef.current?.connectionState === "connected"}
             />
             <VideoPanel
               ref={remoteVideoRef}
