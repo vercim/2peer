@@ -11,6 +11,11 @@ const rtcConfig = {
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
     { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
+    { urls: "stun:stun1.stunprotocol.org:3478" },
+    { urls: "stun:stun2.stunprotocol.org:3478" },
+    { urls: "stun:stun.ekiga.net:3478" },
+    { urls: "stun:stun.ideasip.com:3478" },
     {
       urls: "turn:openrelay.metered.ca:80",
       username: "openrelayproject",
@@ -21,8 +26,56 @@ const rtcConfig = {
       username: "openrelayproject",
       credential: "openrelayproject",
     },
+    {
+      urls: "turn:relay.webtelek.com:3478",
+      username: "free",
+      credential: "free",
+    },
   ],
+  iceCandidatePoolSize: 10,
+  sdpSemantics: "unified-plan",
 };
+
+function getStunServers() {
+  const stunIPs = [
+    "74.125.143.127:19302",
+    "142.250.80.127:19302",
+    "172.217.12.227:19302",
+    "142.250.136.127:19302",
+  ];
+  return stunIPs.map((ip) => ({
+    urls: `stun:${ip}`,
+  }));
+}
+
+async function gatherLocalCandidates(pc) {
+  try {
+    const pc2 = new RTCPeerConnection({ iceServers: [] });
+    const localIPs = [];
+
+    pc2.createDataChannel("temp");
+    const offer = await pc2.createOffer();
+    await pc2.setLocalDescription(offer);
+
+    pc2.onicecandidate = (e) => {
+      if (e.candidate?.candidate) {
+        const match = e.candidate.candidate.match(/([0-9.]+)/);
+        if (match) localIPs.push(match[1]);
+      }
+    };
+
+    await new Promise((r) => setTimeout(r, 500));
+    pc2.close();
+
+    const uniqueIPs = [...new Set(localIPs)].filter(
+      (ip) => !ip.startsWith("127."),
+    );
+    return uniqueIPs;
+  } catch (e) {
+    console.warn("[PC] Local IP gathering failed:", e);
+    return [];
+  }
+}
 
 function streamHasVideo(stream) {
   try {
@@ -494,7 +547,7 @@ export default function App() {
     }
   };
 
-  const createPeerConnection = (peerId) => {
+  const createPeerConnection = async (peerId) => {
     console.log("[PC] Creating peer connection for:", peerId);
     setCurrentPeerId(peerId);
     if (pcRef.current) {
@@ -509,8 +562,25 @@ export default function App() {
       window._prevBytesReceived = 0;
     }
 
+    console.log("[PC] Gathering local IPs...");
+    const localIPs = await gatherLocalCandidates(pcRef.current || null);
+    console.log("[PC] Local IPs found:", localIPs);
+
+    const localStunServers = localIPs.map((ip) => ({
+      urls: `stun:${ip}:19302`,
+    }));
+
     console.log("[PC] Creating new RTCPeerConnection with config:", rtcConfig);
-    const pc = new RTCPeerConnection(rtcConfig);
+    const configWithIPs = {
+      ...rtcConfig,
+      iceServers: [
+        ...rtcConfig.iceServers,
+        ...getStunServers(),
+        ...localStunServers,
+      ],
+    };
+    console.log("[PC] Full ICE config:", configWithIPs);
+    const pc = new RTCPeerConnection(configWithIPs);
 
     pc.ontrack = (event) => {
       console.log("[PC] ontrack fired!", event);
@@ -705,7 +775,7 @@ export default function App() {
 
     console.log("[Call] Creating peer connection...");
     answerProcessedRef.current = false;
-    createPeerConnection(peerId);
+    await createPeerConnection(peerId);
 
     console.log("[Call] Attaching local tracks...");
     await attachLocalTracks();
@@ -761,7 +831,7 @@ export default function App() {
 
     isPoliteRef.current = true;
     console.log("[Accept] Creating peer connection...");
-    createPeerConnection(from);
+    await createPeerConnection(from);
 
     console.log("[Accept] Attaching local tracks...");
     await attachLocalTracks();
