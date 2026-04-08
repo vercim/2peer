@@ -400,6 +400,13 @@ export default function App() {
         console.warn("[Signal] No peer connection to set answer");
         return;
       }
+      if (pcRef.current.signalingState !== "have-local-offer") {
+        console.warn(
+          "[Signal] Answer received in wrong state:",
+          pcRef.current.signalingState,
+        );
+        return;
+      }
       await pcRef.current.setRemoteDescription(msg.answer);
       console.log("[Signal] Remote description set successfully");
       pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
@@ -449,6 +456,13 @@ export default function App() {
     if (msg.type === "renegotiate-answer") {
       console.log("[Signal] Received renegotiation answer");
       if (!pcRef.current) return;
+      if (pcRef.current.signalingState !== "have-local-offer") {
+        console.warn(
+          "[Signal] Renegotiate answer received in wrong state:",
+          pcRef.current.signalingState,
+        );
+        return;
+      }
       await pcRef.current.setRemoteDescription(msg.answer);
       pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
     }
