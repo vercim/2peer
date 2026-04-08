@@ -44,7 +44,6 @@ function applyMaxQualityEncoding(sender) {
 
 export default function App() {
   const [selfId, setSelfId] = useState("");
-  const [serverInfo, setServerInfo] = useState("");
   const [statusDotColor, setStatusDotColor] = useState("#444");
   const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
@@ -57,18 +56,12 @@ export default function App() {
   const [currentPeerId, setCurrentPeerId] = useState("");
   const [hasActiveCall, setHasActiveCall] = useState(false);
   const [localStream, setLocalStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
   const [config, setConfig] = useState(null);
-  const [remoteVideoWrapClass, setRemoteVideoWrapClass] = useState(
-    "flex-1 min-h-0 relative bg-[#050505] placeholder"
-  );
-  const [localVideoWrapClass, setLocalVideoWrapClass] = useState(
-    "flex-1 min-h-0 relative bg-[#050505] placeholder"
-  );
   const [isElectronReady, setIsElectronReady] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteContainerRef = useRef(null);
   const pcRef = useRef(null);
   const outChannelRef = useRef(null);
   const pendingIceRef = useRef([]);
@@ -77,7 +70,7 @@ export default function App() {
   const bitrateIntervalRef = useRef(null);
   const answerProcessedRef = useRef(false);
   const hangupProcessedRef = useRef(false);
-  // Refs that always hold the latest value (avoid stale closures in async code)
+  // Refs for always-fresh values inside async callbacks (avoid stale closures)
   const selfIdRef = useRef("");
   const currentPeerIdRef = useRef("");
   const localStreamRef = useRef(null);
@@ -126,13 +119,13 @@ export default function App() {
     if (window.electronAPI) {
       setIsElectronReady(true);
     } else {
-      const checkInterval = setInterval(() => {
+      const id = setInterval(() => {
         if (window.electronAPI) {
           setIsElectronReady(true);
-          clearInterval(checkInterval);
+          clearInterval(id);
         }
       }, 100);
-      return () => clearInterval(checkInterval);
+      return () => clearInterval(id);
     }
   }, []);
 
@@ -167,7 +160,6 @@ export default function App() {
           auth: { persistSession: false, autoRefreshToken: false },
         });
         supabaseClientRef.current = client;
-        setServerInfo("Supabase Realtime");
       } catch (e) {
         addStatus("Supabase init error: " + e.message, true);
         return;
@@ -216,7 +208,6 @@ export default function App() {
       addStatus("No connection to Supabase.", true);
       return;
     }
-    // Use ref to always have the current selfId even inside stale closures
     const signalPayload = { ...payload, from: selfIdRef.current };
     try {
       await ensureOutChannel(payload.to);
@@ -243,7 +234,6 @@ export default function App() {
       if (pcRef.current.signalingState !== "have-local-offer") return;
       answerProcessedRef.current = true;
       await pcRef.current.setRemoteDescription(msg.answer);
-      // Drain queued ICE candidates AFTER remote description is set
       for (const c of pendingIceRef.current) {
         await pcRef.current.addIceCandidate(c).catch(() => {});
       }
@@ -259,10 +249,8 @@ export default function App() {
         pendingIceRef.current.push(msg.candidate);
         return;
       }
-      try {
-        await pcRef.current.addIceCandidate(msg.candidate);
-      } catch (e) {
-        console.error("[Signal] Failed to add ICE candidate:", e);
+      try { await pcRef.current.addIceCandidate(msg.candidate); } catch (e) {
+        console.error("[Signal] ICE candidate error:", e);
       }
     }
 
@@ -275,11 +263,7 @@ export default function App() {
         pendingIceRef.current = [];
         const answer = await pcRef.current.createAnswer();
         await pcRef.current.setLocalDescription(answer);
-        sendSignal({
-          type: "renegotiate-answer",
-          to: msg.from,
-          answer: pcRef.current.localDescription,
-        });
+        sendSignal({ type: "renegotiate-answer", to: msg.from, answer: pcRef.current.localDescription });
       } catch (e) {
         console.warn("[Signal] Renegotiate failed:", e.message);
       }
@@ -301,7 +285,6 @@ export default function App() {
         remoteVideoRef.current.srcObject.getTracks().forEach((t) => t.stop());
         remoteVideoRef.current.srcObject = null;
       }
-      setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
       setRemoteMeta("\u2014");
       addStatus("Peer broadcast ended.");
     }
@@ -338,13 +321,10 @@ export default function App() {
     const pc = new RTCPeerConnection(rtcConfig);
 
     pc.ontrack = (event) => {
-      setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
-      // IMPORTANT: use streams[0] if present, else wrap track in new MediaStream
       const stream = event.streams?.[0] ?? new MediaStream([event.track]);
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
       }
-      setRemoteStream(stream);
       const s = event.track.getSettings?.() ?? {};
       setRemoteMeta(
         `${s.width ?? "?"}x${s.height ?? "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`
@@ -357,8 +337,8 @@ export default function App() {
       if (candidate) sendSignal({ type: "candidate", to: peerId, candidate });
     };
 
-    pc.onicecandidateerror = (event) => {
-      console.warn("[PC] ICE error:", event.errorText || event.errorCode);
+    pc.onicecandidateerror = (e) => {
+      console.warn("[PC] ICE error:", e.errorText || e.errorCode);
     };
 
     pc.onconnectionstatechange = () => {
@@ -405,26 +385,23 @@ export default function App() {
   };
 
   /**
-   * attachLocalTracks — syncs localStream tracks onto the peer connection.
-   * @param {boolean} triggerRenegotiate — if true AND already connected,
-   *   sends a renegotiation offer so the remote side receives the new track.
+   * Syncs current localStream tracks onto PeerConnection.
+   * Pass triggerRenegotiate=true when already connected to notify remote peer.
    */
   const attachLocalTracks = async (triggerRenegotiate = false) => {
     const stream = localStreamRef.current;
     if (!stream || !stream.active || !pcRef.current) return;
-
     const senders = pcRef.current.getSenders();
     for (const track of stream.getTracks()) {
-      const existingSender = senders.find((s) => s.track?.kind === track.kind);
-      if (existingSender) {
-        await existingSender.replaceTrack(track);
-        applyMaxQualityEncoding(existingSender);
+      const existing = senders.find((s) => s.track?.kind === track.kind);
+      if (existing) {
+        await existing.replaceTrack(track);
+        applyMaxQualityEncoding(existing);
       } else {
         const sender = pcRef.current.addTrack(track, stream);
         setTimeout(() => applyMaxQualityEncoding(sender), 500);
       }
     }
-
     if (
       triggerRenegotiate &&
       pcRef.current.connectionState === "connected" &&
@@ -465,7 +442,6 @@ export default function App() {
     hangupProcessedRef.current = false;
 
     await createPeerConnection(peerId);
-    // Attach tracks BEFORE createOffer so they appear in the SDP
     await attachLocalTracks(false);
 
     const offer = await pcRef.current.createOffer({ offerToReceiveVideo: true });
@@ -492,15 +468,13 @@ export default function App() {
       setRemoteBitrate(0);
       window._prevBytesReceived = 0;
     }
-
     hangupProcessedRef.current = false;
     answerProcessedRef.current = false;
 
     await createPeerConnection(from);
-    // Attach local tracks BEFORE setting remote description
     await attachLocalTracks(false);
-
     await pcRef.current.setRemoteDescription(offer);
+
     for (const c of pendingIceRef.current) {
       await pcRef.current.addIceCandidate(c).catch(() => {});
     }
@@ -558,12 +532,9 @@ export default function App() {
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     setLocalMeta("\u2014");
-    setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
 
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    setRemoteStream(null);
     setRemoteMeta("\u2014");
-    setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
   };
 
   // ── Broadcast ─────────────────────────────────────────────────────────────
@@ -582,7 +553,6 @@ export default function App() {
       localStreamRef.current = null;
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
     setLocalMeta("\u2014");
     addStatus("Broadcast stopped.");
     if (currentPeerIdRef.current && pcRef.current?.connectionState === "connected") {
@@ -592,19 +562,16 @@ export default function App() {
 
   const handleSourceSelected = async (sourceId) => {
     setSourcePickerOpen(false);
-
     const oldStream = localStreamRef.current;
     if (oldStream) {
       oldStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
       localStreamRef.current = null;
     }
-
     try {
       if (window.electronAPI?.setPendingSource) {
         await window.electronAPI.setPendingSource(sourceId);
       }
-
       const newStream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           width: { ideal: 2560, max: 2560 },
@@ -615,24 +582,19 @@ export default function App() {
         audio: false,
         selfBrowserSurface: "exclude",
       });
-
       const [track] = newStream.getVideoTracks();
       track.onended = () => stopBroadcast();
 
       setLocalStream(newStream);
       localStreamRef.current = newStream;
+      if (localVideoRef.current) localVideoRef.current.srcObject = newStream;
 
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = newStream;
-      }
-
-      // KEY FIX: triggerRenegotiate=true so remote peer gets the new stream
+      // KEY FIX: triggerRenegotiate=true so remote peer gets the stream
       if (pcRef.current) {
         await attachLocalTracks(true);
         pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
       }
 
-      setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
       const s = track.getSettings?.() ?? {};
       setLocalMeta(
         `${s.width ?? "?"}x${s.height ?? "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`
@@ -642,9 +604,6 @@ export default function App() {
       addStatus("Failed to capture screen: " + (e.message || "Unknown error"), true);
     }
   };
-
-  const handleBroadcast = () => setSourcePickerOpen(true);
-  const handleChangeSource = () => setSourcePickerOpen(true);
 
   const handlePiP = async () => {
     try {
@@ -656,7 +615,7 @@ export default function App() {
   };
 
   const handleFullscreen = async () => {
-    const wrap = remoteVideoRef.current?.parentElement;
+    const wrap = remoteContainerRef.current;
     if (wrap?.requestFullscreen) await wrap.requestFullscreen();
     else if (wrap?.webkitRequestFullscreen) await wrap.webkitRequestFullscreen();
   };
@@ -713,46 +672,63 @@ export default function App() {
     addStatus("Call ended.");
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-screen bg-[#0a0a0a] text-white select-none overflow-hidden">
-      <TitleBar
-        selfId={selfId}
-        serverInfo={serverInfo}
-        statusDotColor={statusDotColor}
-        onCopyId={handleCopyId}
-        onMinimize={() => window.electronAPI?.minimizeWindow()}
-        onClose={() => window.electronAPI?.closeWindow()}
-      />
+      <TitleBar statusDotColor={statusDotColor} />
+
       <div className="flex flex-1 min-h-0">
+        {/* Sidebar: props match Sidebar component signature exactly */}
         <Sidebar
           selfId={selfId}
-          callStatus={callStatus}
-          hasActiveCall={hasActiveCall}
-          localStream={localStream}
+          onCopyId={handleCopyId}
+          onRegenId={handleRegenId}
           onCall={handleCall}
           onHangup={handleHangup}
-          onBroadcast={handleBroadcast}
-          onStopBroadcast={stopBroadcast}
-          onChangeSource={handleChangeSource}
-          onRegenId={handleRegenId}
-          incomingCall={incomingCall}
-          onAcceptCall={handleAcceptCall}
-          onDeclineCall={handleDeclineCall}
-        />
-        <VideoPanel
-          localVideoRef={localVideoRef}
-          remoteVideoRef={remoteVideoRef}
-          localMeta={localMeta}
-          remoteMeta={remoteMeta}
-          remoteBitrate={remoteBitrate}
-          localVideoWrapClass={localVideoWrapClass}
-          remoteVideoWrapClass={remoteVideoWrapClass}
+          onAccept={handleAcceptCall}
+          onDecline={handleDeclineCall}
+          hasIncomingCall={!!incomingCall}
+          callerId={incomingCall?.from ?? ""}
           hasActiveCall={hasActiveCall}
-          onPiP={handlePiP}
-          onFullscreen={handleFullscreen}
-          statusLog={statusLog}
+          connectionStatus={callStatus}
+          statusMessages={statusLog}
         />
+
+        {/* Video panels: VideoPanel is called twice (local + remote) */}
+        <div className="flex flex-1 min-h-0 flex-col gap-2 p-2">
+          {/* Remote video */}
+          <VideoPanel
+            title="Remote"
+            meta={remoteMeta}
+            bitrate={remoteBitrate}
+            showControls={true}
+            isLocal={false}
+            showPlaceholder={!hasActiveCall}
+            isBroadcasting={false}
+            canBroadcast={false}
+            onPiP={handlePiP}
+            onFullscreen={handleFullscreen}
+            videoRef={remoteVideoRef}
+            containerRef={remoteContainerRef}
+          />
+
+          {/* Local video */}
+          <VideoPanel
+            title="Local"
+            meta={localMeta}
+            bitrate={0}
+            showControls={true}
+            isLocal={true}
+            showPlaceholder={!localStream}
+            isBroadcasting={!!localStream}
+            canBroadcast={true}
+            onBroadcast={() => setSourcePickerOpen(true)}
+            onChangeSource={() => setSourcePickerOpen(true)}
+            videoRef={localVideoRef}
+          />
+        </div>
       </div>
+
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         message={confirmDialog.message}
@@ -765,6 +741,7 @@ export default function App() {
           setConfirmDialog({ isOpen: false, message: "" });
         }}
       />
+
       {sourcePickerOpen && (
         <SourcePicker
           onSelect={handleSourceSelected}
