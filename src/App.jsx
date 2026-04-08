@@ -11,6 +11,10 @@ const rtcConfig = {
     { urls: "stun:stun2.l.google.com:19302" },
     { urls: "stun:stun3.l.google.com:19302" },
     { urls: "stun:stun4.l.google.com:19302" },
+    { urls: "stun:stun1.stunprotocol.org:3478" },
+    { urls: "stun:stun2.stunprotocol.org:3478" },
+    { urls: "stun:stun.ekiga.net:3478" },
+    { urls: "stun:stun.ideasip.com:3478" },
     {
       urls: "turn:openrelay.metered.ca:80",
       username: "openrelayproject",
@@ -21,19 +25,80 @@ const rtcConfig = {
       username: "openrelayproject",
       credential: "openrelayproject",
     },
+    {
+      urls: "turn:relay.webtelek.com:3478",
+      username: "free",
+      credential: "free",
+    },
   ],
   iceCandidatePoolSize: 10,
   sdpSemantics: "unified-plan",
 };
 
+function getStunServers() {
+  const stunIPs = [
+    "74.125.143.127:19302",
+    "142.250.80.127:19302",
+    "172.217.12.227:19302",
+    "142.250.136.127:19302",
+  ];
+  return stunIPs.map((ip) => ({
+    urls: `stun:${ip}`,
+  }));
+}
+
+async function gatherLocalCandidates(pc) {
+  try {
+    const pc2 = new RTCPeerConnection({ iceServers: [] });
+    const localIPs = [];
+
+    pc2.createDataChannel("temp");
+    const offer = await pc2.createOffer();
+    await pc2.setLocalDescription(offer);
+
+    pc2.onicecandidate = (e) => {
+      if (e.candidate?.candidate) {
+        const match = e.candidate.candidate.match(
+          /([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/,
+        );
+        if (match) localIPs.push(match[1]);
+      }
+    };
+
+    await new Promise((r) => setTimeout(r, 500));
+    pc2.close();
+
+    const uniqueIPs = [...new Set(localIPs)].filter(
+      (ip) => !ip.startsWith("127."),
+    );
+    return uniqueIPs;
+  } catch (e) {
+    console.warn("[PC] Local IP gathering failed:", e);
+    return [];
+  }
+}
+
+function streamHasVideo(stream) {
+  try {
+    return (
+      stream &&
+      stream.active &&
+      stream.getVideoTracks &&
+      stream.getVideoTracks().length > 0
+    );
+  } catch {
+    return false;
+  }
+}
+
 function applyMaxQualityEncoding(sender) {
   if (!sender || sender.track?.kind !== "video") return;
   const params = sender.getParameters();
-  if (!params.encodings || params.encodings.length === 0) {
-    params.encodings = [{}];
-  }
+  params.encodings ??= [{}];
+  let maxBitrate = 15_000_000;
+
   params.encodings.forEach((enc) => {
-    enc.maxBitrate = 15_000_000;
+    enc.maxBitrate = maxBitrate;
     enc.maxFramerate = 60;
     enc.scaleResolutionDownBy = 1.0;
     enc.priority = "high";
@@ -44,51 +109,64 @@ function applyMaxQualityEncoding(sender) {
 
 export default function App() {
   const [selfId, setSelfId] = useState("");
+  const [serverInfo, setServerInfo] = useState("");
   const [statusDotColor, setStatusDotColor] = useState("#444");
   const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
-  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: "" });
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    message: "",
+  });
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
-  const [localMeta, setLocalMeta] = useState("\u2014");
-  const [remoteMeta, setRemoteMeta] = useState("\u2014");
+  const [localMeta, setLocalMeta] = useState("—");
+  const [remoteMeta, setRemoteMeta] = useState("—");
   const [remoteBitrate, setRemoteBitrate] = useState(0);
   const [currentPeerId, setCurrentPeerId] = useState("");
   const [hasActiveCall, setHasActiveCall] = useState(false);
   const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
   const [config, setConfig] = useState(null);
+  const [remoteVideoWrapClass, setRemoteVideoWrapClass] = useState(
+    "flex-1 min-h-0 relative bg-[#050505] placeholder",
+  );
+  const [localVideoWrapClass, setLocalVideoWrapClass] = useState(
+    "flex-1 min-h-0 relative bg-[#050505] placeholder",
+  );
+  const [remoteVideoWrapRef, setRemoteVideoWrapRef] = useState(null);
   const [isElectronReady, setIsElectronReady] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const remoteContainerRef = useRef(null);
   const pcRef = useRef(null);
   const outChannelRef = useRef(null);
   const pendingIceRef = useRef([]);
   const supabaseClientRef = useRef(null);
   const myChannelRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const isPoliteRef = useRef(false);
   const bitrateIntervalRef = useRef(null);
   const answerProcessedRef = useRef(false);
   const hangupProcessedRef = useRef(false);
-  // Refs for always-fresh values inside async callbacks (avoid stale closures)
-  const selfIdRef = useRef("");
-  const currentPeerIdRef = useRef("");
-  const localStreamRef = useRef(null);
-  const configRef = useRef(null);
 
-  useEffect(() => { selfIdRef.current = selfId; }, [selfId]);
-  useEffect(() => { currentPeerIdRef.current = currentPeerId; }, [currentPeerId]);
-  useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
-  useEffect(() => { configRef.current = config; }, [config]);
+  // --- ИСПРАВЛЕНИЕ: Эффекты для удержания стримов в DOM при ререндере ---
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream && remoteVideoRef.current.srcObject !== remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, remoteVideoWrapClass]);
 
-  const addStatus = useCallback((msg, isError = false) => {
-    setStatusLog((prev) => [...prev.slice(-49), { text: msg, isError }]);
-  }, []);
+  useEffect(() => {
+    if (localVideoRef.current && localStream && localVideoRef.current.srcObject !== localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream, localVideoWrapClass]);
+  // --------------------------------------------------------------------
 
   const monitorBitrate = useCallback(() => {
     if (!pcRef.current || pcRef.current.connectionState !== "connected") {
       setRemoteBitrate(0);
-      setRemoteMeta("\u2014");
+      setRemoteMeta("—");
       return;
     }
     pcRef.current.getStats().then((report) => {
@@ -105,49 +183,62 @@ export default function App() {
         }
       });
       if (width > 0 && height > 0) {
-        setRemoteMeta(`${width}x${height} @${frameRate > 0 ? Math.round(frameRate) : "?"}fps`);
+        setRemoteMeta(
+          `${width}×${height} @${frameRate > 0 ? Math.round(frameRate) : "?"}fps`,
+        );
       }
       window._prevBytesReceived = window._prevBytesReceived || bytesReceived;
       const bytesDiff = bytesReceived - window._prevBytesReceived;
       window._prevBytesReceived = bytesReceived;
-      setRemoteBitrate(bytesDiff * 8);
+      const bitsPerSecond = bytesDiff * 8;
+      setRemoteBitrate(bitsPerSecond);
     });
   }, []);
 
-  // ── Electron ready ────────────────────────────────────────────────────────
+  const addStatus = useCallback((msg, isError = false) => {
+    setStatusLog((prev) => [...prev.slice(-49), { text: msg, isError }]);
+  }, []);
+
+  useEffect(() => {
+    console.log("[App] window.electronAPI:", window.electronAPI);
+    console.log("[App] window.supabase:", window.supabase);
+  }, []);
+
   useEffect(() => {
     if (window.electronAPI) {
       setIsElectronReady(true);
     } else {
-      const id = setInterval(() => {
+      const checkInterval = setInterval(() => {
         if (window.electronAPI) {
           setIsElectronReady(true);
-          clearInterval(id);
+          clearInterval(checkInterval);
         }
       }, 100);
-      return () => clearInterval(id);
+      return () => clearInterval(checkInterval);
     }
   }, []);
 
   useEffect(() => {
-    if (!isElectronReady) return;
-    (async () => {
-      try {
-        const profile = await window.electronAPI.getProfile();
-        const cfg = await window.electronAPI.getConfig();
-        setSelfId(profile.id);
-        selfIdRef.current = profile.id;
-        setConfig(cfg);
-        configRef.current = cfg;
-        window.__SELF_ID__ = profile.id;
-        await connectSupabase(cfg.supabaseUrl, cfg.supabaseKey, profile.id);
-      } catch (e) {
-        addStatus(e.message || "Init error", true);
-      }
-    })();
+    if (isElectronReady) {
+      (async () => {
+        try {
+          const profile = await window.electronAPI.getProfile();
+          const cfg = await window.electronAPI.getConfig();
+          setSelfId(profile.id);
+          setConfig(cfg);
+          window.__SELF_ID__ = profile.id;
+          await connectSupabase(cfg.supabaseUrl, cfg.supabaseKey, profile.id);
+        } catch (e) {
+          addStatus(e.message || "Init error", true);
+        }
+      })();
+    }
   }, [isElectronReady]);
 
-  // ── Supabase ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    setRemoteVideoWrapRef(remoteVideoRef.current);
+  }, [remoteVideoRef]);
+
   const connectSupabase = async (url, key, id) => {
     if (!window.supabase) {
       addStatus("Error: Supabase library not loaded.", true);
@@ -160,45 +251,110 @@ export default function App() {
           auth: { persistSession: false, autoRefreshToken: false },
         });
         supabaseClientRef.current = client;
+        setServerInfo("⚡ Supabase Realtime");
       } catch (e) {
         addStatus("Supabase init error: " + e.message, true);
         return;
       }
     }
     if (myChannelRef.current) {
-      try { await client.removeChannel(myChannelRef.current); } catch (_) {}
+      try {
+        await client.removeChannel(myChannelRef.current);
+      } catch (_) {}
       myChannelRef.current = null;
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 500));
     }
+
     const ch = client.channel(`peer:${id}`, {
       config: { broadcast: { self: false } },
     });
-    ch.on("broadcast", { event: "signal" }, ({ payload }) => handleSignal(payload));
+    ch.on("broadcast", { event: "signal" }, ({ payload }) =>
+      handleSignal(payload),
+    );
+
+    let retryCount = 0;
+    const maxRetries = 3;
+
     ch.subscribe((status) => {
-      if (status === "SUBSCRIBED") addStatus('Ready. Share your ID and click "Call".');
-      if (status === "CHANNEL_ERROR") addStatus("Channel error.", true);
+      if (status === "SUBSCRIBED") {
+        if (reconnectTimerRef.current) {
+          clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = null;
+        }
+        addStatus('Ready. Share your ID and click "Call".');
+      }
+      if (status === "CHANNEL_ERROR") {
+        addStatus("Channel error. Attempting to reconnect...", true);
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(() => ch.subscribe(), 1000);
+        } else {
+          addStatus("Connection failed. Please try again.", true);
+          retryCount = 0;
+        }
+      }
+      if (status === "TIMED_OUT") {
+        addStatus("Connection timeout. Retrying...", true);
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(() => ch.subscribe(), 1500);
+        }
+      }
+      if (status === "CLOSED") {
+        addStatus("Connection closed.");
+        retryCount = 0;
+      }
     });
+
     myChannelRef.current = ch;
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (ch.state !== "joined") reject(new Error("Connection timeout"));
+      }, 10000);
+
+      const checkInterval = setInterval(() => {
+        if (ch.state === "joined" || ch.state === "subscribed") {
+          clearTimeout(timeout);
+          clearInterval(checkInterval);
+          resolve(ch);
+        }
+      }, 100);
+    });
   };
 
   const ensureOutChannel = async (peerId) => {
     if (
       outChannelRef.current &&
       outChannelRef.current._topic === `realtime:peer:${peerId}`
-    ) return;
+    )
+      return;
     if (outChannelRef.current) {
-      try { await supabaseClientRef.current.removeChannel(outChannelRef.current); } catch (_) {}
+      try {
+        await supabaseClientRef.current.removeChannel(outChannelRef.current);
+      } catch (_) {}
       outChannelRef.current = null;
     }
     const ch = supabaseClientRef.current.channel(`peer:${peerId}`, {
       config: { broadcast: { self: false } },
     });
     await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("timeout")), 8000);
+      const timer = setTimeout(
+        () =>
+          outChannelRef.current ? resolve() : reject(new Error("timeout")),
+        8000,
+      );
       ch.subscribe((status) => {
         clearTimeout(timer);
-        outChannelRef.current = ch;
-        resolve();
+        if (status === "SUBSCRIBED") {
+          outChannelRef.current = ch;
+          resolve();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
+          reject(new Error(status));
+        else {
+          outChannelRef.current = ch;
+          resolve();
+        }
       });
     });
   };
@@ -208,9 +364,9 @@ export default function App() {
       addStatus("No connection to Supabase.", true);
       return;
     }
-    const signalPayload = { ...payload, from: selfIdRef.current };
     try {
       await ensureOutChannel(payload.to);
+      const signalPayload = { ...payload, from: selfId };
       await outChannelRef.current.send({
         type: "broadcast",
         event: "signal",
@@ -221,26 +377,33 @@ export default function App() {
     }
   };
 
-  // ── Signal handling ───────────────────────────────────────────────────────
   const handleSignal = async (msg) => {
     if (msg.type === "call") {
       setIncomingCall({ from: msg.from, offer: msg.offer });
-      addStatus(`Incoming call from **${msg.from}**.`);
+      addStatus(
+        `Incoming call from <strong style="font-family:monospace">${msg.from}</strong>.`,
+      );
     }
 
     if (msg.type === "answer") {
       if (!pcRef.current) return;
       if (answerProcessedRef.current) return;
       if (pcRef.current.signalingState !== "have-local-offer") return;
+      
+      // ИСПРАВЛЕНИЕ: Добавление кандидатов и удаление пустого addIceCandidate(null)
       answerProcessedRef.current = true;
       await pcRef.current.setRemoteDescription(msg.answer);
+      pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+      
       for (const c of pendingIceRef.current) {
-        await pcRef.current.addIceCandidate(c).catch(() => {});
+        await pcRef.current.addIceCandidate(c).catch(console.error);
       }
       pendingIceRef.current = [];
-      pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+
       setStatusDotColor("#4ade80");
-      addStatus(`**${msg.from}** accepted the call.`);
+      addStatus(
+        `<strong style="font-family:monospace">${msg.from}</strong> accepted the call.`,
+      );
     }
 
     if (msg.type === "candidate") {
@@ -249,8 +412,10 @@ export default function App() {
         pendingIceRef.current.push(msg.candidate);
         return;
       }
-      try { await pcRef.current.addIceCandidate(msg.candidate); } catch (e) {
-        console.error("[Signal] ICE candidate error:", e);
+      try {
+        await pcRef.current.addIceCandidate(msg.candidate);
+      } catch (e) {
+        console.error("[Signal] Failed to add ICE candidate:", e);
       }
     }
 
@@ -263,9 +428,13 @@ export default function App() {
         pendingIceRef.current = [];
         const answer = await pcRef.current.createAnswer();
         await pcRef.current.setLocalDescription(answer);
-        sendSignal({ type: "renegotiate-answer", to: msg.from, answer: pcRef.current.localDescription });
+        sendSignal({
+          type: "renegotiate-answer",
+          to: msg.from,
+          answer: pcRef.current.localDescription,
+        });
       } catch (e) {
-        console.warn("[Signal] Renegotiate failed:", e.message);
+        console.warn("[Signal] Failed to process renegotiate:", e.message);
       }
     }
 
@@ -276,7 +445,7 @@ export default function App() {
         await pcRef.current.setRemoteDescription(msg.answer);
         pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
       } catch (e) {
-        console.warn("[Signal] Renegotiate answer failed:", e.message);
+        console.warn("[Signal] Failed to set remote answer:", e.message);
       }
     }
 
@@ -285,28 +454,30 @@ export default function App() {
         remoteVideoRef.current.srcObject.getTracks().forEach((t) => t.stop());
         remoteVideoRef.current.srcObject = null;
       }
-      setRemoteMeta("\u2014");
+      setRemoteVideoWrapClass((prev) => prev + " placeholder");
+      setRemoteMeta("—");
       addStatus("Peer broadcast ended.");
     }
 
     if (msg.type === "decline") {
-      addStatus(`**${msg.from}** declined the call.`);
+      addStatus(
+        `<strong style="font-family:monospace">${msg.from}</strong> declined the call.`,
+      );
       hangup(false);
     }
 
     if (msg.type === "hangup") {
       if (hangupProcessedRef.current) return;
       hangupProcessedRef.current = true;
-      addStatus(`**${msg.from}** ended the call.`);
+      addStatus(
+        `<strong style="font-family:monospace">${msg.from}</strong> ended the call.`,
+      );
       hangup(false);
     }
   };
 
-  // ── Peer connection ───────────────────────────────────────────────────────
   const createPeerConnection = async (peerId) => {
     setCurrentPeerId(peerId);
-    currentPeerIdRef.current = peerId;
-
     if (pcRef.current) {
       pcRef.current.getSenders().forEach((s) => s.track?.stop());
       pcRef.current.close();
@@ -318,38 +489,93 @@ export default function App() {
       window._prevBytesReceived = 0;
     }
 
-    const pc = new RTCPeerConnection(rtcConfig);
+    const localIPs = await gatherLocalCandidates(pcRef.current || null);
+    const localStunServers = localIPs.map((ip) => ({
+      urls: `stun:${ip}:19302`,
+    }));
 
+    const configWithIPs = {
+      ...rtcConfig,
+      iceServers: [
+        ...rtcConfig.iceServers,
+        ...getStunServers(),
+        ...localStunServers,
+      ],
+    };
+    const pc = new RTCPeerConnection(configWithIPs);
+
+    // ИСПРАВЛЕНИЕ: Корректное присвоение стрима
     pc.ontrack = (event) => {
-      const stream = event.streams?.[0] ?? new MediaStream([event.track]);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
+      setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
+      let stream = event?.streams?.[0] || null;
+      if (!stream && event?.track) {
+        stream = new MediaStream([event.track]);
       }
-      const s = event.track.getSettings?.() ?? {};
+      
+      setRemoteStream(stream);
+
+      const videoEl = remoteVideoRef.current || document.getElementById("remoteVideo");
+      if (videoEl && stream && videoEl.srcObject !== stream) {
+        videoEl.srcObject = stream;
+      }
+
+      const s = event.track.getSettings ? event.track.getSettings() : {};
       setRemoteMeta(
-        `${s.width ?? "?"}x${s.height ?? "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`
+        `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
       );
       setStatusDotColor("#4ade80");
-      addStatus(`Connected to **${peerId}**.`);
+      addStatus(
+        `Connected to <strong style="font-family:monospace">${peerId}</strong>.`,
+      );
     };
 
     pc.onicecandidate = ({ candidate }) => {
-      if (candidate) sendSignal({ type: "candidate", to: peerId, candidate });
+      if (candidate && peerId) {
+        sendSignal({ type: "candidate", to: peerId, candidate });
+      }
     };
 
-    pc.onicecandidateerror = (e) => {
-      console.warn("[PC] ICE error:", e.errorText || e.errorCode);
+    pc.onicecandidateerror = (event) => {
+      console.warn("[PC] ICE candidate error:", event.errorText || event.errorCode);
     };
 
     pc.onconnectionstatechange = () => {
-      const st = pc.connectionState;
+      const st = pc?.connectionState;
       if (st === "connected") {
         setHasActiveCall(true);
         setStatusDotColor("#4ade80");
         setCallStatus("connected");
-        addStatus(`Connected to **${peerId}**.`);
-        if (bitrateIntervalRef.current) clearInterval(bitrateIntervalRef.current);
-        bitrateIntervalRef.current = setInterval(monitorBitrate, 1000);
+
+        setTimeout(() => {
+          try {
+            const stats = pc.getStats();
+            stats.then((report) => {
+              let connectionType = "Unknown";
+              report.forEach((item) => {
+                if (item.type === "candidate-pair" && item.state === "succeeded") {
+                  const localCandidate = report.get(item.localCandidateId);
+                  const remoteCandidate = report.get(item.remoteCandidateId);
+                  if (localCandidate && remoteCandidate) {
+                    if (localCandidate.candidateType === "relay" || remoteCandidate.candidateType === "relay") {
+                      connectionType = "TURN (Relay)";
+                    } else if (localCandidate.candidateType === "srflx" || remoteCandidate.candidateType === "srflx") {
+                      connectionType = "STUN (Public IP)";
+                    } else if (localCandidate.candidateType === "host") {
+                      connectionType = "Local (Same Network)";
+                    }
+                  }
+                }
+              });
+              if (connectionType !== "Unknown") {
+                addStatus(`Connection type: ${connectionType}`);
+              }
+            });
+            if (bitrateIntervalRef.current) clearInterval(bitrateIntervalRef.current);
+            bitrateIntervalRef.current = setInterval(monitorBitrate, 1000);
+          } catch (e) {
+            console.log("[PC] Could not determine connection type:", e);
+          }
+        }, 1000);
       }
       if (st === "failed") {
         setHasActiveCall(false);
@@ -361,7 +587,7 @@ export default function App() {
       if (st === "disconnected") {
         setStatusDotColor("#facc15");
         setCallStatus("connecting");
-        addStatus("Connection lost. Reconnecting...", true);
+        addStatus("Connection lost. Attempting to reconnect...", true);
         setTimeout(() => {
           if (pc.connectionState === "disconnected") pc.restartIce();
         }, 3000);
@@ -370,121 +596,120 @@ export default function App() {
         setHasActiveCall(false);
         setStatusDotColor("#888");
         setCallStatus("idle");
+        addStatus("Connection closed.");
       }
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === "failed") {
-        addStatus("ICE failed. Reconnecting...", true);
+      const iceState = pc?.iceConnectionState;
+      if (iceState === "failed") {
+        addStatus("ICE failed. Attempting to reconnect...", true);
         pc.restartIce();
       }
+      if (iceState === "disconnected") {
+        addStatus("ICE disconnected.");
+      }
     };
+
+    pc.onicegatheringstatechange = () => {};
 
     pcRef.current = pc;
     return pc;
   };
 
-  /**
-   * Syncs current localStream tracks onto PeerConnection.
-   * Pass triggerRenegotiate=true when already connected to notify remote peer.
-   */
-  const attachLocalTracks = async (triggerRenegotiate = false) => {
-    const stream = localStreamRef.current;
-    if (!stream || !stream.active || !pcRef.current) return;
-    const senders = pcRef.current.getSenders();
-    for (const track of stream.getTracks()) {
-      const existing = senders.find((s) => s.track?.kind === track.kind);
-      if (existing) {
-        await existing.replaceTrack(track);
-        applyMaxQualityEncoding(existing);
+  // ИСПРАВЛЕНИЕ: передаем поток как аргумент для избежания конфликтов состояния React
+  const attachLocalTracks = async (streamToAttach = localStream) => {
+    if (!streamToAttach || !streamToAttach.active || !pcRef.current) return;
+    const senders = pcRef.current.getSenders() || [];
+    const tracks = streamToAttach.getTracks();
+
+    for (const track of tracks) {
+      const existingSender = senders.find((s) => s.track?.kind === track.kind);
+      if (existingSender) {
+        await existingSender.replaceTrack(track);
+        applyMaxQualityEncoding(existingSender);
       } else {
-        const sender = pcRef.current.addTrack(track, stream);
+        const sender = pcRef.current.addTrack(track, streamToAttach);
         setTimeout(() => applyMaxQualityEncoding(sender), 500);
-      }
-    }
-    if (
-      triggerRenegotiate &&
-      pcRef.current.connectionState === "connected" &&
-      pcRef.current.signalingState === "stable"
-    ) {
-      try {
-        const offer = await pcRef.current.createOffer();
-        await pcRef.current.setLocalDescription(offer);
-        sendSignal({
-          type: "renegotiate",
-          to: currentPeerIdRef.current,
-          offer: pcRef.current.localDescription,
-        });
-      } catch (e) {
-        console.warn("[attachLocalTracks] Renegotiate error:", e.message);
       }
     }
   };
 
-  // ── Call flow ─────────────────────────────────────────────────────────────
   const handleCall = async (peerId) => {
-    if (peerId === selfIdRef.current) {
+    if (peerId === selfId) {
       addStatus("Cannot call yourself.", true);
       return;
     }
+
     const ok = await new Promise((r) =>
       setConfirmDialog({
         isOpen: true,
-        message: `Call **${peerId}**?`,
+        message: `Call <strong>${peerId}</strong>?`,
         onConfirm: () => r(true),
         onCancel: () => r(false),
-      })
+      }),
     );
     if (!ok) return;
 
     hangup(false);
-    answerProcessedRef.current = false;
+    isPoliteRef.current = false;
     hangupProcessedRef.current = false;
+    answerProcessedRef.current = false;
 
     await createPeerConnection(peerId);
-    await attachLocalTracks(false);
+    await attachLocalTracks();
 
     const offer = await pcRef.current.createOffer({ offerToReceiveVideo: true });
     await pcRef.current.setLocalDescription(offer);
-    sendSignal({ type: "call", to: peerId, offer: pcRef.current.localDescription });
 
-    addStatus(`Calling **${peerId}**...`);
+    sendSignal({
+      type: "call",
+      to: peerId,
+      offer: pcRef.current.localDescription,
+    });
+
+    addStatus(`Calling <strong style="font-family:monospace">${peerId}</strong>...`);
     setStatusDotColor("#f97316");
     setCallStatus("connecting");
   };
 
   const handleAcceptCall = async () => {
     if (!incomingCall) return;
+
     const { from, offer } = incomingCall;
     setIncomingCall(null);
 
     if (pcRef.current) {
       pcRef.current.getSenders().forEach((s) => s.track?.stop());
       pcRef.current.close();
-      if (bitrateIntervalRef.current) {
-        clearInterval(bitrateIntervalRef.current);
-        bitrateIntervalRef.current = null;
-      }
+      if (bitrateIntervalRef.current) clearInterval(bitrateIntervalRef.current);
       setRemoteBitrate(0);
       window._prevBytesReceived = 0;
     }
+
+    isPoliteRef.current = true;
     hangupProcessedRef.current = false;
-    answerProcessedRef.current = false;
 
     await createPeerConnection(from);
-    await attachLocalTracks(false);
+    await attachLocalTracks();
+
     await pcRef.current.setRemoteDescription(offer);
 
     for (const c of pendingIceRef.current) {
-      await pcRef.current.addIceCandidate(c).catch(() => {});
+      await pcRef.current.addIceCandidate(c);
     }
     pendingIceRef.current = [];
 
     const answer = await pcRef.current.createAnswer();
     await pcRef.current.setLocalDescription(answer);
-    sendSignal({ type: "answer", to: from, answer: pcRef.current.localDescription });
 
-    addStatus(`Call accepted. Connecting to **${from}**...`);
+    sendSignal({
+      type: "answer",
+      to: from,
+      answer: pcRef.current.localDescription,
+    });
+
+    addStatus(`Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`);
     setStatusDotColor("#f97316");
     setCallStatus("connecting");
   };
@@ -494,13 +719,11 @@ export default function App() {
     const { from } = incomingCall;
     setIncomingCall(null);
     sendSignal({ type: "decline", to: from });
-    addStatus(`Call from **${from}** declined.`);
+    addStatus(`Call from <strong style="font-family:monospace">${from}</strong> declined.`);
   };
 
   const hangup = (notify = true) => {
-    if (notify && currentPeerIdRef.current) {
-      sendSignal({ type: "hangup", to: currentPeerIdRef.current });
-    }
+    if (notify && currentPeerId) sendSignal({ type: "hangup", to: currentPeerId });
     if (outChannelRef.current) {
       supabaseClientRef.current?.removeChannel(outChannelRef.current).catch(() => {});
       outChannelRef.current = null;
@@ -508,71 +731,65 @@ export default function App() {
     if (pcRef.current) {
       pcRef.current.getSenders().forEach((s) => s.track?.stop());
       pcRef.current.close();
-      if (bitrateIntervalRef.current) {
-        clearInterval(bitrateIntervalRef.current);
-        bitrateIntervalRef.current = null;
-      }
+      if (bitrateIntervalRef.current) clearInterval(bitrateIntervalRef.current);
       setRemoteBitrate(0);
       window._prevBytesReceived = 0;
     }
     pcRef.current = null;
     setCurrentPeerId("");
-    currentPeerIdRef.current = "";
     setHasActiveCall(false);
     pendingIceRef.current = [];
     setIncomingCall(null);
     setStatusDotColor("#888");
-    setCallStatus("idle");
-
-    const stream = localStreamRef.current;
-    if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
-      localStreamRef.current = null;
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    setLocalMeta("\u2014");
-
+    setLocalMeta("—");
+    setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    setRemoteMeta("\u2014");
+    setRemoteStream(null);
+    setRemoteMeta("—");
+    setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
   };
 
-  // ── Broadcast ─────────────────────────────────────────────────────────────
+  const handleBroadcast = async () => setSourcePickerOpen(true);
+
   const stopBroadcast = () => {
-    if (pcRef.current) {
+    if (pcRef.current && pcRef.current.connectionState === "connected") {
       pcRef.current.getSenders().forEach((sender) => {
-        if (sender.track?.kind === "video") {
+        if (sender.track && sender.track.kind === "video") {
           try { pcRef.current.removeTrack(sender); } catch (_) {}
         }
       });
     }
-    const stream = localStreamRef.current;
-    if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
-      localStreamRef.current = null;
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    setLocalMeta("\u2014");
+    setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
+    setLocalMeta("—");
     addStatus("Broadcast stopped.");
-    if (currentPeerIdRef.current && pcRef.current?.connectionState === "connected") {
-      sendSignal({ type: "stop-broadcast", to: currentPeerIdRef.current });
-    }
+    if (currentPeerId && pcRef.current?.connectionState === "connected")
+      sendSignal({ type: "stop-broadcast", to: currentPeerId });
   };
 
+  const handleChangeSource = async () => setSourcePickerOpen(true);
+
+  // ИСПРАВЛЕНИЕ: Вызов attachLocalTracks с новым стримом + Renegotiation
   const handleSourceSelected = async (sourceId) => {
     setSourcePickerOpen(false);
-    const oldStream = localStreamRef.current;
-    if (oldStream) {
-      oldStream.getTracks().forEach((t) => t.stop());
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
-      localStreamRef.current = null;
     }
     try {
       if (window.electronAPI?.setPendingSource) {
         await window.electronAPI.setPendingSource(sourceId);
       }
-      const newStream = await navigator.mediaDevices.getDisplayMedia({
+      const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           width: { ideal: 2560, max: 2560 },
           height: { ideal: 1440, max: 1440 },
@@ -582,22 +799,41 @@ export default function App() {
         audio: false,
         selfBrowserSurface: "exclude",
       });
-      const [track] = newStream.getVideoTracks();
-      track.onended = () => stopBroadcast();
-
-      setLocalStream(newStream);
-      localStreamRef.current = newStream;
-      if (localVideoRef.current) localVideoRef.current.srcObject = newStream;
-
-      // KEY FIX: triggerRenegotiate=true so remote peer gets the stream
-      if (pcRef.current) {
-        await attachLocalTracks(true);
-        pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+      const [track] = stream.getVideoTracks();
+      track.onended = () => {
+        stopBroadcast();
+        if (currentPeerId && pcRef.current?.connectionState === "connected")
+          sendSignal({ type: "stop-broadcast", to: currentPeerId });
+      };
+      
+      setLocalStream(stream);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
       }
 
-      const s = track.getSettings?.() ?? {};
+      if (pcRef.current?.connectionState === "connected") {
+        await attachLocalTracks(stream);
+        pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+        
+        try {
+          if (pcRef.current.signalingState === "stable") {
+            const offer = await pcRef.current.createOffer();
+            await pcRef.current.setLocalDescription(offer);
+            sendSignal({
+              type: "renegotiate",
+              to: currentPeerId,
+              offer: pcRef.current.localDescription
+            });
+          }
+        } catch (err) {
+          console.error("[Broadcast] Renegotiation error:", err);
+        }
+      }
+
+      setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
+      const s = track.getSettings ? track.getSettings() : {};
       setLocalMeta(
-        `${s.width ?? "?"}x${s.height ?? "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`
+        `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
       );
       addStatus("Broadcast started.");
     } catch (e) {
@@ -607,21 +843,26 @@ export default function App() {
 
   const handlePiP = async () => {
     try {
-      if (document.pictureInPictureElement) await document.exitPictureInPicture();
-      else if (remoteVideoRef.current) await remoteVideoRef.current.requestPictureInPicture();
-    } catch {
+      if (document.pictureInPictureElement)
+        await document.exitPictureInPicture();
+      else if (remoteVideoRef.current)
+        await remoteVideoRef.current.requestPictureInPicture();
+    } catch (e) {
       addStatus("PiP not supported for this source.", true);
     }
   };
 
   const handleFullscreen = async () => {
-    const wrap = remoteContainerRef.current;
-    if (wrap?.requestFullscreen) await wrap.requestFullscreen();
-    else if (wrap?.webkitRequestFullscreen) await wrap.webkitRequestFullscreen();
+    if (remoteVideoWrapRef.current) {
+      const wrap = remoteVideoWrapRef.current;
+      if (wrap?.requestFullscreen) await wrap.requestFullscreen();
+      else if (wrap?.webkitRequestFullscreen)
+        await wrap.webkitRequestFullscreen();
+    }
   };
 
   const handleCopyId = async () => {
-    await navigator.clipboard.writeText(selfIdRef.current);
+    await navigator.clipboard.writeText(selfId);
     addStatus("ID copied.");
   };
 
@@ -632,22 +873,21 @@ export default function App() {
         message: "Reset ID? Current ID will become unavailable.",
         onConfirm: () => r(true),
         onCancel: () => r(false),
-      })
+      }),
     );
     if (!ok) return;
+
     addStatus("Regenerating ID...");
     try {
       if (myChannelRef.current) {
         await supabaseClientRef.current.removeChannel(myChannelRef.current).catch(() => {});
         myChannelRef.current = null;
       }
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 500));
       const profile = await window.electronAPI.regenerateProfile();
       setSelfId(profile.id);
-      selfIdRef.current = profile.id;
       window.__SELF_ID__ = profile.id;
-      const cfg = configRef.current;
-      await connectSupabase(cfg.supabaseUrl, cfg.supabaseKey, profile.id);
+      await connectSupabase(config.supabaseUrl, config.supabaseKey, profile.id);
       addStatus("New ID created.");
     } catch (e) {
       addStatus("Failed to change ID: " + (e.message || "Unknown error"), true);
@@ -655,7 +895,7 @@ export default function App() {
   };
 
   const handleHangup = async () => {
-    if (!currentPeerIdRef.current && !pcRef.current) {
+    if (!currentPeerId && !pcRef.current) {
       addStatus("No active call.");
       return;
     }
@@ -665,20 +905,17 @@ export default function App() {
         message: "End call?",
         onConfirm: () => r(true),
         onCancel: () => r(false),
-      })
+      }),
     );
     if (!ok) return;
     hangup(true);
     addStatus("Call ended.");
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-screen bg-[#0a0a0a] text-white select-none overflow-hidden">
+    <div className="h-screen flex flex-col bg-bg text-text font-sans text-[13px] antialiased overflow-hidden">
       <TitleBar statusDotColor={statusDotColor} />
-
-      <div className="flex flex-1 min-h-0">
-        {/* Sidebar: props match Sidebar component signature exactly */}
+      <div className="h-[calc(100vh-38px)] grid grid-cols-[272px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden">
         <Sidebar
           selfId={selfId}
           onCopyId={handleCopyId}
@@ -688,66 +925,58 @@ export default function App() {
           onAccept={handleAcceptCall}
           onDecline={handleDeclineCall}
           hasIncomingCall={!!incomingCall}
-          callerId={incomingCall?.from ?? ""}
+          callerId={incomingCall?.from || ""}
           hasActiveCall={hasActiveCall}
           connectionStatus={callStatus}
           statusMessages={statusLog}
         />
-
-        {/* Video panels: VideoPanel is called twice (local + remote) */}
-        <div className="flex flex-1 min-h-0 flex-col gap-2 p-2">
-          {/* Remote video */}
-          <VideoPanel
-            title="Remote"
-            meta={remoteMeta}
-            bitrate={remoteBitrate}
-            showControls={true}
-            isLocal={false}
-            showPlaceholder={!hasActiveCall}
-            isBroadcasting={false}
-            canBroadcast={false}
-            onPiP={handlePiP}
-            onFullscreen={handleFullscreen}
-            videoRef={remoteVideoRef}
-            containerRef={remoteContainerRef}
-          />
-
-          {/* Local video */}
-          <VideoPanel
-            title="Local"
-            meta={localMeta}
-            bitrate={0}
-            showControls={true}
-            isLocal={true}
-            showPlaceholder={!localStream}
-            isBroadcasting={!!localStream}
-            canBroadcast={true}
-            onBroadcast={() => setSourcePickerOpen(true)}
-            onChangeSource={() => setSourcePickerOpen(true)}
-            videoRef={localVideoRef}
-          />
-        </div>
+        <main className="flex flex-col gap-[8px] min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col gap-[8px]">
+            <VideoPanel
+              ref={localVideoRef}
+              title="Your Screen"
+              meta={localMeta}
+              isLocal
+              isBroadcasting={!!localStream}
+              onBroadcast={localStream ? stopBroadcast : handleBroadcast}
+              onChangeSource={handleChangeSource}
+              showPlaceholder={!streamHasVideo(localStream)}
+              videoRef={localVideoRef}
+              containerRef={localVideoRef}
+              canBroadcast={pcRef.current?.connectionState === "connected"}
+            />
+            <VideoPanel
+              ref={remoteVideoRef}
+              title="Peer Screen"
+              meta={remoteMeta}
+              bitrate={remoteBitrate}
+              onPiP={handlePiP}
+              onFullscreen={handleFullscreen}
+              showPlaceholder={!streamHasVideo(remoteStream)}
+              className={remoteVideoWrapClass}
+              videoRef={remoteVideoRef}
+              containerRef={remoteVideoRef}
+            />
+          </div>
+        </main>
       </div>
-
+      <SourcePicker
+        isOpen={sourcePickerOpen}
+        onClose={() => setSourcePickerOpen(false)}
+        onSelect={handleSourceSelected}
+      />
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         message={confirmDialog.message}
         onConfirm={() => {
-          confirmDialog.onConfirm?.();
+          confirmDialog.onConfirm();
           setConfirmDialog({ isOpen: false, message: "" });
         }}
         onCancel={() => {
-          confirmDialog.onCancel?.();
+          confirmDialog.onCancel();
           setConfirmDialog({ isOpen: false, message: "" });
         }}
       />
-
-      {sourcePickerOpen && (
-        <SourcePicker
-          onSelect={handleSourceSelected}
-          onClose={() => setSourcePickerOpen(false)}
-        />
-      )}
     </div>
   );
 }
