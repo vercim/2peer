@@ -524,6 +524,10 @@ export default function App() {
     if (msg.type === "renegotiate-answer") {
       console.log("[Signal] Received renegotiation answer");
       if (!pcRef.current) return;
+      if (pcRef.current.signalingState === "stable") {
+        console.log("[Signal] Already stable, ignoring duplicate answer");
+        return;
+      }
       if (
         pcRef.current.signalingState !== "have-local-offer" &&
         pcRef.current.signalingState !== "stable"
