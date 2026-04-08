@@ -4,7 +4,6 @@ import { Sidebar } from "./components/Sidebar.jsx";
 import { VideoPanel } from "./components/VideoPanel.jsx";
 import { SourcePicker } from "./components/SourcePicker.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
-import { StatusLog } from "./components/StatusLog.jsx";
 
 const rtcConfig = {
   iceServers: [
@@ -171,7 +170,9 @@ export default function App() {
         }
       });
       if (width > 0 && height > 0) {
-        setRemoteMeta(`${width}×${height} @${Math.round(frameRate || 60)}fps`);
+        setRemoteMeta(
+          `${width}×${height} @${frameRate > 0 ? Math.round(frameRate) : "?"}fps`,
+        );
       }
       window._prevBytesReceived = window._prevBytesReceived || bytesReceived;
       const bytesDiff = bytesReceived - window._prevBytesReceived;
@@ -497,6 +498,13 @@ export default function App() {
     if (msg.type === "renegotiate") {
       console.log("[Signal] Received renegotiation request");
       if (!pcRef.current || pcRef.current.signalingState === "closed") return;
+      if (pcRef.current.signalingState !== "have-remote-offer") {
+        console.warn(
+          "[Signal] Renegotiate received in wrong state:",
+          pcRef.current.signalingState,
+        );
+        return;
+      }
       await pcRef.current.setRemoteDescription(msg.offer);
       for (const c of pendingIceRef.current)
         await pcRef.current.addIceCandidate(c).catch(() => {});
@@ -597,7 +605,7 @@ export default function App() {
       }
       const s = event.track.getSettings ? event.track.getSettings() : {};
       setRemoteMeta(
-        `${s.width || "?"}×${s.height || "?"} @${Math.round(s.frameRate || "?")}fps`,
+        `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
       );
       setStatusDotColor("#4ade80");
       addStatus(
@@ -936,8 +944,8 @@ export default function App() {
 
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
-          width: { ideal: 7680, max: 7680 },
-          height: { ideal: 4320, max: 4320 },
+          width: { ideal: 2560, max: 2560 },
+          height: { ideal: 1440, max: 1440 },
           frameRate: { ideal: 60, max: 60 },
           displaySurface: "monitor",
         },
@@ -966,7 +974,7 @@ export default function App() {
       setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
       const s = track.getSettings ? track.getSettings() : {};
       setLocalMeta(
-        `${s.width || "?"}×${s.height || "?"} @${Math.round(s.frameRate || 60)}fps`,
+        `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
       );
 
       console.log("[Broadcast] Current peer state:", {
@@ -1036,8 +1044,8 @@ export default function App() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
-          width: { ideal: 7680, max: 7680 },
-          height: { ideal: 4320, max: 4320 },
+          width: { ideal: 2560, max: 2560 },
+          height: { ideal: 1440, max: 1440 },
           frameRate: { ideal: 60, max: 60 },
           displaySurface: "monitor",
         },
@@ -1054,7 +1062,7 @@ export default function App() {
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
       const s = track.getSettings ? track.getSettings() : {};
       setLocalMeta(
-        `${s.width || "?"}×${s.height || "?"} @${Math.round(s.frameRate || 60)}fps`,
+        `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
       );
       if (
         pcRef.current &&
