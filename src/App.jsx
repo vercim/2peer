@@ -496,50 +496,48 @@ export default function App() {
     }
 
     if (msg.type === "renegotiate") {
-      console.log("[Signal] Received renegotiation request");
+      console.log(
+        "[Signal] Received renegotiation request, state:",
+        pcRef.current?.signalingState,
+      );
       if (!pcRef.current || pcRef.current.signalingState === "closed") return;
-      if (
-        pcRef.current.signalingState !== "have-remote-offer" &&
-        pcRef.current.signalingState !== "stable"
-      ) {
-        console.warn(
-          "[Signal] Renegotiate received in wrong state:",
-          pcRef.current.signalingState,
-        );
-        return;
+      if (pcRef.current.signalingState === "stable") {
+        console.log("[Signal] Already stable, processing renegotiate");
       }
-      await pcRef.current.setRemoteDescription(msg.offer);
-      for (const c of pendingIceRef.current)
-        await pcRef.current.addIceCandidate(c).catch(() => {});
-      pendingIceRef.current = [];
-      const answer = await pcRef.current.createAnswer();
-      await pcRef.current.setLocalDescription(answer);
-      sendSignal({
-        type: "renegotiate-answer",
-        to: msg.from,
-        answer: pcRef.current.localDescription,
-      });
+      try {
+        await pcRef.current.setRemoteDescription(msg.offer);
+        for (const c of pendingIceRef.current)
+          await pcRef.current.addIceCandidate(c).catch(() => {});
+        pendingIceRef.current = [];
+        const answer = await pcRef.current.createAnswer();
+        await pcRef.current.setLocalDescription(answer);
+        sendSignal({
+          type: "renegotiate-answer",
+          to: msg.from,
+          answer: pcRef.current.localDescription,
+        });
+      } catch (e) {
+        console.warn("[Signal] Failed to process renegotiate:", e.message);
+      }
     }
 
     if (msg.type === "renegotiate-answer") {
-      console.log("[Signal] Received renegotiation answer");
+      console.log(
+        "[Signal] Received renegotiation answer, state:",
+        pcRef.current?.signalingState,
+      );
       if (!pcRef.current) return;
+      if (pcRef.current.signalingState === "closed") return;
       if (pcRef.current.signalingState === "stable") {
-        console.log("[Signal] Already stable, ignoring duplicate answer");
+        console.log("[Signal] Already stable, ignoring answer");
         return;
       }
-      if (
-        pcRef.current.signalingState !== "have-local-offer" &&
-        pcRef.current.signalingState !== "stable"
-      ) {
-        console.warn(
-          "[Signal] Renegotiate answer received in wrong state:",
-          pcRef.current.signalingState,
-        );
-        return;
+      try {
+        await pcRef.current.setRemoteDescription(msg.answer);
+        pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+      } catch (e) {
+        console.warn("[Signal] Failed to set remote answer:", e.message);
       }
-      await pcRef.current.setRemoteDescription(msg.answer);
-      pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
     }
 
     if (msg.type === "stop-broadcast") {
@@ -642,6 +640,7 @@ export default function App() {
       const st = pc?.connectionState;
       console.log("[PC] Connection state changed to:", st);
       if (st === "connected") {
+        setHasActiveCall(true);
         setStatusDotColor("#4ade80");
         setCallStatus("connected");
         addStatus(
@@ -692,6 +691,7 @@ export default function App() {
         }, 1000);
       }
       if (st === "failed") {
+        setHasActiveCall(false);
         setStatusDotColor("#f87171");
         setCallStatus("failed");
         addStatus("P2P connection failed.", true);
@@ -714,8 +714,8 @@ export default function App() {
         }, 3000);
       }
       if (st === "closed") {
+        setHasActiveCall(false);
         setStatusDotColor("#888");
-        setCallStatus("idle");
         setCallStatus("idle");
         addStatus("Connection closed.");
       }
@@ -1010,28 +1010,20 @@ export default function App() {
       } else {
         console.log("[Broadcast] ERROR: localVideoRef.current is null!");
       }
+
+      setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
       const s = track.getSettings ? track.getSettings() : {};
       setLocalMeta(
         `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
       );
-      if (
-        pcRef.current &&
-        pcRef.current.connectionState === "connected" &&
-        currentPeerId
-      ) {
-        await attachLocalTracks();
-        await new Promise((r) => setTimeout(r, 100));
-        const offer = await pcRef.current.createOffer();
-        await pcRef.current.setLocalDescription(offer);
-        sendSignal({
-          type: "renegotiate",
-          to: currentPeerId,
-          offer: pcRef.current.localDescription,
-        });
-      }
-      addStatus("Broadcast source changed.");
+      addStatus("Broadcast started.");
+      console.log("[Broadcast] Broadcast started successfully");
     } catch (e) {
-      addStatus(e.message || "Failed to change source.", true);
+      console.error("[Broadcast] Error:", e);
+      addStatus(
+        "Failed to capture screen: " + (e.message || "Unknown error"),
+        true,
+      );
     }
   };
 
