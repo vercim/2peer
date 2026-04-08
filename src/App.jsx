@@ -82,9 +82,9 @@ function streamHasVideo(stream) {
   try {
     return (
       stream &&
+      stream.active &&
       stream.getVideoTracks &&
-      stream.getVideoTracks().length > 0 &&
-      stream.getVideoTracks().some((t) => t.readyState === "live")
+      stream.getVideoTracks().length > 0
     );
   } catch {
     return false;

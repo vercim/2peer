@@ -132,7 +132,10 @@ export const VideoPanel = forwardRef(function VideoPanel(
         className={`flex-1 min-h-0 relative bg-[#050505] ${showPlaceholder ? "placeholder" : ""}`}
       >
         <video
-          ref={ref}
+          ref={(el) => {
+            if (ref) ref.current = el;
+            if (videoRef) videoRef.current = el;
+          }}
           className="absolute inset-0 w-full h-full object-contain"
           autoPlay
           playsInline
