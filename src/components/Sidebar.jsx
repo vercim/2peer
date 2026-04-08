@@ -12,8 +12,7 @@ export function Sidebar({
   hasIncomingCall = false,
   callerId = "",
   hasActiveCall = false,
-  version = "",
-  serverInfo = "",
+  connectionStatus = "idle",
   statusMessages = [],
 }) {
   const [remoteId, setRemoteId] = useState("");
@@ -121,12 +120,9 @@ export function Sidebar({
       <div className="mt-auto flex flex-col gap-[10px]">
         <div className="bg-panel border border-border rounded-[8px] p-[10px_14px]">
           <div className="text-[11px] text-[#2e2e2e] font-mono overflow-hidden text-ellipsis whitespace-nowrap">
-            {version || "--"}
-          </div>
-        </div>
-        <div className="bg-panel border border-border rounded-[8px] p-[10px_14px]">
-          <div className="text-[11px] text-[#2e2e2e] font-mono overflow-hidden text-ellipsis whitespace-nowrap">
-            {serverInfo || "--"}
+            {connectionStatus === "connected"
+              ? "⚡ Connected"
+              : "⚠ Connection may be unstable"}
           </div>
         </div>
       </div>

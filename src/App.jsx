@@ -57,9 +57,9 @@ function applyMaxQualityEncoding(sender) {
 
 export default function App() {
   const [selfId, setSelfId] = useState("");
-  const [version, setVersion] = useState("");
   const [serverInfo, setServerInfo] = useState("");
   const [statusDotColor, setStatusDotColor] = useState("#444");
+  const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -169,16 +169,11 @@ export default function App() {
           const profile = await window.electronAPI.getProfile();
           console.log("[App] Got profile:", profile);
 
-          console.log("[App] Getting version...");
-          const v = await window.electronAPI.getVersion();
-          console.log("[App] Got version:", v);
-
           console.log("[App] Getting config...");
           const cfg = await window.electronAPI.getConfig();
           console.log("[App] Got config:", cfg);
 
           setSelfId(profile.id);
-          setVersion("v" + v);
           setConfig(cfg);
           window.__SELF_ID__ = profile.id;
 
@@ -209,7 +204,7 @@ export default function App() {
           auth: { persistSession: false, autoRefreshToken: false },
         });
         supabaseClientRef.current = client;
-        setServerInfo("Supabase Realtime");
+        setServerInfo("⚡ Supabase Realtime");
       } catch (e) {
         addStatus("Supabase init error: " + e.message, true);
         return;
@@ -551,6 +546,7 @@ export default function App() {
       console.log("[PC] Connection state changed to:", st);
       if (st === "connected") {
         setStatusDotColor("#4ade80");
+        setCallStatus("connected");
         addStatus(
           `Connected to <strong style="font-family:monospace">${peerId}</strong>.`,
         );
@@ -600,6 +596,7 @@ export default function App() {
       }
       if (st === "failed") {
         setStatusDotColor("#f87171");
+        setCallStatus("failed");
         addStatus("P2P connection failed.", true);
         console.error("[PC] Connection failed!");
 
@@ -609,6 +606,7 @@ export default function App() {
       }
       if (st === "disconnected") {
         setStatusDotColor("#facc15");
+        setCallStatus("connecting");
         addStatus("Connection lost. Attempting to reconnect...", true);
         // Автоматическая попытка переподключения
         setTimeout(() => {
@@ -620,6 +618,8 @@ export default function App() {
       }
       if (st === "closed") {
         setStatusDotColor("#888");
+        setCallStatus("idle");
+        setCallStatus("idle");
         addStatus("Connection closed.");
       }
     };
@@ -722,6 +722,8 @@ export default function App() {
     addStatus(
       `Calling <strong style="font-family:monospace">${peerId}</strong>...`,
     );
+    setStatusDotColor("#f97316");
+    setCallStatus("connecting");
     console.log("[Call] Call initiated successfully");
   };
 
@@ -786,6 +788,8 @@ export default function App() {
     addStatus(
       `Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`,
     );
+    setStatusDotColor("#f97316");
+    setCallStatus("connecting");
     console.log("[Accept] Answer sent successfully");
   };
 
@@ -1100,8 +1104,7 @@ export default function App() {
           hasIncomingCall={!!incomingCall}
           callerId={incomingCall?.from || ""}
           hasActiveCall={hasActiveCall}
-          version={version}
-          serverInfo={serverInfo}
+          connectionStatus={callStatus}
           statusMessages={statusLog}
         />
         <main className="flex flex-col gap-[8px] min-h-0 overflow-hidden">
