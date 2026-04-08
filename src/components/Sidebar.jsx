@@ -122,7 +122,7 @@ export function Sidebar({
           <div className="text-[11px] text-[#2e2e2e] font-mono overflow-hidden text-ellipsis whitespace-nowrap">
             {connectionStatus === "connected"
               ? "⚡ Connected"
-              : "⚠ Connection may be unstable"}
+              : "⚠ Disconnected"}
           </div>
         </div>
       </div>

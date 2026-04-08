@@ -498,7 +498,10 @@ export default function App() {
     if (msg.type === "renegotiate") {
       console.log("[Signal] Received renegotiation request");
       if (!pcRef.current || pcRef.current.signalingState === "closed") return;
-      if (pcRef.current.signalingState !== "have-remote-offer") {
+      if (
+        pcRef.current.signalingState !== "have-remote-offer" &&
+        pcRef.current.signalingState !== "stable"
+      ) {
         console.warn(
           "[Signal] Renegotiate received in wrong state:",
           pcRef.current.signalingState,
@@ -521,7 +524,10 @@ export default function App() {
     if (msg.type === "renegotiate-answer") {
       console.log("[Signal] Received renegotiation answer");
       if (!pcRef.current) return;
-      if (pcRef.current.signalingState !== "have-local-offer") {
+      if (
+        pcRef.current.signalingState !== "have-local-offer" &&
+        pcRef.current.signalingState !== "stable"
+      ) {
         console.warn(
           "[Signal] Renegotiate answer received in wrong state:",
           pcRef.current.signalingState,
