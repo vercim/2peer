@@ -8,7 +8,6 @@ A peer-to-peer screen streaming application that connects two computers directly
 - **Screen sharing** — broadcast your entire screen or individual windows
 - **Fullscreen mode** — view peer's screen on your entire monitor
 - **Picture-in-Picture** — keep peer's screen in the corner
-- **Minimalist** — no accounts, complex settings, or subscriptions
 
 ## How to use
 
@@ -27,8 +26,8 @@ A peer-to-peer screen streaming application that connects two computers directly
 
 ## Requirements
 
-- Windows 10+, macOS 10.14+, or Linux
-- Internet access (for signaling server)
+- Windows, macOS
+- Internet access
 - Screen capture permission
 
 ## Technical details

@@ -2,32 +2,44 @@
   "name": "2peer",
   "version": "1.0.0",
   "description": "2peer",
-  "main": "src/main.js",
+  "type": "module",
+  "main": "src/electron.cjs",
   "scripts": {
-    "start": "electron .",
-    "build:win": "electron-builder --win --x64",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux",
-    "css": "npx @tailwindcss/cli -i ./src/styles.css -o ./src/compiled.css"
+    "start": "vite build && electron .",
+    "dev": "vite",
+    "build": "vite build",
+    "build:win": "vite build && electron-builder --win --x64",
+    "build:mac": "vite build && electron-builder --mac"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
     "electron-updater": "^6.8.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.2.2",
     "@tailwindcss/vite": "^4.2.2",
+    "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.27",
     "electron": "^35.0.0",
     "electron-builder": "^25.1.8",
     "postcss": "^8.5.8",
     "prettier": "^3.8.1",
-    "tailwindcss": "^4.2.2"
+    "tailwindcss": "^4.2.2",
+    "vite": "^5.1.0"
   },
   "build": {
     "appId": "dev.vercim.2peer",
     "productName": "2peer",
+    "files": [
+      "dist/**/*",
+      "dist",
+      "src/electron.cjs",
+      "src/preload.cjs",
+      "package.json"
+    ],
     "mac": {
       "icon": "assets/icon.icns",
       "target": [

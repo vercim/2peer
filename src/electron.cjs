@@ -38,6 +38,23 @@ let pendingSourceId = null;
 let mainWindow = null;
 
 function createWindow() {
+  // Determine if we're running in development or production
+  const isDev = !app.isPackaged;
+
+  // In development, dist is in the project root
+  // In production, dist is next to the main entry point (src folder)
+  let indexPath;
+  let preloadPath;
+
+  if (isDev) {
+    indexPath = path.join(__dirname, "..", "dist", "index.html");
+    preloadPath = path.join(__dirname, "preload.cjs");
+  } else {
+    // In production (packaged app), files are in app.asar
+    indexPath = path.join(__dirname, "..", "dist", "index.html");
+    preloadPath = path.join(__dirname, "preload.cjs");
+  }
+
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 770,
@@ -47,13 +64,20 @@ function createWindow() {
     backgroundColor: "#0a0a0a",
     autoHideMenuBar: true,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
     },
   });
-  mainWindow.loadFile(path.join(__dirname, "renderer.html"));
+
+  mainWindow.loadFile(indexPath);
+
+  // Открываем devtools только в development режиме
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
+  }
+
   return mainWindow;
 }
 
