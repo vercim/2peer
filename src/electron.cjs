@@ -115,7 +115,7 @@ if (!gotTheLock) {
 
       tray.setContextMenu(contextMenu);
 
-      tray.on("click", () => {
+      tray.on("double-click", () => {
         if (mainWindow) {
           mainWindow.show();
           mainWindow.focus();
