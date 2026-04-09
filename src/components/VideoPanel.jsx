@@ -144,25 +144,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
                               </option>
                             ))}
                           </select>
-                          <div className="text-[10px] text-muted mb-1">
-                            Bitrate (Mbps)
-                          </div>
-                          <select
-                            className="w-full bg-[#0a0a0a] border border-border rounded-[4px] p-1 text-[11px] text-text"
-                            value={streamQuality.bitrate}
-                            onChange={(e) =>
-                              onQualityChange({
-                                ...streamQuality,
-                                bitrate: parseInt(e.target.value),
-                              })
-                            }
-                          >
-                            {qualityOptions.bitrate.map((b) => (
-                              <option key={b} value={b}>
-                                {b} Mbps
-                              </option>
-                            ))}
-                          </select>
                         </div>
                       )}
                     </div>

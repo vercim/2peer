@@ -97,24 +97,35 @@ function applyMaxQualityEncoding(sender, quality = {}) {
   const params = sender.getParameters();
   params.encodings ??= [{}];
 
-  const settings = sender.track.getSettings();
-  let width = settings.width || 1920;
-  let height = settings.height || 1080;
-
   const res =
     qualityOptions.resolution.find(
       (r) => r.value === (quality.resolution || "1080p"),
     ) || qualityOptions.resolution[2];
-  if (res) {
-    width = res.width;
-    height = res.height;
+  const fps = quality.fps || 60;
+
+  let autoBitrate;
+  switch (res.value) {
+    case "480p":
+      autoBitrate = 3_000_000;
+      break;
+    case "720p":
+      autoBitrate = 5_000_000;
+      break;
+    case "1080p":
+      autoBitrate = 8_000_000;
+      break;
+    case "1440p":
+      autoBitrate = 12_000_000;
+      break;
+    case "2160p":
+      autoBitrate = 20_000_000;
+      break;
+    default:
+      autoBitrate = 8_000_000;
   }
 
-  const fps = quality.fps || 60;
-  const bitrate = (quality.bitrate || 8) * 1_000_000;
-
   params.encodings.forEach((enc) => {
-    enc.maxBitrate = bitrate;
+    enc.maxBitrate = autoBitrate;
     enc.maxFramerate = fps;
     enc.scaleResolutionDownBy = 1.0;
     enc.priority = "very-high";
@@ -123,7 +134,11 @@ function applyMaxQualityEncoding(sender, quality = {}) {
   });
   sender.setParameters(params).catch(console.error);
 
-  console.log("[Encoding] Applied quality:", { width, height, bitrate, fps });
+  console.log("[Encoding] Applied quality:", {
+    resolution: res.value,
+    autoBitrate,
+    fps,
+  });
 
   if (sender.track) {
     sender.track.contentHint = "detail";
@@ -139,11 +154,32 @@ const qualityOptions = {
     { value: "2160p", label: "2160p 4K", width: 3840, height: 2160 },
   ],
   fps: [30, 60],
-  bitrate: [4, 6, 8, 12, 20, 30],
 };
 
-function setMaxBandwidthInSDP(sdp, bitrate = 8) {
-  const bandwidth = bitrate * 1000;
+function setMaxBandwidthInSDP(sdp, resolution = "1080p") {
+  const res =
+    qualityOptions.resolution.find((r) => r.value === resolution) ||
+    qualityOptions.resolution[2];
+  let bandwidth;
+  switch (res.value) {
+    case "480p":
+      bandwidth = 3000;
+      break;
+    case "720p":
+      bandwidth = 5000;
+      break;
+    case "1080p":
+      bandwidth = 8000;
+      break;
+    case "1440p":
+      bandwidth = 12000;
+      break;
+    case "2160p":
+      bandwidth = 20000;
+      break;
+    default:
+      bandwidth = 8000;
+  }
   sdp = sdp.replace(/b=AS:[0-9]+/g, `b=AS:${bandwidth}`);
   sdp = sdp.replace(/b=TIAS:[0-9]+/g, `b=TIAS:${bandwidth * 1000}`);
   return sdp;
@@ -179,7 +215,6 @@ export default function App() {
   const [streamQuality, setStreamQuality] = useState({
     resolution: "1080p",
     fps: 60,
-    bitrate: 8,
   });
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
 
@@ -453,7 +488,7 @@ export default function App() {
       answerProcessedRef.current = true;
       const modifiedAnswer = {
         ...msg.answer,
-        sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.bitrate),
+        sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.resolution),
       };
       await pcRef.current.setRemoteDescription(modifiedAnswer);
       pcRef.current
@@ -493,7 +528,7 @@ export default function App() {
         const answer = await pcRef.current.createAnswer();
         const modifiedAnswer = {
           ...answer,
-          sdp: setMaxBandwidthInSDP(answer.sdp, streamQuality.bitrate),
+          sdp: setMaxBandwidthInSDP(answer.sdp, streamQuality.resolution),
         };
         await pcRef.current.setLocalDescription(modifiedAnswer);
         pcRef.current
@@ -510,7 +545,7 @@ export default function App() {
       try {
         const modifiedAnswer = {
           ...msg.answer,
-          sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.bitrate),
+          sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.resolution),
         };
         await pcRef.current.setLocalDescription(modifiedAnswer);
         sendSignal({
@@ -529,7 +564,7 @@ export default function App() {
       try {
         const modifiedAnswer = {
           ...msg.answer,
-          sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.bitrate),
+          sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.resolution),
         };
         await pcRef.current.setRemoteDescription(modifiedAnswer);
         pcRef.current
@@ -760,7 +795,7 @@ export default function App() {
     });
     const modifiedOffer = {
       ...offer,
-      sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.bitrate),
+      sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.resolution),
     };
     await pcRef.current.setLocalDescription(modifiedOffer);
 
@@ -808,7 +843,7 @@ export default function App() {
     const answer = await pcRef.current.createAnswer();
     const modifiedAnswer = {
       ...answer,
-      sdp: setMaxBandwidthInSDP(answer.sdp, streamQuality.bitrate),
+      sdp: setMaxBandwidthInSDP(answer.sdp, streamQuality.resolution),
     };
     await pcRef.current.setLocalDescription(modifiedAnswer);
 
@@ -897,7 +932,7 @@ export default function App() {
             const offer = await pcRef.current.createOffer();
             const modifiedOffer = {
               ...offer,
-              sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.bitrate),
+              sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.resolution),
             };
             await pcRef.current.setLocalDescription(modifiedOffer);
             sendSignal({
@@ -973,7 +1008,7 @@ export default function App() {
             const offer = await pcRef.current.createOffer();
             const modifiedOffer = {
               ...offer,
-              sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.bitrate),
+              sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.resolution),
             };
             await pcRef.current.setLocalDescription(modifiedOffer);
             sendSignal({
