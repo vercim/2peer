@@ -1117,7 +1117,7 @@ export default function App({ version = "" }) {
         audio: true,
         selfBrowserSurface: "exclude",
         surfaceSwitching: "include",
-        systemAudio: "include",
+        systemAudio: "exclude",
       });
       const [track] = stream.getVideoTracks();
       track.onended = () => {

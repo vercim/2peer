@@ -13,6 +13,10 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 
+if (process.platform === "win32") {
+  app.setAppUserModelId("2peer");
+}
+
 const packageJson = JSON.parse(
   fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
 );
@@ -134,7 +138,7 @@ if (!gotTheLock) {
           } else {
             source = sources[0];
           }
-          callback({ video: source, audio: false });
+          callback({ video: source, audio: true });
         } catch (err) {
           console.error("[displayMedia] error:", err.message);
           callback({ video: null, audio: false });
@@ -281,7 +285,7 @@ app.whenReady().then(() => {
         } else {
           source = sources[0];
         }
-        callback({ video: source, audio: false });
+        callback({ video: source, audio: true });
       } catch (err) {
         console.error("[displayMedia] error:", err.message);
         callback({ video: null, audio: false });

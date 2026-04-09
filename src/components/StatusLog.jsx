@@ -9,7 +9,7 @@ function formatMessage(text) {
       return (
         <span
           key={i}
-          className="font-mono text-blue-400 cursor-pointer hover:text-blue-300 hover:underline"
+          className="font-mono text-[#ccc] cursor-pointer hover:text-white"
           onClick={(e) => {
             e.stopPropagation();
             navigator.clipboard.writeText(id);
