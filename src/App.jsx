@@ -157,31 +157,6 @@ const qualityOptions = {
 };
 
 function setMaxBandwidthInSDP(sdp, resolution = "1080p") {
-  const res =
-    qualityOptions.resolution.find((r) => r.value === resolution) ||
-    qualityOptions.resolution[2];
-  let bandwidth;
-  switch (res.value) {
-    case "480p":
-      bandwidth = 3000;
-      break;
-    case "720p":
-      bandwidth = 5000;
-      break;
-    case "1080p":
-      bandwidth = 8000;
-      break;
-    case "1440p":
-      bandwidth = 12000;
-      break;
-    case "2160p":
-      bandwidth = 20000;
-      break;
-    default:
-      bandwidth = 8000;
-  }
-  sdp = sdp.replace(/b=AS:[0-9]+/g, `b=AS:${bandwidth}`);
-  sdp = sdp.replace(/b=TIAS:[0-9]+/g, `b=TIAS:${bandwidth * 1000}`);
   return sdp;
 }
 
@@ -646,10 +621,13 @@ export default function App() {
         videoEl.srcObject = stream;
       }
 
-      const s = event.track.getSettings ? event.track.getSettings() : {};
-      setRemoteMeta(
-        `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
-      );
+      const track = event.track;
+      const settings = track?.getSettings ? track.getSettings() : {};
+      const width = settings.width || track?.getConstraints?.().width || "1920";
+      const height =
+        settings.height || track?.getConstraints?.().height || "1080";
+      const frameRate = settings.frameRate || "60";
+      setRemoteMeta(`${width}×${height} @${Math.round(frameRate)}fps`);
       setStatusDotColor("#4ade80");
       addStatus(
         `Connected to <strong style="font-family:monospace">${peerId}</strong>.`,
@@ -1023,10 +1001,11 @@ export default function App() {
       }
 
       setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
-      const s = track.getSettings ? track.getSettings() : {};
-      setLocalMeta(
-        `${s.width || "?"}×${s.height || "?"} @${s.frameRate > 0 ? Math.round(s.frameRate) : "?"}fps`,
-      );
+      const q =
+        qualityOptions.resolution.find(
+          (r) => r.value === streamQuality.resolution,
+        ) || qualityOptions.resolution[2];
+      setLocalMeta(`${q.width}×${q.height} @${streamQuality.fps}fps`);
       addStatus("Broadcast started.");
     } catch (e) {
       addStatus(
