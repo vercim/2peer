@@ -1,5 +1,29 @@
 import { useRef, useEffect, useState } from "react";
 
+function formatMessage(text) {
+  const parts = text.split(/(<strong[^>]*>.*?<\/strong>)/);
+  return parts.map((part, i) => {
+    const match = part.match(/<strong[^>]*>(.*?)<\/strong>/);
+    if (match) {
+      const id = match[1];
+      return (
+        <span
+          key={i}
+          className="font-mono text-blue-400 cursor-pointer hover:text-blue-300 hover:underline"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(id);
+          }}
+          title="Click to copy ID"
+        >
+          {id}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
 export function StatusLog({ messages = [] }) {
   const containerRef = useRef(null);
   const [animatedIds, setAnimatedIds] = useState(new Set());
@@ -35,8 +59,9 @@ export function StatusLog({ messages = [] }) {
           <div
             key={id}
             className={`entry text-[12px] text-muted leading-[1.4] py-[2px] break-word ${msg.isError ? "text-red-400" : ""} ${shouldAnimate ? "animate-pulse-once" : ""}`}
-            dangerouslySetInnerHTML={{ __html: msg.text }}
-          />
+          >
+            {formatMessage(msg.text)}
+          </div>
         );
       })}
     </div>

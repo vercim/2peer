@@ -94,11 +94,11 @@ function streamHasVideo(stream) {
 }
 
 const DEFAULT_BITRATES = {
-  "480p": 1_500_000,
-  "720p": 2_500_000,
-  "1080p": 4_000_000,
-  "1440p": 6_000_000,
-  "2160p": 10_000_000,
+  "480p": 2_500_000,
+  "720p": 4_000_000,
+  "1080p": 6_000_000,
+  "1440p": 8_000_000,
+  "2160p": 15_000_000,
 };
 
 let currentBitrate = { value: 4_000_000, target: 4_000_000 };
@@ -203,11 +203,11 @@ const qualityOptions = {
 
 function setMaxBandwidthInSDP(sdp, resolution = "1080p") {
   const bitrateMap = {
-    "480p": 1500,
-    "720p": 2500,
-    "1080p": 4000,
-    "1440p": 6000,
-    "2160p": 10000,
+    "480p": 2500,
+    "720p": 4000,
+    "1080p": 6000,
+    "1440p": 8000,
+    "2160p": 15000,
   };
   const kbps = bitrateMap[resolution] ?? 4000;
 
@@ -1114,10 +1114,10 @@ export default function App({ version = "" }) {
           frameRate: { ideal: streamQuality.fps },
           displaySurface: "monitor",
         },
-        audio: false,
+        audio: true,
         selfBrowserSurface: "exclude",
         surfaceSwitching: "include",
-        systemAudio: "exclude",
+        systemAudio: "include",
       });
       const [track] = stream.getVideoTracks();
       track.onended = () => {

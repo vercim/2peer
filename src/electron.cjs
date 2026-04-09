@@ -13,10 +13,6 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 
-if (process.platform === "win32") {
-  app.setAppUserModelId("dev.vercim.2peer");
-}
-
 const packageJson = JSON.parse(
   fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
 );
@@ -253,7 +249,6 @@ function registerIpcHandlers() {
         title: title,
         body: body,
         silent: false,
-        icon: path.join(__dirname, "..", "assets", "icon.png"),
       });
       notification.on("click", () => {
         if (mainWindow) {
