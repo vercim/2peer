@@ -506,28 +506,8 @@ export default function App() {
           sdp: setMaxBandwidthInSDP(answer.sdp, streamQuality.resolution),
         };
         await pcRef.current.setLocalDescription(modifiedAnswer);
-        pcRef.current
-          .getSenders()
-          .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
-      } catch (e) {
-        console.warn("[Signal] Failed to process renegotiate:", e.message);
-      }
-    }
-
-    if (msg.type === "renegotiate-answer") {
-      if (!pcRef.current || pcRef.current.signalingState === "closed") return;
-      if (pcRef.current.signalingState === "stable") return;
-      try {
-        const modifiedAnswer = {
-          ...msg.answer,
-          sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.resolution),
-        };
-        await pcRef.current.setLocalDescription(modifiedAnswer);
-        sendSignal({
-          type: "renegotiate-answer",
-          to: msg.from,
-          answer: pcRef.current.localDescription,
-        });
+        pcRef.current.getSenders().forEach((s) => applyMaxQualityEncoding(s, streamQuality));
+        sendSignal({ type: "renegotiate-answer", to: msg.from, answer: modifiedAnswer });
       } catch (e) {
         console.warn("[Signal] Failed to process renegotiate:", e.message);
       }
