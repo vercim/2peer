@@ -101,9 +101,10 @@ function applyMaxQualityEncoding(sender, quality = {}) {
   let width = settings.width || 1920;
   let height = settings.height || 1080;
 
-  const res = qualityOptions.resolution.find(
-    (r) => r.value === (quality.resolution || "1080p"),
-  );
+  const res =
+    qualityOptions.resolution.find(
+      (r) => r.value === (quality.resolution || "1080p"),
+    ) || qualityOptions.resolution[2];
   if (res) {
     width = res.width;
     height = res.height;
@@ -128,6 +129,18 @@ function applyMaxQualityEncoding(sender, quality = {}) {
     sender.track.contentHint = "detail";
   }
 }
+
+const qualityOptions = {
+  resolution: [
+    { value: "480p", label: "480p", width: 854, height: 480 },
+    { value: "720p", label: "720p HD", width: 1280, height: 720 },
+    { value: "1080p", label: "1080p Full HD", width: 1920, height: 1080 },
+    { value: "1440p", label: "1440p Quad HD", width: 2560, height: 1440 },
+    { value: "2160p", label: "2160p 4K", width: 3840, height: 2160 },
+  ],
+  fps: [30, 60],
+  bitrate: [4, 6, 8, 12, 20, 30],
+};
 
 function setMaxBandwidthInSDP(sdp, bitrate = 8) {
   const bandwidth = bitrate * 1000;
@@ -169,18 +182,6 @@ export default function App() {
     bitrate: 8,
   });
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
-
-  const qualityOptions = {
-    resolution: [
-      { value: "480p", label: "480p", width: 854, height: 480 },
-      { value: "720p", label: "720p HD", width: 1280, height: 720 },
-      { value: "1080p", label: "1080p Full HD", width: 1920, height: 1080 },
-      { value: "1440p", label: "1440p Quad HD", width: 2560, height: 1440 },
-      { value: "2160p", label: "2160p 4K", width: 3840, height: 2160 },
-    ],
-    fps: [30, 60],
-    bitrate: [4, 6, 8, 12, 20, 30],
-  };
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
