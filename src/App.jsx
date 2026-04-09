@@ -819,14 +819,21 @@ export default function App() {
     if (localStream) {
       localStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
+      setLocalMeta("—-");
+      setLocalVideoWrapClass(
+        "flex-1 min-h-0 relative bg-[#050505] placeholder",
+      );
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    setLocalMeta("—-");
-    setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     setRemoteStream(null);
     setRemoteMeta("—-");
     setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
+    if (pcRef.current) {
+      pcRef.current.getSenders().forEach((s) => {
+        if (s.track) s.track.stop();
+      });
+    }
   };
 
   const handleBroadcast = async () => setSourcePickerOpen(true);

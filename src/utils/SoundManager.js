@@ -47,41 +47,41 @@ export class SoundManager {
   }
 
   playCall() {
-    this.playBubble(440, 0.15, 0.4);
-    setTimeout(() => this.playBubble(550, 0.15, 0.4), 100);
-    setTimeout(() => this.playBubble(660, 0.15, 0.4), 200);
+    this.playBubble(440, 0.15, 0.32);
+    setTimeout(() => this.playBubble(550, 0.15, 0.32), 100);
+    setTimeout(() => this.playBubble(660, 0.15, 0.32), 200);
   }
 
   playConnecting() {
-    this.playBubble(700, 0.1, 0.35);
-    setTimeout(() => this.playBubble(850, 0.1, 0.35), 80);
+    this.playBubble(700, 0.1, 0.28);
+    setTimeout(() => this.playBubble(850, 0.1, 0.28), 80);
   }
 
   playConnect() {
-    this.playBubble(660, 0.1, 0.5);
-    setTimeout(() => this.playBubble(880, 0.15, 0.55), 80);
+    this.playBubble(660, 0.1, 0.4);
+    setTimeout(() => this.playBubble(880, 0.15, 0.44), 80);
   }
 
   playDisconnect() {
-    this.playBubble(440, 0.1, 0.4);
-    setTimeout(() => this.playBubble(330, 0.15, 0.35), 80);
+    this.playBubble(440, 0.1, 0.32);
+    setTimeout(() => this.playBubble(330, 0.15, 0.28), 80);
   }
 
   playCancel() {
-    this.playBubble(300, 0.08, 0.35);
-    setTimeout(() => this.playBubble(250, 0.12, 0.3), 80);
+    this.playBubble(300, 0.08, 0.28);
+    setTimeout(() => this.playBubble(250, 0.12, 0.24), 80);
   }
 
   playIdChange() {
-    this.playBubble(300, 0.05, 0.2);
-    this.playBubble(400, 0.05, 0.25);
-    this.playBubble(600, 0.08, 0.3);
-    this.playBubble(900, 0.12, 0.4);
+    this.playBubble(300, 0.05, 0.16);
+    this.playBubble(400, 0.05, 0.2);
+    this.playBubble(600, 0.08, 0.24);
+    this.playBubble(900, 0.12, 0.32);
   }
 
   playIncoming() {
-    this.playBubble(587.33, 0.12, 0.4);
-    setTimeout(() => this.playBubble(659.25, 0.12, 0.4), 120);
+    this.playBubble(587.33, 0.12, 0.32);
+    setTimeout(() => this.playBubble(659.25, 0.12, 0.32), 120);
   }
 }
 
