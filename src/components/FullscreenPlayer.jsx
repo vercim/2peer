@@ -22,21 +22,26 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
 
   const handleClose = useCallback(() => {
     if (document.fullscreenElement) {
-      document.exitFullscreen();
+      document.exitFullscreen().catch(() => {});
     }
-    setShowControls(false);
-    setTimeout(() => {
-      onClose();
-    }, 100);
+    onClose();
   }, [onClose]);
 
   useEffect(() => {
     showControlsTemporarily();
 
     const container = containerRef.current;
-    if (container && container.requestFullscreen) {
-      container.requestFullscreen().catch(() => {});
+    if (container?.requestFullscreen) {
+      container.requestFullscreen().catch((err) => {
+        console.warn("Fullscreen failed:", err);
+      });
     }
+
+    const handleFsChange = () => {
+      if (!document.fullscreenElement) {
+        onClose();
+      }
+    };
 
     const handleMouseMove = () => showControlsTemporarily();
     const handleKeyDown = (e) => {
@@ -58,18 +63,17 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
       }
     };
 
+    document.addEventListener("fullscreenchange", handleFsChange);
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      document.removeEventListener("fullscreenchange", handleFsChange);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("keydown", handleKeyDown);
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      }
     };
-  }, [showControlsTemporarily, handleClose, videoRef]);
+  }, [showControlsTemporarily, handleClose, onClose, videoRef]);
 
   const handleVideoClick = () => {
     if (videoRef?.current) {

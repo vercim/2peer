@@ -444,6 +444,7 @@ export default function App() {
       addStatus(
         `<strong style="font-family:monospace">${msg.from}</strong> accepted the call.`,
       );
+      soundManager.playAccepted();
     }
 
     if (msg.type === "candidate") {
