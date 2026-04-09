@@ -92,12 +92,10 @@ function streamHasVideo(stream) {
   }
 }
 
-// ИСПРАВЛЕНИЕ 1: убран bitratePriority (нестандартное поле),
-// убран scaleResolutionDownBy (ни на что не влияет при захвате экрана)
 function applyMaxQualityEncoding(sender, quality = {}) {
   if (!sender || sender.track?.kind !== "video") return;
   const params = sender.getParameters();
-  if (!params.encodings?.length) params.encodings = [{}];
+  params.encodings ??= [{}];
 
   const res =
     qualityOptions.resolution.find(
@@ -105,33 +103,46 @@ function applyMaxQualityEncoding(sender, quality = {}) {
     ) || qualityOptions.resolution[2];
   const fps = quality.fps || 60;
 
-  const bitrateMap = {
-    "480p": 3_000_000,
-    "720p": 5_000_000,
-    "1080p": 8_000_000,
-    "1440p": 12_000_000,
-    "2160p": 20_000_000,
-  };
-  const maxBitrate = bitrateMap[res.value] ?? 8_000_000;
+  let autoBitrate;
+  switch (res.value) {
+    case "480p":
+      autoBitrate = 3_000_000;
+      break;
+    case "720p":
+      autoBitrate = 5_000_000;
+      break;
+    case "1080p":
+      autoBitrate = 8_000_000;
+      break;
+    case "1440p":
+      autoBitrate = 12_000_000;
+      break;
+    case "2160p":
+      autoBitrate = 20_000_000;
+      break;
+    default:
+      autoBitrate = 8_000_000;
+  }
 
   params.encodings.forEach((enc) => {
-    enc.maxBitrate = maxBitrate;
+    enc.maxBitrate = autoBitrate;
     enc.maxFramerate = fps;
+    enc.scaleResolutionDownBy = 1.0;
     enc.priority = "very-high";
     enc.networkPriority = "high";
+    enc.bitratePriority = 50;
   });
-
   sender.setParameters(params).catch(console.error);
+
+  console.log("[Encoding] Applied quality:", {
+    resolution: res.value,
+    autoBitrate,
+    fps,
+  });
 
   if (sender.track) {
     sender.track.contentHint = "detail";
   }
-
-  console.log("[Encoding] Applied quality:", {
-    resolution: res.value,
-    maxBitrate,
-    fps,
-  });
 }
 
 const qualityOptions = {
@@ -145,29 +156,8 @@ const qualityOptions = {
   fps: [30, 60],
 };
 
-// ИСПРАВЛЕНИЕ 2: реальная модификация SDP для увеличения битрейта
 function setMaxBandwidthInSDP(sdp, resolution = "1080p") {
-  const bitrateMap = {
-    "480p": 3000,
-    "720p": 5000,
-    "1080p": 8000,
-    "1440p": 12000,
-    "2160p": 20000,
-  };
-  const kbps = bitrateMap[resolution] ?? 8000;
-
-  // Удаляем старые b=AS и b=TIAS строки
-  let result = sdp
-    .replace(/b=AS:\d+\r\n/g, "")
-    .replace(/b=TIAS:\d+\r\n/g, "");
-
-  // Вставляем новые b=AS и b=TIAS сразу после строки m=video
-  result = result.replace(
-    /(m=video[^\r\n]*\r\n)/,
-    `$1b=AS:${kbps}\r\nb=TIAS:${kbps * 1000}\r\n`,
-  );
-
-  return result;
+  return sdp;
 }
 
 export default function App() {
@@ -202,37 +192,12 @@ export default function App() {
     fps: 60,
   });
 
-  // ИСПРАВЛЕНИЕ 3: при смене качества — применяем applyConstraints к треку
-  // И applyMaxQualityEncoding к sender'у
   useEffect(() => {
-    const pc = pcRef.current;
-    if (!pc || pc.connectionState !== "connected") return;
-
-    const res =
-      qualityOptions.resolution.find(
-        (r) => r.value === streamQuality.resolution,
-      ) || qualityOptions.resolution[2];
-
-    // Применяем constraints к треку (меняет реальное разрешение захвата)
-    const currentStream = localStreamRef.current;
-    if (currentStream) {
-      const videoTrack = currentStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack
-          .applyConstraints({
-            width: { ideal: res.width },
-            height: { ideal: res.height },
-            frameRate: { ideal: streamQuality.fps },
-          })
-          .catch((e) => console.warn("[Quality] applyConstraints failed:", e));
-      }
+    if (pcRef.current && pcRef.current.connectionState === "connected") {
+      pcRef.current
+        .getSenders()
+        .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
     }
-
-    // Применяем encoding params к RTCRtpSender
-    pc.getSenders().forEach((s) => applyMaxQualityEncoding(s, streamQuality));
-
-    // Обновляем localMeta
-    setLocalMeta(`${res.width}×${res.height} @${streamQuality.fps}fps`);
   }, [streamQuality]);
 
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
@@ -251,15 +216,8 @@ export default function App() {
   const bitrateIntervalRef = useRef(null);
   const answerProcessedRef = useRef(false);
   const hangupProcessedRef = useRef(false);
-  // ИСПРАВЛЕНИЕ 4: ref для localStream чтобы useEffect видел актуальное значение
-  const localStreamRef = useRef(null);
 
-  // Синхронизируем ref с state
-  useEffect(() => {
-    localStreamRef.current = localStream;
-  }, [localStream]);
-
-  // --- Эффекты для удержания стримов в DOM при ререндере ---
+  // --- ИСПРАВЛЕНИЕ: Эффекты для удержания стримов в DOM при ререндере ---
   useEffect(() => {
     if (
       remoteVideoRef.current &&
@@ -287,7 +245,6 @@ export default function App() {
       setRemoteMeta("—");
       return;
     }
-
     pcRef.current.getStats().then((report) => {
       let bytesReceived = 0;
       let frameRate = 0;
@@ -360,7 +317,6 @@ export default function App() {
       addStatus("Error: Supabase library not loaded.", true);
       return;
     }
-
     let client = supabaseClientRef.current;
     if (!client) {
       try {
@@ -375,7 +331,6 @@ export default function App() {
         return;
       }
     }
-
     if (myChannelRef.current) {
       try {
         await client.removeChannel(myChannelRef.current);
@@ -402,7 +357,6 @@ export default function App() {
         }
         addStatus('Ready. Share your ID and click "Call".');
       }
-
       if (status === "CHANNEL_ERROR") {
         addStatus("Channel error. Attempting to reconnect...", true);
         if (retryCount < maxRetries) {
@@ -413,7 +367,6 @@ export default function App() {
           retryCount = 0;
         }
       }
-
       if (status === "TIMED_OUT") {
         addStatus("Connection timeout. Retrying...", true);
         if (retryCount < maxRetries) {
@@ -421,7 +374,6 @@ export default function App() {
           setTimeout(() => ch.subscribe(), 1500);
         }
       }
-
       if (status === "CLOSED") {
         addStatus("Connection closed.");
         retryCount = 0;
@@ -457,7 +409,6 @@ export default function App() {
       } catch (_) {}
       outChannelRef.current = null;
     }
-
     const ch = supabaseClientRef.current.channel(`peer:${peerId}`, {
       config: { broadcast: { self: false } },
     });
@@ -487,7 +438,6 @@ export default function App() {
       addStatus("No connection to Supabase.", true);
       return;
     }
-
     try {
       await ensureOutChannel(payload.to);
       if (!outChannelRef.current) return;
@@ -508,12 +458,17 @@ export default function App() {
     if (msg.type === "call") {
       setIncomingCall({ from: msg.from, offer: msg.offer });
       soundManager.playIncoming();
-      addStatus(`Incoming call from **${msg.from}**.`);
+      addStatus(
+        `Incoming call from <strong style="font-family:monospace">${msg.from}</strong>.`,
+      );
     }
+
     if (msg.type === "answer") {
       if (!pcRef.current) return;
       if (answerProcessedRef.current) return;
       if (pcRef.current.signalingState !== "have-local-offer") return;
+
+      // ИСПРАВЛЕНИЕ: Добавление кандидатов и удаление пустого addIceCandidate(null)
       answerProcessedRef.current = true;
       const modifiedAnswer = {
         ...msg.answer,
@@ -523,12 +478,17 @@ export default function App() {
       pcRef.current
         .getSenders()
         .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
+
       for (const c of pendingIceRef.current) {
         await pcRef.current.addIceCandidate(c).catch(console.error);
       }
       pendingIceRef.current = [];
-      addStatus(`**${msg.from}** accepted the call.`);
+
+      addStatus(
+        `<strong style="font-family:monospace">${msg.from}</strong> accepted the call.`,
+      );
     }
+
     if (msg.type === "candidate") {
       if (!msg.candidate) return;
       if (!pcRef.current || !pcRef.current.remoteDescription) {
@@ -541,6 +501,7 @@ export default function App() {
         console.error("[Signal] Failed to add ICE candidate:", e);
       }
     }
+
     if (msg.type === "renegotiate") {
       if (!pcRef.current || pcRef.current.signalingState === "closed") return;
       try {
@@ -566,6 +527,7 @@ export default function App() {
         console.warn("[Signal] Failed to process renegotiate:", e.message);
       }
     }
+
     if (msg.type === "renegotiate-answer") {
       if (!pcRef.current || pcRef.current.signalingState === "closed") return;
       if (pcRef.current.signalingState === "stable") return;
@@ -582,6 +544,7 @@ export default function App() {
         console.warn("[Signal] Failed to set remote answer:", e.message);
       }
     }
+
     if (msg.type === "stop-broadcast") {
       if (remoteVideoRef.current?.srcObject) {
         remoteVideoRef.current.srcObject.getTracks().forEach((t) => t.stop());
@@ -591,14 +554,20 @@ export default function App() {
       setRemoteMeta("—");
       addStatus("Peer broadcast ended.");
     }
+
     if (msg.type === "decline") {
-      addStatus(`**${msg.from}** declined the call.`);
+      addStatus(
+        `<strong style="font-family:monospace">${msg.from}</strong> declined the call.`,
+      );
       hangup(false);
     }
+
     if (msg.type === "hangup") {
       if (hangupProcessedRef.current) return;
       hangupProcessedRef.current = true;
-      addStatus(`**${msg.from}** ended the call.`);
+      addStatus(
+        `<strong style="font-family:monospace">${msg.from}</strong> ended the call.`,
+      );
       hangup(false);
     }
   };
@@ -615,10 +584,12 @@ export default function App() {
       setRemoteBitrate(0);
       window._prevBytesReceived = 0;
     }
+
     const localIPs = await gatherLocalCandidates(pcRef.current || null);
     const localStunServers = localIPs.map((ip) => ({
       urls: `stun:${ip}:19302`,
     }));
+
     const configWithIPs = {
       ...rtcConfig,
       iceServers: [
@@ -628,18 +599,23 @@ export default function App() {
       ],
     };
     const pc = new RTCPeerConnection(configWithIPs);
+
+    // ИСПРАВЛЕНИЕ: Корректное присвоение стрима
     pc.ontrack = (event) => {
       setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
       let stream = event?.streams?.[0] || null;
       if (!stream && event?.track) {
         stream = new MediaStream([event.track]);
       }
+
       setRemoteStream(stream);
+
       const videoEl =
         remoteVideoRef.current || document.getElementById("remoteVideo");
       if (videoEl && stream && videoEl.srcObject !== stream) {
         videoEl.srcObject = stream;
       }
+
       const track = event.track;
       const settings = track?.getSettings ? track.getSettings() : {};
       const width = settings.width || track?.getConstraints?.().width || "1920";
@@ -648,19 +624,24 @@ export default function App() {
       const frameRate = settings.frameRate || "60";
       setRemoteMeta(`${width}×${height} @${Math.round(frameRate)}fps`);
       setStatusDotColor("#4ade80");
-      addStatus(`Connected to **${peerId}**.`);
+      addStatus(
+        `Connected to <strong style="font-family:monospace">${peerId}</strong>.`,
+      );
     };
+
     pc.onicecandidate = ({ candidate }) => {
       if (candidate && peerId) {
         sendSignal({ type: "candidate", to: peerId, candidate });
       }
     };
+
     pc.onicecandidateerror = (event) => {
       console.warn(
         "[PC] ICE candidate error:",
         event.errorText || event.errorCode,
       );
     };
+
     pc.onconnectionstatechange = () => {
       const st = pc?.connectionState;
       if (st === "connected") {
@@ -668,6 +649,7 @@ export default function App() {
         setStatusDotColor("#4ade80");
         setCallStatus("connected");
         soundManager.playConnect();
+
         setTimeout(() => {
           try {
             const stats = pc.getStats();
@@ -731,6 +713,7 @@ export default function App() {
         addStatus("Connection closed.");
       }
     };
+
     pc.oniceconnectionstatechange = () => {
       const iceState = pc?.iceConnectionState;
       if (iceState === "failed") {
@@ -741,15 +724,19 @@ export default function App() {
         addStatus("ICE disconnected.");
       }
     };
+
     pc.onicegatheringstatechange = () => {};
+
     pcRef.current = pc;
     return pc;
   };
 
-  const attachLocalTracks = async (streamToAttach = localStreamRef.current) => {
+  // ИСПРАВЛЕНИЕ: передаем поток как аргумент для избежания конфликтов состояния React
+  const attachLocalTracks = async (streamToAttach = localStream) => {
     if (!streamToAttach || !streamToAttach.active || !pcRef.current) return;
     const senders = pcRef.current.getSenders() || [];
     const tracks = streamToAttach.getTracks();
+
     for (const track of tracks) {
       const existingSender = senders.find((s) => s.track?.kind === track.kind);
       if (existingSender) {
@@ -767,12 +754,15 @@ export default function App() {
       addStatus("Cannot call yourself.", true);
       return;
     }
+
     hangup(false);
     isPoliteRef.current = false;
     hangupProcessedRef.current = false;
     answerProcessedRef.current = false;
+
     await createPeerConnection(peerId);
     await attachLocalTracks();
+
     const offer = await pcRef.current.createOffer({
       offerToReceiveVideo: true,
     });
@@ -781,12 +771,16 @@ export default function App() {
       sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.resolution),
     };
     await pcRef.current.setLocalDescription(modifiedOffer);
+
     sendSignal({
       type: "call",
       to: peerId,
       offer: pcRef.current.localDescription,
     });
-    addStatus(`Calling **${peerId}**...`);
+
+    addStatus(
+      `Calling <strong style="font-family:monospace">${peerId}</strong>...`,
+    );
     soundManager.playCall();
     setStatusDotColor("#f97316");
     setCallStatus("connecting");
@@ -794,8 +788,10 @@ export default function App() {
 
   const handleAcceptCall = async () => {
     if (!incomingCall) return;
+
     const { from, offer } = incomingCall;
     setIncomingCall(null);
+
     if (pcRef.current) {
       pcRef.current.getSenders().forEach((s) => s.track?.stop());
       pcRef.current.close();
@@ -803,27 +799,36 @@ export default function App() {
       setRemoteBitrate(0);
       window._prevBytesReceived = 0;
     }
+
     isPoliteRef.current = true;
     hangupProcessedRef.current = false;
+
     await createPeerConnection(from);
     await attachLocalTracks();
+
     await pcRef.current.setRemoteDescription(offer);
+
     for (const c of pendingIceRef.current) {
       await pcRef.current.addIceCandidate(c);
     }
     pendingIceRef.current = [];
+
     const answer = await pcRef.current.createAnswer();
     const modifiedAnswer = {
       ...answer,
       sdp: setMaxBandwidthInSDP(answer.sdp, streamQuality.resolution),
     };
     await pcRef.current.setLocalDescription(modifiedAnswer);
+
     sendSignal({
       type: "answer",
       to: from,
       answer: pcRef.current.localDescription,
     });
-    addStatus(`Call accepted. Connecting to **${from}**...`);
+
+    addStatus(
+      `Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`,
+    );
     soundManager.playConnecting();
     setStatusDotColor("#f97316");
     setCallStatus("connecting");
@@ -834,11 +839,14 @@ export default function App() {
     const { from } = incomingCall;
     setIncomingCall(null);
     sendSignal({ type: "decline", to: from });
-    addStatus(`Call from **${from}** declined.`);
+    addStatus(
+      `Call from <strong style="font-family:monospace">${from}</strong> declined.`,
+    );
   };
 
   const hangup = (notify = true) => {
-    if (notify && currentPeerId) sendSignal({ type: "hangup", to: currentPeerId });
+    if (notify && currentPeerId)
+      sendSignal({ type: "hangup", to: currentPeerId });
     soundManager.playDisconnect();
     if (outChannelRef.current) {
       supabaseClientRef.current
@@ -859,10 +867,9 @@ export default function App() {
     pendingIceRef.current = [];
     setIncomingCall(null);
     setStatusDotColor("#888");
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((t) => t.stop());
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
-      localStreamRef.current = null;
       setLocalMeta("—-");
       setLocalVideoWrapClass(
         "flex-1 min-h-0 relative bg-[#050505] placeholder",
@@ -873,6 +880,11 @@ export default function App() {
     setRemoteStream(null);
     setRemoteMeta("—-");
     setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
+    if (pcRef.current) {
+      pcRef.current.getSenders().forEach((s) => {
+        if (s.track) s.track.stop();
+      });
+    }
   };
 
   const handleBroadcast = async () => setSourcePickerOpen(true);
@@ -907,10 +919,9 @@ export default function App() {
         }
       }, 100);
     }
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((t) => t.stop());
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
-      localStreamRef.current = null;
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
@@ -922,12 +933,12 @@ export default function App() {
 
   const handleChangeSource = async () => setSourcePickerOpen(true);
 
+  // ИСПРАВЛЕНИЕ: Вызов attachLocalTracks с новым стримом + Renegotiation
   const handleSourceSelected = async (sourceId) => {
     setSourcePickerOpen(false);
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((t) => t.stop());
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
-      localStreamRef.current = null;
     }
     try {
       if (window.electronAPI?.setPendingSource) {
@@ -953,16 +964,18 @@ export default function App() {
         if (currentPeerId && pcRef.current?.connectionState === "connected")
           sendSignal({ type: "stop-broadcast", to: currentPeerId });
       };
+
       setLocalStream(stream);
-      localStreamRef.current = stream;
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
+
       if (pcRef.current?.connectionState === "connected") {
         await attachLocalTracks(stream);
         pcRef.current
           .getSenders()
           .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
+
         try {
           if (pcRef.current.signalingState === "stable") {
             const offer = await pcRef.current.createOffer();
@@ -981,6 +994,7 @@ export default function App() {
           console.error("[Broadcast] Renegotiation error:", err);
         }
       }
+
       setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
       const q =
         qualityOptions.resolution.find(
@@ -1010,6 +1024,7 @@ export default function App() {
   const handleFullscreen = async () => {
     const videoElement = remoteVideoRef.current;
     if (!videoElement) return;
+
     try {
       if (videoElement.requestFullscreen) {
         await videoElement.requestFullscreen();
@@ -1019,7 +1034,10 @@ export default function App() {
         await videoElement.msRequestFullscreen();
       }
     } catch (e) {
-      console.error("[Fullscreen] Ошибка при переходе в полноэкранный режим:", e);
+      console.error(
+        "[Fullscreen] Ошибка при переходе в полноэкранный режим:",
+        e,
+      );
     }
   };
 
@@ -1037,6 +1055,7 @@ export default function App() {
       }),
     );
     if (!ok) return;
+
     addStatus("Regenerating ID...");
     soundManager.playIdChange();
     try {
@@ -1051,7 +1070,7 @@ export default function App() {
       setSelfId(profile.id);
       window.__SELF_ID__ = profile.id;
       await connectSupabase(config.supabaseUrl, config.supabaseKey, profile.id);
-      addStatus("... New ID created.");
+      addStatus("New ID created.");
     } catch (e) {
       addStatus("Failed to change ID: " + (e.message || "Unknown error"), true);
     }
@@ -1089,72 +1108,76 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#0a0a0a] text-white overflow-hidden">
+    <div className="h-screen flex flex-col bg-bg text-text font-sans text-[13px] antialiased overflow-hidden">
       <TitleBar
-        selfId={selfId}
-        supabaseStatus={supabaseStatus}
         statusDotColor={statusDotColor}
-        callStatus={callStatus}
-        onCopyId={handleCopyId}
-        onRegenId={handleRegenId}
-        onHangup={handleHangup}
-        onCancelCall={handleCancelCall}
+        connectionStatus={callStatus}
         hasActiveCall={hasActiveCall}
-        streamQuality={streamQuality}
-        setStreamQuality={setStreamQuality}
-        qualityOptions={qualityOptions}
-        qualityMenuOpen={qualityMenuOpen}
-        setQualityMenuOpen={setQualityMenuOpen}
       />
-      <div className="flex flex-1 min-h-0">
+      <div className="h-[calc(100vh-38px)] grid grid-cols-[272px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden">
         <Sidebar
-          statusLog={statusLog}
+          selfId={selfId}
+          onCopyId={handleCopyId}
+          onRegenId={handleRegenId}
           onCall={handleCall}
-          onBroadcast={handleBroadcast}
-          onChangeSource={handleChangeSource}
-          onStopBroadcast={stopBroadcast}
+          onHangup={handleHangup}
+          onCancelCall={handleCancelCall}
+          onAccept={handleAcceptCall}
+          onDecline={handleDeclineCall}
+          hasIncomingCall={!!incomingCall}
+          callerId={incomingCall?.from || ""}
           hasActiveCall={hasActiveCall}
-          localStream={localStream}
-          incomingCall={incomingCall}
-          onAcceptCall={handleAcceptCall}
-          onDeclineCall={handleDeclineCall}
+          connectionStatus={callStatus}
+          supabaseStatus={supabaseStatus}
+          statusMessages={statusLog}
         />
-        <div className="flex flex-col flex-1 min-w-0 gap-1 p-1">
-          <VideoPanel
-            label="Remote"
-            videoRef={remoteVideoRef}
-            containerRef={remoteContainerRef}
-            wrapClass={remoteVideoWrapClass}
-            meta={remoteMeta}
-            bitrate={remoteBitrate}
-            onPiP={handlePiP}
-            onFullscreen={handleFullscreen}
-          />
-          <VideoPanel
-            label="Local"
-            videoRef={localVideoRef}
-            containerRef={localContainerRef}
-            wrapClass={localVideoWrapClass}
-            meta={localMeta}
-            muted
-          />
-        </div>
+        <main className="flex flex-col gap-[8px] min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col gap-[8px]">
+            <VideoPanel
+              ref={localVideoRef}
+              title="Your Screen"
+              meta={localMeta}
+              isLocal
+              isBroadcasting={!!localStream}
+              onBroadcast={localStream ? stopBroadcast : handleBroadcast}
+              onChangeSource={handleChangeSource}
+              showPlaceholder={!streamHasVideo(localStream)}
+              videoRef={localVideoRef}
+              containerRef={localContainerRef}
+              canBroadcast={pcRef.current?.connectionState === "connected"}
+              streamQuality={streamQuality}
+              onQualityChange={setStreamQuality}
+              qualityOptions={qualityOptions}
+            />
+            <VideoPanel
+              ref={remoteVideoRef}
+              title="Peer Screen"
+              meta={remoteMeta}
+              bitrate={remoteBitrate}
+              onPiP={handlePiP}
+              onFullscreen={handleFullscreen}
+              showPlaceholder={!streamHasVideo(remoteStream)}
+              className={remoteVideoWrapClass}
+              videoRef={remoteVideoRef}
+              containerRef={remoteContainerRef}
+            />
+          </div>
+        </main>
       </div>
-      {sourcePickerOpen && (
-        <SourcePicker
-          onSelect={handleSourceSelected}
-          onClose={() => setSourcePickerOpen(false)}
-        />
-      )}
+      <SourcePicker
+        isOpen={sourcePickerOpen}
+        onClose={() => setSourcePickerOpen(false)}
+        onSelect={handleSourceSelected}
+      />
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         message={confirmDialog.message}
         onConfirm={() => {
-          confirmDialog.onConfirm?.();
+          confirmDialog.onConfirm();
           setConfirmDialog({ isOpen: false, message: "" });
         }}
         onCancel={() => {
-          confirmDialog.onCancel?.();
+          confirmDialog.onCancel();
           setConfirmDialog({ isOpen: false, message: "" });
         }}
       />
