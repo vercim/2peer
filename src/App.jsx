@@ -123,7 +123,7 @@ function applyMaxQualityEncoding(sender, quality = {}, forcedBitrate = null) {
     enc.maxBitrate = autoBitrate;
     enc.minBitrate = Math.floor(autoBitrate * 0.5);
     enc.maxFramerate = fps;
-    enc.priority = "very-high";
+    enc.priority = "high";
     enc.networkPriority = "high";
     enc.rmsLevel = 0.01;
     enc.scaleResolutionDownBy = 1;
@@ -1049,32 +1049,36 @@ export default function App({ version = "" }) {
   const stopBroadcast = () => {
     if (pcRef.current && pcRef.current.connectionState === "connected") {
       const senders = pcRef.current.getSenders();
+      let hasVideo = false;
       for (const sender of senders) {
         if (sender.track && sender.track.kind === "video") {
+          hasVideo = true;
           try {
             pcRef.current.removeTrack(sender);
           } catch (_) {}
         }
       }
-      setTimeout(async () => {
-        try {
-          if (pcRef.current?.signalingState === "stable") {
-            const offer = await pcRef.current.createOffer();
-            const modifiedOffer = {
-              ...offer,
-              sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.resolution),
-            };
-            await pcRef.current.setLocalDescription(modifiedOffer);
-            sendSignal({
-              type: "renegotiate",
-              to: currentPeerId,
-              offer: pcRef.current.localDescription,
-            });
+      if (hasVideo) {
+        setTimeout(async () => {
+          try {
+            if (pcRef.current?.signalingState === "stable") {
+              const offer = await pcRef.current.createOffer();
+              const modifiedOffer = {
+                ...offer,
+                sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.resolution),
+              };
+              await pcRef.current.setLocalDescription(modifiedOffer);
+              sendSignal({
+                type: "renegotiate",
+                to: currentPeerId,
+                offer: pcRef.current.localDescription,
+              });
+            }
+          } catch (err) {
+            console.error("[StopBroadcast] Renegotiation error:", err);
           }
-        } catch (err) {
-          console.error("[StopBroadcast] Renegotiation error:", err);
-        }
-      }, 100);
+        }, 100);
+      }
     }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -1091,7 +1095,6 @@ export default function App({ version = "" }) {
 
   const handleChangeSource = async () => setSourcePickerOpen(true);
 
-  // ИСПРАВЛЕНИЕ: Вызов attachLocalTracks с новым стримом + Renegotiation
   const handleSourceSelected = async (sourceId) => {
     setSourcePickerOpen(false);
     if (localStreamRef.current) {
@@ -1100,24 +1103,27 @@ export default function App({ version = "" }) {
       localStreamRef.current = null;
     }
     try {
-      if (window.electronAPI?.setPendingSource) {
-        await window.electronAPI.setPendingSource(sourceId);
-      }
       const res =
         qualityOptions.resolution.find(
           (r) => r.value === streamQuality.resolution,
         ) || qualityOptions.resolution[2];
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: res.width },
-          height: { ideal: res.height },
-          frameRate: { ideal: streamQuality.fps },
-          displaySurface: "monitor",
+          mandatory: {
+            chromeMediaSource: "desktop",
+            chromeMediaSourceId: sourceId,
+            maxWidth: res.width,
+            maxHeight: res.height,
+            maxFrameRate: streamQuality.fps,
+          },
         },
-        audio: true,
-        selfBrowserSurface: "exclude",
-        surfaceSwitching: "include",
-        systemAudio: "exclude",
+        audio: {
+          mandatory: {
+            chromeMediaSource: "desktop",
+            chromeMediaSourceId: sourceId,
+          },
+        },
       });
       const [track] = stream.getVideoTracks();
       track.onended = () => {
