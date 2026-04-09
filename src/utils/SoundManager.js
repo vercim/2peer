@@ -2,6 +2,7 @@ export class SoundManager {
   constructor() {
     this.audioContext = null;
     this.initialized = false;
+    this.incomingInterval = null;
   }
 
   init() {
@@ -82,6 +83,21 @@ export class SoundManager {
   playIncoming() {
     this.playBubble(587.33, 0.12, 0.288);
     setTimeout(() => this.playBubble(659.25, 0.12, 0.288), 120);
+  }
+
+  playIncomingLoop() {
+    this.stopIncomingLoop();
+    this.incomingInterval = setInterval(() => {
+      this.playBubble(587.33, 0.12, 0.288);
+      setTimeout(() => this.playBubble(659.25, 0.12, 0.288), 120);
+    }, 500);
+  }
+
+  stopIncomingLoop() {
+    if (this.incomingInterval) {
+      clearInterval(this.incomingInterval);
+      this.incomingInterval = null;
+    }
   }
 }
 

@@ -1,10 +1,12 @@
 {
   "name": "2peer",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "2peer",
   "type": "module",
   "main": "src/electron.cjs",
   "scripts": {
+    "prebuild:win": "node -e \"const p=require('./package.json');p.version=p.version.replace(/(\\d+\\.\\d+\\.)(\\d+)/,(m,m1,m2)=>m1+(+m2+1));require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))\"",
+    "prebuild:mac": "node -e \"const p=require('./package.json');p.version=p.version.replace(/(\\d+\\.\\d+\\.)(\\d+)/,(m,m1,m2)=>m1+(+m2+1));require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))\"",
     "start": "vite build && electron .",
     "dev": "vite",
     "build": "vite build",
@@ -40,6 +42,7 @@
       "dist",
       "src/electron.cjs",
       "src/preload.cjs",
+      "assets/**/*",
       "package.json"
     ],
     "mac": {
@@ -64,8 +67,16 @@
       ]
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "license": null,
+      "guid": "D6F8C64E-8A3B-4E9F-B2C1-5D7E3F9A8B2C"
     }
   },
   "author": "vercim"

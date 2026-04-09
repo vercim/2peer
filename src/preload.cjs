@@ -9,4 +9,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
   closeWindow: () => ipcRenderer.invoke("window:close"),
   getVersion: () => ipcRenderer.invoke("app:version"),
+  showNotification: (title, body) =>
+    ipcRenderer.invoke("app:show-notification", { title, body }),
+  quitApp: () => ipcRenderer.invoke("app:quit"),
 });

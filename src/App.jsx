@@ -12,23 +12,6 @@ const rtcConfig = {
     { urls: "stun:stun2.l.google.com:19302" },
     { urls: "stun:stun3.l.google.com:19302" },
     { urls: "stun:stun4.l.google.com:19302" },
-    { urls: "stun:stun1.stunprotocol.org:3478" },
-    { urls: "stun:stun2.stunprotocol.org:3478" },
-    {
-      urls: "turn:openrelay.metered.ca:80",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:relay.metered.ca:443",
-      username: "metered",
-      credential: "metered",
-    },
   ],
   iceCandidatePoolSize: 10,
   sdpSemantics: "unified-plan",
@@ -42,6 +25,10 @@ function getStunServers() {
     "142.250.80.127:19302",
     "172.217.12.227:19302",
     "142.250.136.127:19302",
+    "216.58.214.174:19302",
+    "108.177.15.127:19302",
+    "142.250.185.127:19302",
+    "172.217.1.227:19302",
   ];
   return stunIPs.map((ip) => ({
     urls: `stun:${ip}`,
@@ -224,7 +211,7 @@ function setMaxBandwidthInSDP(sdp, resolution = "1080p") {
   return result;
 }
 
-export default function App() {
+export default function App({ version = "" }) {
   const [selfId, setSelfId] = useState("");
   const [supabaseStatus, setSupabaseStatus] = useState("disconnected");
   const [statusDotColor, setStatusDotColor] = useState("#444");
@@ -603,7 +590,13 @@ export default function App() {
   const handleSignal = async (msg) => {
     if (msg.type === "call") {
       setIncomingCall({ from: msg.from, offer: msg.offer });
-      soundManager.playIncoming();
+      soundManager.playIncomingLoop();
+      if (window.electronAPI?.showNotification) {
+        window.electronAPI.showNotification(
+          "Incoming call",
+          `From: ${msg.from}`,
+        );
+      }
       addStatus(
         `Incoming call from <strong style="font-family:monospace">${msg.from}</strong>.`,
       );
@@ -789,6 +782,7 @@ export default function App() {
     };
 
     pc.onconnectionstatechange = () => {
+      console.log("[PC] Connection state:", pc?.connectionState);
       const st = pc?.connectionState;
       if (st === "connected") {
         setHasActiveCall(true);
@@ -934,6 +928,7 @@ export default function App() {
 
   const handleAcceptCall = async () => {
     if (!incomingCall) return;
+    soundManager.stopIncomingLoop();
 
     const { from, offer } = incomingCall;
     setIncomingCall(null);
@@ -982,6 +977,7 @@ export default function App() {
 
   const handleDeclineCall = () => {
     if (!incomingCall) return;
+    soundManager.stopIncomingLoop();
     const { from } = incomingCall;
     setIncomingCall(null);
     sendSignal({ type: "decline", to: from });
@@ -1282,6 +1278,7 @@ export default function App() {
           connectionStatus={callStatus}
           supabaseStatus={supabaseStatus}
           statusMessages={statusLog}
+          version={version}
         />
         <main className="flex flex-col gap-[8px] min-h-0 overflow-hidden">
           <div className="flex-1 min-h-0 flex flex-col gap-[8px]">

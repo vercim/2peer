@@ -4,6 +4,10 @@ const {
   ipcMain,
   desktopCapturer,
   session,
+  Tray,
+  Menu,
+  Notification,
+  nativeImage,
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -42,6 +46,108 @@ function setProfile(profile) {
 let pendingSourceId = null;
 
 let mainWindow = null;
+let tray = null;
+let isQuitting = false;
+
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(() => {
+    registerIpcHandlers();
+
+    function createTray() {
+      const iconPath = path.join(__dirname, "..", "assets", "icon.png");
+      let trayIcon;
+      try {
+        if (fs.existsSync(iconPath)) {
+          trayIcon = nativeImage
+            .createFromPath(iconPath)
+            .resize({ width: 16, height: 16 });
+        } else {
+          trayIcon = nativeImage.createEmpty();
+        }
+      } catch (_) {
+        trayIcon = nativeImage.createEmpty();
+      }
+
+      tray = new Tray(
+        trayIcon.isEmpty()
+          ? nativeImage.createFromDataURL(
+              "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA7AAAAOwBeShxvQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAGfSURBVFiF7ZY9TsNAEIW/WRsJKChyAe6RK9A7cQNKJS5AT8ENKJW4ABUoKVBQoEuRC1Aok5CQNiQn2Rkva9bOxoDQsjP72n8e29nEGGP+T1L+HwP7wD5QAhZAA/gE3IBdYBuo/mXADnAKPAFvwAiwDdwGpoCJUwQngXPgEbgH3AL3QOkKsgWcA+fAE7ABbAH3QBkwBM6BV+AR2AQugBJQBM6AN+AZ2ACugCKQBy6AO+AJWAcuARlAClgGroBbIA9cAjJAHjgHboFbIA9cALLALXAe/PwK4E8BEsA5cAvIA+eADDADrADPgAwwDawC5UAmUAqU/9fA/8c4D4BToA4sA+f/+4DL4C+QCRSBJeDs/zlwHvgIXAEy/3dgJSAPnAAvgUugCFwC/gIog2XgGLgKXAJf/wugBBaBI+A0+N0E/gL+FwJnoBTYDhaBY+AqMAv8BSgBJSAHXASPgOPABSCBAngB3AQugZf/RVAESsAOcBY8Bo6AY0ACBfASuAueAVeBc+DzXwBl8Bi4Cp4Cx8AxIIECeAXcB8+Bq+ApcPIPgEvAcfAYOAaOgf8A5ICj4DFwHDwGjgF3AP8BUAMu/10ATwPO/wGQ+wdJ6g9M1Yq/GAAAAABJRU5ErkJggg==",
+            )
+          : trayIcon,
+      );
+
+      tray.setToolTip("2peer");
+
+      const contextMenu = Menu.buildFromTemplate([
+        {
+          label: "Show 2peer",
+          click: () => {
+            if (mainWindow) {
+              mainWindow.show();
+              mainWindow.focus();
+            }
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Quit",
+          click: () => {
+            isQuitting = true;
+            app.quit();
+          },
+        },
+      ]);
+
+      tray.setContextMenu(contextMenu);
+
+      tray.on("double-click", () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      });
+    }
+
+    createTray();
+    session.defaultSession.setDisplayMediaRequestHandler(
+      async (_req, callback) => {
+        try {
+          const sources = await desktopCapturer.getSources({
+            types: ["screen", "window"],
+          });
+          let source;
+          if (pendingSourceId) {
+            source =
+              sources.find((s) => s.id === pendingSourceId) || sources[0];
+            pendingSourceId = null;
+          } else {
+            source = sources[0];
+          }
+          callback({ video: source, audio: false });
+        } catch (err) {
+          console.error("[displayMedia] error:", err.message);
+          callback({ video: null, audio: false });
+        }
+      },
+      { useSystemPicker: true },
+    );
+    createWindow();
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+}
 
 function createWindow() {
   // Determine if we're running in development or production
@@ -78,6 +184,13 @@ function createWindow() {
   });
 
   mainWindow.loadFile(indexPath);
+
+  mainWindow.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
 
   // if (isDev) {
   //   mainWindow.webContents.openDevTools();
@@ -130,10 +243,31 @@ function registerIpcHandlers() {
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
   ipcMain.handle("app:version", () => APP_VERSION);
+  ipcMain.handle("app:show-notification", (_, { title, body }) => {
+    if (Notification.isSupported()) {
+      const notification = new Notification({
+        title: title,
+        body: body,
+        silent: false,
+      });
+      notification.on("click", () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      });
+      notification.show();
+    }
+  });
+  ipcMain.handle("app:quit", () => {
+    isQuitting = true;
+    app.quit();
+  });
 }
 
 app.whenReady().then(() => {
   registerIpcHandlers();
+  createTray();
   session.defaultSession.setDisplayMediaRequestHandler(
     async (_req, callback) => {
       try {
@@ -162,5 +296,19 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  if (process.platform === "darwin") {
+    app.quit();
+  }
+});
+
+app.on("activate", () => {
+  if (mainWindow === null) {
+    createWindow();
+  } else {
+    mainWindow.show();
+  }
+});
+
+app.on("before-quit", () => {
+  isQuitting = true;
 });

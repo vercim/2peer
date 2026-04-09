@@ -38,6 +38,7 @@ export function Sidebar({
   connectionStatus = "idle",
   supabaseStatus = "disconnected",
   statusMessages = [],
+  version = "",
 }) {
   const [remoteId, setRemoteId] = useState("");
   const [copied, setCopied] = useState(false);
@@ -182,6 +183,13 @@ export function Sidebar({
       </div>
 
       <div className="mt-auto flex flex-col gap-[10px]">
+        {version && (
+          <div className="bg-panel border border-border rounded-[8px] p-[10px_14px]">
+            <div className="text-[11px] text-[#666] font-mono overflow-hidden text-ellipsis whitespace-nowrap">
+              v{version}
+            </div>
+          </div>
+        )}
         <div className="bg-panel border border-border rounded-[8px] p-[10px_14px]">
           <div className="text-[11px] text-[#2e2e2e] font-mono overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-[6px]">
             {supabaseStatus === "connected" ? (
