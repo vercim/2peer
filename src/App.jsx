@@ -395,9 +395,6 @@ export default function App() {
       addStatus("No connection to Supabase.", true);
       return;
     }
-    if (!outChannelRef.current) {
-      return;
-    }
     try {
       await ensureOutChannel(payload.to);
       if (!outChannelRef.current) return;
