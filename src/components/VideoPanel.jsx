@@ -1,5 +1,4 @@
-import { forwardRef, useState, useEffect } from "react";
-import { FullscreenPlayer } from "./FullscreenPlayer.jsx";
+import { forwardRef } from "react";
 
 export const VideoPanel = forwardRef(function VideoPanel(
   {
@@ -21,8 +20,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
   },
   ref,
 ) {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showFullscreenOverlay, setShowFullscreenOverlay] = useState(false);
   const formatBitrate = (bps) => {
     if (bps >= 8_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
     if (bps >= 1_000) return `${(bps / 1_000).toFixed(0)} Kbps`;
@@ -31,38 +28,9 @@ export const VideoPanel = forwardRef(function VideoPanel(
 
   const handleFullscreen = (e) => {
     e.stopPropagation();
-    if (!isLocal) {
-      setIsFullscreen(true);
-    }
+    if (onFullscreen) onFullscreen();
   };
 
-  const handleCloseFullscreen = () => {
-    setIsFullscreen(false);
-    setShowFullscreenOverlay(true);
-    setTimeout(() => setShowFullscreenOverlay(false), 500);
-  };
-
-  useEffect(() => {
-    const handleFsChange = () => {
-      if (!document.fullscreenElement && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-    document.addEventListener("fullscreenchange", handleFsChange);
-    return () =>
-      document.removeEventListener("fullscreenchange", handleFsChange);
-  }, [isFullscreen]);
-
-  if (isFullscreen && !isLocal) {
-    return (
-      <FullscreenPlayer
-        videoRef={videoRef}
-        meta={meta}
-        bitrate={bitrate}
-        onClose={handleCloseFullscreen}
-      />
-    );
-  }
   return (
     <div
       className={`flex-1 min-h-0 bg-panel border border-border rounded-[8px] flex flex-col overflow-hidden ${className}`}

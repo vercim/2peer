@@ -22,7 +22,7 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
 
   const handleClose = useCallback(() => {
     if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+      document.exitFullscreen();
     }
     onClose();
   }, [onClose]);
@@ -31,24 +31,13 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
     showControlsTemporarily();
 
     const container = containerRef.current;
-    if (container?.requestFullscreen) {
-      container.requestFullscreen().catch((err) => {
-        console.warn("Fullscreen failed:", err);
-      });
+    if (container && container.requestFullscreen) {
+      container.requestFullscreen().catch(() => {});
     }
-
-    const handleFsChange = () => {
-      if (!document.fullscreenElement) {
-        onClose();
-      }
-    };
 
     const handleMouseMove = () => showControlsTemporarily();
     const handleKeyDown = (e) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        handleClose();
-      }
+      if (e.key === "Escape") handleClose();
       if (e.key === " ") {
         e.preventDefault();
         if (videoRef?.current) {
@@ -63,17 +52,18 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
       }
     };
 
-    document.addEventListener("fullscreenchange", handleFsChange);
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener("fullscreenchange", handleFsChange);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("keydown", handleKeyDown);
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      }
     };
-  }, [showControlsTemporarily, handleClose, onClose, videoRef]);
+  }, [showControlsTemporarily, handleClose, videoRef]);
 
   const handleVideoClick = () => {
     if (videoRef?.current) {
