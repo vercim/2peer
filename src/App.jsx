@@ -108,26 +108,33 @@ function applyMaxQualityEncoding(sender) {
   } else if (pixels >= 2560 * 1440) {
     maxBitrate = 12_000_000;
   } else {
-    maxBitrate = 6_000_000;
+    maxBitrate = 8_000_000;
   }
 
   params.encodings.forEach((enc) => {
     enc.maxBitrate = maxBitrate;
     enc.maxFramerate = 60;
     enc.scaleResolutionDownBy = 1.0;
-    enc.priority = "high";
+    enc.priority = "very-high";
     enc.networkPriority = "high";
-    enc.bitratePriority = 10;
+    enc.bitratePriority = 50;
   });
   sender.setParameters(params).catch(console.error);
 
+  console.log("[Encoding] Applied max quality:", {
+    width,
+    height,
+    maxBitrate,
+    fps: 60,
+  });
+
   if (sender.track) {
-    sender.track.contentHint = "screen";
+    sender.track.contentHint = "detail";
   }
 }
 
 function setMaxBandwidthInSDP(sdp) {
-  let bandwidth = 15000;
+  let bandwidth = 50000;
   sdp = sdp.replace(/b=AS:[0-9]+/g, `b=AS:${bandwidth}`);
   sdp = sdp.replace(/b=TIAS:[0-9]+/g, `b=TIAS:${bandwidth * 1000}`);
   return sdp;
