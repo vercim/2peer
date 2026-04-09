@@ -191,6 +191,15 @@ export default function App() {
     resolution: "1080p",
     fps: 60,
   });
+
+  useEffect(() => {
+    if (pcRef.current && pcRef.current.connectionState === "connected") {
+      pcRef.current
+        .getSenders()
+        .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
+    }
+  }, [streamQuality]);
+
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
 
   const localVideoRef = useRef(null);
@@ -506,8 +515,14 @@ export default function App() {
           sdp: setMaxBandwidthInSDP(answer.sdp, streamQuality.resolution),
         };
         await pcRef.current.setLocalDescription(modifiedAnswer);
-        pcRef.current.getSenders().forEach((s) => applyMaxQualityEncoding(s, streamQuality));
-        sendSignal({ type: "renegotiate-answer", to: msg.from, answer: modifiedAnswer });
+        pcRef.current
+          .getSenders()
+          .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
+        sendSignal({
+          type: "renegotiate-answer",
+          to: msg.from,
+          answer: modifiedAnswer,
+        });
       } catch (e) {
         console.warn("[Signal] Failed to process renegotiate:", e.message);
       }
