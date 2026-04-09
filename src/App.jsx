@@ -14,8 +14,6 @@ const rtcConfig = {
     { urls: "stun:stun4.l.google.com:19302" },
     { urls: "stun:stun1.stunprotocol.org:3478" },
     { urls: "stun:stun2.stunprotocol.org:3478" },
-    { urls: "stun:stun.ekiga.net:3478" },
-    { urls: "stun:stun.ideasip.com:3478" },
     {
       urls: "turn:openrelay.metered.ca:80",
       username: "openrelayproject",
@@ -27,13 +25,15 @@ const rtcConfig = {
       credential: "openrelayproject",
     },
     {
-      urls: "turn:relay.webtelek.com:3478",
-      username: "free",
-      credential: "free",
+      urls: "turn:relay.metered.ca:443",
+      username: "metered",
+      credential: "metered",
     },
   ],
   iceCandidatePoolSize: 10,
   sdpSemantics: "unified-plan",
+  bundlePolicy: "max-bundle",
+  rtcpMuxPolicy: "require",
 };
 
 function getStunServers() {
@@ -92,7 +92,19 @@ function streamHasVideo(stream) {
   }
 }
 
-function applyMaxQualityEncoding(sender, quality = {}) {
+const DEFAULT_BITRATES = {
+  "480p": 1_500_000,
+  "720p": 2_500_000,
+  "1080p": 4_000_000,
+  "1440p": 6_000_000,
+  "2160p": 10_000_000,
+};
+
+let currentBitrate = { value: 4_000_000, target: 4_000_000 };
+const BITRATE_HISTORY = [];
+const RTT_HISTORY = [];
+
+function applyMaxQualityEncoding(sender, quality = {}, forcedBitrate = null) {
   if (!sender || sender.track?.kind !== "video") return;
   const params = sender.getParameters();
   if (!params.encodings?.length) params.encodings = [{}];
@@ -103,44 +115,75 @@ function applyMaxQualityEncoding(sender, quality = {}) {
     ) || qualityOptions.resolution[2];
   const fps = quality.fps || 60;
 
-  let autoBitrate;
-  switch (res.value) {
-    case "480p":
-      autoBitrate = 3_000_000;
-      break;
-    case "720p":
-      autoBitrate = 5_000_000;
-      break;
-    case "1080p":
-      autoBitrate = 8_000_000;
-      break;
-    case "1440p":
-      autoBitrate = 12_000_000;
-      break;
-    case "2160p":
-      autoBitrate = 20_000_000;
-      break;
-    default:
-      autoBitrate = 8_000_000;
-  }
+  let autoBitrate = forcedBitrate || currentBitrate.value;
 
   params.encodings.forEach((enc) => {
     enc.maxBitrate = autoBitrate;
+    enc.minBitrate = Math.floor(autoBitrate * 0.5);
     enc.maxFramerate = fps;
     enc.priority = "very-high";
     enc.networkPriority = "high";
+    enc.rmsLevel = 0.01;
+    enc.scaleResolutionDownBy = 1;
   });
+
+  if (sender.track) {
+    sender.track.contentHint = "motion";
+    if (typeof sender.track.applyConstraints === "function") {
+      sender.track
+        .applyConstraints({
+          latencyHint: "interactive",
+        })
+        .catch(() => {});
+    }
+  }
+
   sender.setParameters(params).catch(console.error);
 
   console.log("[Encoding] Applied quality:", {
     resolution: res.value,
-    autoBitrate,
+    bitrate: autoBitrate,
     fps,
   });
+}
 
-  if (sender.track) {
-    sender.track.contentHint = "detail";
+function adaptBitrate(rtt, packetsLost, bitrate) {
+  const now = Date.now();
+  RTT_HISTORY.push({ rtt, time: now });
+  while (RTT_HISTORY.length > 10 && now - RTT_HISTORY[0].time > 10000) {
+    RTT_HISTORY.shift();
   }
+
+  const avgRtt =
+    RTT_HISTORY.reduce((sum, m) => sum + m.rtt, 0) /
+    Math.max(RTT_HISTORY.length, 1);
+
+  let newTarget = currentBitrate.target;
+
+  if (avgRtt > 300) {
+    newTarget = Math.max(500_000, currentBitrate.target * 0.5);
+  } else if (avgRtt > 200) {
+    newTarget = Math.max(1_000_000, currentBitrate.target * 0.7);
+  } else if (packetsLost > 0) {
+    newTarget = Math.max(500_000, currentBitrate.target * 0.8);
+  } else if (avgRtt < 100 && packetsLost === 0) {
+    newTarget = Math.min(currentBitrate.target * 1.1, 10_000_000);
+  }
+
+  currentBitrate.target = newTarget;
+  currentBitrate.value =
+    currentBitrate.value + (newTarget - currentBitrate.value) * 0.3;
+
+  console.log(
+    "[Adaptive] Bitrate:",
+    currentBitrate.value,
+    "Target:",
+    newTarget,
+    "RTT:",
+    avgRtt,
+    "Lost:",
+    packetsLost,
+  );
 }
 
 const qualityOptions = {
@@ -156,13 +199,13 @@ const qualityOptions = {
 
 function setMaxBandwidthInSDP(sdp, resolution = "1080p") {
   const bitrateMap = {
-    "480p": 3000,
-    "720p": 5000,
-    "1080p": 8000,
-    "1440p": 12000,
-    "2160p": 20000,
+    "480p": 1500,
+    "720p": 2500,
+    "1080p": 4000,
+    "1440p": 6000,
+    "2160p": 10000,
   };
-  const kbps = bitrateMap[resolution] ?? 8000;
+  const kbps = bitrateMap[resolution] ?? 4000;
 
   let result = sdp.replace(/b=AS:\d+\r\n/g, "").replace(/b=TIAS:\d+\r\n/g, "");
 
@@ -170,6 +213,10 @@ function setMaxBandwidthInSDP(sdp, resolution = "1080p") {
     /(m=video[^\r\n]*\r\n)/,
     `$1b=AS:${kbps}\r\nb=TIAS:${kbps * 1000}\r\n`,
   );
+
+  if (!result.includes("transport-cc")) {
+    result = result.replace(/(a=mid:video\r\n)/, `$1a=transport-cc:1\r\n`);
+  }
 
   return result;
 }
@@ -289,24 +336,70 @@ export default function App() {
       let frameRate = 0;
       let width = 0;
       let height = 0;
+      let rtt = 0;
+      let packetsLost = 0;
+      let packetsReceived = 0;
+
       report.forEach((item) => {
         if (item.type === "inbound-rtp" && item.kind === "video") {
           bytesReceived += item.bytesReceived || 0;
           frameRate = item.framesPerSecond || frameRate;
           width = item.frameWidth || width;
           height = item.frameHeight || height;
+          packetsLost += item.packetsLost || 0;
+          packetsReceived += item.packetsReceived || 0;
+        }
+        if (item.type === "candidate-pair" && item.state === "succeeded") {
+          rtt = item.currentRoundTripTime
+            ? item.currentRoundTripTime * 1000
+            : 0;
         }
       });
+
       if (width > 0 && height > 0) {
         setRemoteMeta(
           `${width}×${height} @${frameRate > 0 ? Math.round(frameRate) : "?"}fps`,
         );
       }
-      window._prevBytesReceived = window._prevBytesReceived || bytesReceived;
+
+      const now = Date.now();
+      if (!window._lastBitrateCheck) {
+        window._lastBitrateCheck = now;
+        window._prevBytesReceived = bytesReceived;
+        window._bitrateHistory = [];
+        return;
+      }
+
+      const timeDiff = (now - window._lastBitrateCheck) / 1000;
+      if (timeDiff < 0.5) return;
+
       const bytesDiff = bytesReceived - window._prevBytesReceived;
       window._prevBytesReceived = bytesReceived;
-      const bitsPerSecond = bytesDiff * 8;
-      setRemoteBitrate(bitsPerSecond);
+      window._lastBitrateCheck = now;
+
+      const rawBitrate = timeDiff > 0 ? (bytesDiff * 8) / timeDiff : 0;
+
+      window._bitrateHistory = window._bitrateHistory || [];
+      window._bitrateHistory.push(rawBitrate);
+      if (window._bitrateHistory.length > 5) {
+        window._bitrateHistory.shift();
+      }
+
+      const avgBitrate =
+        window._bitrateHistory.reduce((a, b) => a + b, 0) /
+        window._bitrateHistory.length;
+
+      setRemoteBitrate(Math.round(avgBitrate));
+
+      adaptBitrate(rtt, packetsLost, avgBitrate);
+
+      if (pcRef.current && pcRef.current.connectionState === "connected") {
+        pcRef.current.getSenders().forEach((s) => {
+          if (s.track?.kind === "video") {
+            applyMaxQualityEncoding(s, streamQuality);
+          }
+        });
+      }
     });
   }, []);
 
@@ -724,7 +817,7 @@ export default function App() {
             });
             if (bitrateIntervalRef.current)
               clearInterval(bitrateIntervalRef.current);
-            bitrateIntervalRef.current = setInterval(monitorBitrate, 1000);
+            bitrateIntervalRef.current = setInterval(monitorBitrate, 2500);
           } catch (e) {
             console.log("[PC] Could not determine connection type:", e);
           }
@@ -992,13 +1085,15 @@ export default function App() {
         ) || qualityOptions.resolution[2];
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
-          width: { ideal: res.width, max: res.width },
-          height: { ideal: res.height, max: res.height },
-          frameRate: { ideal: streamQuality.fps, max: streamQuality.fps },
+          width: { ideal: res.width },
+          height: { ideal: res.height },
+          frameRate: { ideal: streamQuality.fps },
           displaySurface: "monitor",
         },
         audio: false,
         selfBrowserSurface: "exclude",
+        surfaceSwitching: "include",
+        systemAudio: "exclude",
       });
       const [track] = stream.getVideoTracks();
       track.onended = () => {
