@@ -95,7 +95,7 @@ function streamHasVideo(stream) {
 function applyMaxQualityEncoding(sender, quality = {}) {
   if (!sender || sender.track?.kind !== "video") return;
   const params = sender.getParameters();
-  params.encodings ??= [{}];
+  if (!params.encodings?.length) params.encodings = [{}];
 
   const res =
     qualityOptions.resolution.find(
@@ -127,10 +127,8 @@ function applyMaxQualityEncoding(sender, quality = {}) {
   params.encodings.forEach((enc) => {
     enc.maxBitrate = autoBitrate;
     enc.maxFramerate = fps;
-    enc.scaleResolutionDownBy = 1.0;
     enc.priority = "very-high";
     enc.networkPriority = "high";
-    enc.bitratePriority = 50;
   });
   sender.setParameters(params).catch(console.error);
 
@@ -157,7 +155,23 @@ const qualityOptions = {
 };
 
 function setMaxBandwidthInSDP(sdp, resolution = "1080p") {
-  return sdp;
+  const bitrateMap = {
+    "480p": 3000,
+    "720p": 5000,
+    "1080p": 8000,
+    "1440p": 12000,
+    "2160p": 20000,
+  };
+  const kbps = bitrateMap[resolution] ?? 8000;
+
+  let result = sdp.replace(/b=AS:\d+\r\n/g, "").replace(/b=TIAS:\d+\r\n/g, "");
+
+  result = result.replace(
+    /(m=video[^\r\n]*\r\n)/,
+    `$1b=AS:${kbps}\r\nb=TIAS:${kbps * 1000}\r\n`,
+  );
+
+  return result;
 }
 
 export default function App() {
@@ -193,11 +207,31 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (pcRef.current && pcRef.current.connectionState === "connected") {
-      pcRef.current
-        .getSenders()
-        .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
+    const pc = pcRef.current;
+    if (!pc || pc.connectionState !== "connected") return;
+
+    const res =
+      qualityOptions.resolution.find(
+        (r) => r.value === streamQuality.resolution,
+      ) || qualityOptions.resolution[2];
+
+    const currentStream = localStreamRef.current;
+    if (currentStream) {
+      const videoTrack = currentStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack
+          .applyConstraints({
+            width: { ideal: res.width },
+            height: { ideal: res.height },
+            frameRate: { ideal: streamQuality.fps },
+          })
+          .catch((e) => console.warn("[Quality] applyConstraints failed:", e));
+      }
     }
+
+    pc.getSenders().forEach((s) => applyMaxQualityEncoding(s, streamQuality));
+
+    setLocalMeta(`${res.width}×${res.height} @${streamQuality.fps}fps`);
   }, [streamQuality]);
 
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
@@ -216,6 +250,11 @@ export default function App() {
   const bitrateIntervalRef = useRef(null);
   const answerProcessedRef = useRef(false);
   const hangupProcessedRef = useRef(false);
+  const localStreamRef = useRef(null);
+
+  useEffect(() => {
+    localStreamRef.current = localStream;
+  }, [localStream]);
 
   // --- ИСПРАВЛЕНИЕ: Эффекты для удержания стримов в DOM при ререндере ---
   useEffect(() => {
@@ -732,7 +771,7 @@ export default function App() {
   };
 
   // ИСПРАВЛЕНИЕ: передаем поток как аргумент для избежания конфликтов состояния React
-  const attachLocalTracks = async (streamToAttach = localStream) => {
+  const attachLocalTracks = async (streamToAttach = localStreamRef.current) => {
     if (!streamToAttach || !streamToAttach.active || !pcRef.current) return;
     const senders = pcRef.current.getSenders() || [];
     const tracks = streamToAttach.getTracks();
@@ -867,9 +906,10 @@ export default function App() {
     pendingIceRef.current = [];
     setIncomingCall(null);
     setStatusDotColor("#888");
-    if (localStream) {
-      localStream.getTracks().forEach((t) => t.stop());
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
+      localStreamRef.current = null;
       setLocalMeta("—-");
       setLocalVideoWrapClass(
         "flex-1 min-h-0 relative bg-[#050505] placeholder",
@@ -919,9 +959,10 @@ export default function App() {
         }
       }, 100);
     }
-    if (localStream) {
-      localStream.getTracks().forEach((t) => t.stop());
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
+      localStreamRef.current = null;
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
@@ -936,9 +977,10 @@ export default function App() {
   // ИСПРАВЛЕНИЕ: Вызов attachLocalTracks с новым стримом + Renegotiation
   const handleSourceSelected = async (sourceId) => {
     setSourcePickerOpen(false);
-    if (localStream) {
-      localStream.getTracks().forEach((t) => t.stop());
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
+      localStreamRef.current = null;
     }
     try {
       if (window.electronAPI?.setPendingSource) {
@@ -966,6 +1008,7 @@ export default function App() {
       };
 
       setLocalStream(stream);
+      localStreamRef.current = stream;
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
