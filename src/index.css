@@ -147,19 +147,6 @@
     background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
   }
 
-  .placeholder-video::after,
-  .placeholder::after {
-    content: "No broadcast";
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #444;
-    font-size: 14px;
-    z-index: 10;
-  }
-
   .placeholder video {
     z-index: 0;
   }
