@@ -92,28 +92,29 @@ function streamHasVideo(stream) {
   }
 }
 
-function applyMaxQualityEncoding(sender) {
+function applyMaxQualityEncoding(sender, quality = {}) {
   if (!sender || sender.track?.kind !== "video") return;
   const params = sender.getParameters();
   params.encodings ??= [{}];
 
   const settings = sender.track.getSettings();
-  const width = settings.width || 1920;
-  const height = settings.height || 1080;
-  const pixels = width * height;
+  let width = settings.width || 1920;
+  let height = settings.height || 1080;
 
-  let maxBitrate;
-  if (pixels >= 3840 * 2160) {
-    maxBitrate = 30_000_000;
-  } else if (pixels >= 2560 * 1440) {
-    maxBitrate = 12_000_000;
-  } else {
-    maxBitrate = 8_000_000;
+  const res = qualityOptions.resolution.find(
+    (r) => r.value === (quality.resolution || "1080p"),
+  );
+  if (res) {
+    width = res.width;
+    height = res.height;
   }
 
+  const fps = quality.fps || 60;
+  const bitrate = (quality.bitrate || 8) * 1_000_000;
+
   params.encodings.forEach((enc) => {
-    enc.maxBitrate = maxBitrate;
-    enc.maxFramerate = 60;
+    enc.maxBitrate = bitrate;
+    enc.maxFramerate = fps;
     enc.scaleResolutionDownBy = 1.0;
     enc.priority = "very-high";
     enc.networkPriority = "high";
@@ -121,20 +122,15 @@ function applyMaxQualityEncoding(sender) {
   });
   sender.setParameters(params).catch(console.error);
 
-  console.log("[Encoding] Applied max quality:", {
-    width,
-    height,
-    maxBitrate,
-    fps: 60,
-  });
+  console.log("[Encoding] Applied quality:", { width, height, bitrate, fps });
 
   if (sender.track) {
     sender.track.contentHint = "detail";
   }
 }
 
-function setMaxBandwidthInSDP(sdp) {
-  let bandwidth = 50000;
+function setMaxBandwidthInSDP(sdp, bitrate = 8) {
+  const bandwidth = bitrate * 1000;
   sdp = sdp.replace(/b=AS:[0-9]+/g, `b=AS:${bandwidth}`);
   sdp = sdp.replace(/b=TIAS:[0-9]+/g, `b=TIAS:${bandwidth * 1000}`);
   return sdp;
@@ -167,6 +163,24 @@ export default function App() {
     "flex-1 min-h-0 relative bg-[#050505] placeholder",
   );
   const [isElectronReady, setIsElectronReady] = useState(false);
+  const [streamQuality, setStreamQuality] = useState({
+    resolution: "1080p",
+    fps: 60,
+    bitrate: 8,
+  });
+  const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
+
+  const qualityOptions = {
+    resolution: [
+      { value: "480p", label: "480p", width: 854, height: 480 },
+      { value: "720p", label: "720p HD", width: 1280, height: 720 },
+      { value: "1080p", label: "1080p Full HD", width: 1920, height: 1080 },
+      { value: "1440p", label: "1440p Quad HD", width: 2560, height: 1440 },
+      { value: "2160p", label: "2160p 4K", width: 3840, height: 2160 },
+    ],
+    fps: [30, 60],
+    bitrate: [4, 6, 8, 12, 20, 30],
+  };
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -438,10 +452,12 @@ export default function App() {
       answerProcessedRef.current = true;
       const modifiedAnswer = {
         ...msg.answer,
-        sdp: setMaxBandwidthInSDP(msg.answer.sdp),
+        sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.bitrate),
       };
       await pcRef.current.setRemoteDescription(modifiedAnswer);
-      pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+      pcRef.current
+        .getSenders()
+        .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
 
       for (const c of pendingIceRef.current) {
         await pcRef.current.addIceCandidate(c).catch(console.error);
@@ -476,7 +492,24 @@ export default function App() {
         const answer = await pcRef.current.createAnswer();
         const modifiedAnswer = {
           ...answer,
-          sdp: setMaxBandwidthInSDP(answer.sdp),
+          sdp: setMaxBandwidthInSDP(answer.sdp, streamQuality.bitrate),
+        };
+        await pcRef.current.setLocalDescription(modifiedAnswer);
+        pcRef.current
+          .getSenders()
+          .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
+      } catch (e) {
+        console.warn("[Signal] Failed to process renegotiate:", e.message);
+      }
+    }
+
+    if (msg.type === "renegotiate-answer") {
+      if (!pcRef.current || pcRef.current.signalingState === "closed") return;
+      if (pcRef.current.signalingState === "stable") return;
+      try {
+        const modifiedAnswer = {
+          ...msg.answer,
+          sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.bitrate),
         };
         await pcRef.current.setLocalDescription(modifiedAnswer);
         sendSignal({
@@ -495,10 +528,12 @@ export default function App() {
       try {
         const modifiedAnswer = {
           ...msg.answer,
-          sdp: setMaxBandwidthInSDP(msg.answer.sdp),
+          sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.bitrate),
         };
         await pcRef.current.setRemoteDescription(modifiedAnswer);
-        pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+        pcRef.current
+          .getSenders()
+          .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
       } catch (e) {
         console.warn("[Signal] Failed to set remote answer:", e.message);
       }
@@ -697,10 +732,10 @@ export default function App() {
       const existingSender = senders.find((s) => s.track?.kind === track.kind);
       if (existingSender) {
         await existingSender.replaceTrack(track);
-        applyMaxQualityEncoding(existingSender);
+        applyMaxQualityEncoding(existingSender, streamQuality);
       } else {
         const sender = pcRef.current.addTrack(track, streamToAttach);
-        applyMaxQualityEncoding(sender);
+        applyMaxQualityEncoding(sender, streamQuality);
       }
     }
   };
@@ -724,7 +759,7 @@ export default function App() {
     });
     const modifiedOffer = {
       ...offer,
-      sdp: setMaxBandwidthInSDP(offer.sdp),
+      sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.bitrate),
     };
     await pcRef.current.setLocalDescription(modifiedOffer);
 
@@ -772,7 +807,7 @@ export default function App() {
     const answer = await pcRef.current.createAnswer();
     const modifiedAnswer = {
       ...answer,
-      sdp: setMaxBandwidthInSDP(answer.sdp),
+      sdp: setMaxBandwidthInSDP(answer.sdp, streamQuality.bitrate),
     };
     await pcRef.current.setLocalDescription(modifiedAnswer);
 
@@ -861,7 +896,7 @@ export default function App() {
             const offer = await pcRef.current.createOffer();
             const modifiedOffer = {
               ...offer,
-              sdp: setMaxBandwidthInSDP(offer.sdp),
+              sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.bitrate),
             };
             await pcRef.current.setLocalDescription(modifiedOffer);
             sendSignal({
@@ -900,11 +935,15 @@ export default function App() {
       if (window.electronAPI?.setPendingSource) {
         await window.electronAPI.setPendingSource(sourceId);
       }
+      const res =
+        qualityOptions.resolution.find(
+          (r) => r.value === streamQuality.resolution,
+        ) || qualityOptions.resolution[2];
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
-          width: { ideal: 2560, max: 2560 },
-          height: { ideal: 1440, max: 1440 },
-          frameRate: { ideal: 60, max: 60 },
+          width: { ideal: res.width, max: res.width },
+          height: { ideal: res.height, max: res.height },
+          frameRate: { ideal: streamQuality.fps, max: streamQuality.fps },
           displaySurface: "monitor",
         },
         audio: false,
@@ -924,14 +963,16 @@ export default function App() {
 
       if (pcRef.current?.connectionState === "connected") {
         await attachLocalTracks(stream);
-        pcRef.current.getSenders().forEach(applyMaxQualityEncoding);
+        pcRef.current
+          .getSenders()
+          .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
 
         try {
           if (pcRef.current.signalingState === "stable") {
             const offer = await pcRef.current.createOffer();
             const modifiedOffer = {
               ...offer,
-              sdp: setMaxBandwidthInSDP(offer.sdp),
+              sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.bitrate),
             };
             await pcRef.current.setLocalDescription(modifiedOffer);
             sendSignal({
@@ -1094,6 +1135,9 @@ export default function App() {
               videoRef={localVideoRef}
               containerRef={localContainerRef}
               canBroadcast={pcRef.current?.connectionState === "connected"}
+              streamQuality={streamQuality}
+              onQualityChange={setStreamQuality}
+              qualityOptions={qualityOptions}
             />
             <VideoPanel
               ref={remoteVideoRef}
