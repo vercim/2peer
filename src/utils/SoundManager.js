@@ -28,11 +28,11 @@ export class SoundManager {
     return base + (Math.random() - 0.5) * variance * 2;
   }
 
-  playBubble(frequency = 800, duration = 0.08, volume = 0.5) {
+  playBubble(frequency = 200, duration = 0.08, volume = 0.5) {
     this.ensureContext();
     const ctx = this.audioContext;
     const now = ctx.currentTime;
-    const adjustedVolume = volume * 0.8;
+    const adjustedVolume = volume * 0.4;
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -57,48 +57,48 @@ export class SoundManager {
   }
 
   playCall() {
-    this.playBubble(this.randomFreq(440, 30), 0.15, 0.32);
+    this.playBubble(this.randomFreq(220, 30), 0.15, 0.32);
     setTimeout(
-      () => this.playBubble(this.randomFreq(550, 30), 0.15, 0.32),
+      () => this.playBubble(this.randomFreq(280, 30), 0.15, 0.32),
       100,
     );
     setTimeout(
-      () => this.playBubble(this.randomFreq(660, 30), 0.15, 0.32),
+      () => this.playBubble(this.randomFreq(330, 30), 0.15, 0.32),
       200,
     );
   }
 
   playConnecting() {
-    this.playBubble(this.randomFreq(700, 50), 0.1, 0.28);
-    setTimeout(() => this.playBubble(this.randomFreq(850, 50), 0.1, 0.28), 80);
+    this.playBubble(this.randomFreq(350, 50), 0.1, 0.28);
+    setTimeout(() => this.playBubble(this.randomFreq(425, 50), 0.1, 0.28), 80);
   }
 
   playConnect() {
-    this.playBubble(this.randomFreq(660, 40), 0.1, 0.4);
-    setTimeout(() => this.playBubble(this.randomFreq(880, 40), 0.15, 0.44), 80);
+    this.playBubble(this.randomFreq(330, 40), 0.1, 0.4);
+    setTimeout(() => this.playBubble(this.randomFreq(440, 40), 0.15, 0.44), 80);
   }
 
   playDisconnect() {
-    this.playBubble(this.randomFreq(440, 30), 0.1, 0.32);
-    setTimeout(() => this.playBubble(this.randomFreq(330, 30), 0.15, 0.28), 80);
+    this.playBubble(this.randomFreq(220, 30), 0.1, 0.32);
+    setTimeout(() => this.playBubble(this.randomFreq(165, 30), 0.15, 0.28), 80);
   }
 
   playCancel() {
-    this.playBubble(this.randomFreq(300, 20), 0.08, 0.28);
-    setTimeout(() => this.playBubble(this.randomFreq(250, 20), 0.12, 0.24), 80);
+    this.playBubble(this.randomFreq(150, 20), 0.08, 0.28);
+    setTimeout(() => this.playBubble(this.randomFreq(125, 20), 0.12, 0.24), 80);
   }
 
   playIdChange() {
-    this.playBubble(this.randomFreq(300, 20), 0.05, 0.16);
-    this.playBubble(this.randomFreq(400, 20), 0.05, 0.2);
-    this.playBubble(this.randomFreq(600, 20), 0.08, 0.24);
-    this.playBubble(this.randomFreq(900, 20), 0.12, 0.32);
+    this.playBubble(this.randomFreq(150, 20), 0.05, 0.16);
+    this.playBubble(this.randomFreq(200, 20), 0.05, 0.2);
+    this.playBubble(this.randomFreq(300, 20), 0.08, 0.24);
+    this.playBubble(this.randomFreq(450, 20), 0.12, 0.32);
   }
 
   playIncoming() {
-    this.playBubble(this.randomFreq(587.33, 40), 0.12, 0.32);
+    this.playBubble(this.randomFreq(293.66, 40), 0.12, 0.32);
     setTimeout(
-      () => this.playBubble(this.randomFreq(659.25, 40), 0.12, 0.32),
+      () => this.playBubble(this.randomFreq(329.63, 40), 0.12, 0.32),
       120,
     );
   }

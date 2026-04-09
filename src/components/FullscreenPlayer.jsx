@@ -24,7 +24,10 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
     if (document.fullscreenElement) {
       document.exitFullscreen();
     }
-    onClose();
+    setShowControls(false);
+    setTimeout(() => {
+      onClose();
+    }, 100);
   }, [onClose]);
 
   useEffect(() => {
@@ -37,7 +40,10 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
 
     const handleMouseMove = () => showControlsTemporarily();
     const handleKeyDown = (e) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleClose();
+      }
       if (e.key === " ") {
         e.preventDefault();
         if (videoRef?.current) {

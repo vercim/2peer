@@ -1,4 +1,4 @@
-import { forwardRef, useState } from "react";
+import { forwardRef, useState, useEffect } from "react";
 import { FullscreenPlayer } from "./FullscreenPlayer.jsx";
 
 export const VideoPanel = forwardRef(function VideoPanel(
@@ -22,6 +22,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
   ref,
 ) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFullscreenOverlay, setShowFullscreenOverlay] = useState(false);
   const formatBitrate = (bps) => {
     if (bps >= 8_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
     if (bps >= 1_000) return `${(bps / 1_000).toFixed(0)} Kbps`;
@@ -37,7 +38,20 @@ export const VideoPanel = forwardRef(function VideoPanel(
 
   const handleCloseFullscreen = () => {
     setIsFullscreen(false);
+    setShowFullscreenOverlay(true);
+    setTimeout(() => setShowFullscreenOverlay(false), 500);
   };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      if (!document.fullscreenElement && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFsChange);
+  }, [isFullscreen]);
 
   if (isFullscreen && !isLocal) {
     return (
