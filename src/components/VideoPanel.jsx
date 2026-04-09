@@ -155,6 +155,22 @@ export const VideoPanel = forwardRef(function VideoPanel(
         ref={containerRef}
         className="flex-1 min-h-0 relative bg-[#050505]"
       >
+        {showPlaceholder && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              className="text-[#555]"
+            >
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <path d="M8 21h8M12 17v4" />
+            </svg>
+          </div>
+        )}
         <video
           ref={(el) => {
             if (ref) ref.current = el;

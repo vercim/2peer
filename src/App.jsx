@@ -163,6 +163,8 @@ export default function App() {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const localContainerRef = useRef(null);
+  const remoteContainerRef = useRef(null);
   const pcRef = useRef(null);
   const outChannelRef = useRef(null);
   const pendingIceRef = useRef([]);
@@ -1076,7 +1078,7 @@ export default function App() {
               onChangeSource={handleChangeSource}
               showPlaceholder={!streamHasVideo(localStream)}
               videoRef={localVideoRef}
-              containerRef={localVideoRef}
+              containerRef={localContainerRef}
               canBroadcast={pcRef.current?.connectionState === "connected"}
             />
             <VideoPanel
@@ -1089,7 +1091,7 @@ export default function App() {
               showPlaceholder={!streamHasVideo(remoteStream)}
               className={remoteVideoWrapClass}
               videoRef={remoteVideoRef}
-              containerRef={remoteVideoRef}
+              containerRef={remoteContainerRef}
             />
           </div>
         </main>

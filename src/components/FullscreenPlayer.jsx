@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
   const [showControls, setShowControls] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+  const containerRef = useRef(null);
   const hideTimeoutRef = useRef(null);
 
   const formatBitrate = (bps) => {
@@ -19,11 +20,24 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
     }, 3000);
   }, []);
 
+  const handleClose = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    }
+    onClose();
+  }, [onClose]);
+
   useEffect(() => {
     showControlsTemporarily();
+
+    const container = containerRef.current;
+    if (container && container.requestFullscreen) {
+      container.requestFullscreen().catch(() => {});
+    }
+
     const handleMouseMove = () => showControlsTemporarily();
     const handleKeyDown = (e) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
       if (e.key === " ") {
         e.preventDefault();
         if (videoRef?.current) {
@@ -37,14 +51,19 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
         }
       }
     };
+
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("keydown", handleKeyDown);
+
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("keydown", handleKeyDown);
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      }
     };
-  }, [showControlsTemporarily, onClose, videoRef]);
+  }, [showControlsTemporarily, handleClose, videoRef]);
 
   const handleVideoClick = () => {
     if (videoRef?.current) {
@@ -60,12 +79,13 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
 
   return (
     <div
+      ref={containerRef}
       className="fixed inset-0 z-[9999] bg-black flex items-center justify-center"
       onClick={handleVideoClick}
     >
       <video
         ref={videoRef}
-        className="max-w-full max-h-full object-contain"
+        className="w-full h-full object-contain"
         playsInline
         autoPlay
       />
@@ -88,7 +108,7 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
           className="bg-black/60 backdrop-blur-sm rounded-lg px-4 py-2 text-[#ccc] text-[13px] flex items-center gap-2 hover:bg-black/80 transition-colors cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
-            onClose();
+            handleClose();
           }}
         >
           <svg
@@ -111,32 +131,7 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-center gap-4 bg-black/60 backdrop-blur-sm rounded-lg px-4 py-3 w-fit mx-auto">
-          <button
-            className="text-[#ccc] hover:text-white transition-colors cursor-pointer p-2"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (videoRef?.current) {
-                videoRef.current.currentTime = Math.max(
-                  0,
-                  videoRef.current.currentTime - 10,
-                );
-              }
-            }}
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M19 20L9 12l10-8v16z" />
-              <path d="M5 19v-2" />
-            </svg>
-          </button>
-
+        <div className="flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg px-4 py-3 w-fit mx-auto">
           <button
             className="text-[#ccc] hover:text-white transition-colors cursor-pointer p-2"
             onClick={(e) => {
@@ -154,8 +149,8 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
           >
             {isPaused ? (
               <svg
-                width="24"
-                height="24"
+                width="28"
+                height="28"
                 viewBox="0 0 24 24"
                 fill="currentColor"
               >
@@ -163,39 +158,14 @@ export function FullscreenPlayer({ videoRef, meta, bitrate, onClose }) {
               </svg>
             ) : (
               <svg
-                width="24"
-                height="24"
+                width="28"
+                height="28"
                 viewBox="0 0 24 24"
                 fill="currentColor"
               >
                 <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
               </svg>
             )}
-          </button>
-
-          <button
-            className="text-[#ccc] hover:text-white transition-colors cursor-pointer p-2"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (videoRef?.current) {
-                videoRef.current.currentTime = Math.min(
-                  videoRef.current.duration,
-                  videoRef.current.currentTime + 10,
-                );
-              }
-            }}
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M5 4l10 8-10 8V4z" />
-              <path d="M19 5v2" />
-            </svg>
           </button>
         </div>
       </div>
