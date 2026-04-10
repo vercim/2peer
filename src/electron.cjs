@@ -317,23 +317,26 @@ function registerIpcHandlers() {
   });
   ipcMain.handle("app:version", () => APP_VERSION);
   ipcMain.handle("app:show-notification", (_, { title, body }) => {
-    if (Notification.isSupported()) {
-      const notification = new Notification({
-        title: title,
-        body: body,
-        silent: false,
-      });
-      notification.on("click", () => {
-        if (mainWindow) {
-          mainWindow.show();
-          mainWindow.focus();
-          if (process.platform === "darwin") {
-            app.dock.show();
-          }
+    if (!Notification.isSupported()) return;
+    if (mainWindow && mainWindow.isVisible()) return;
+
+    const iconPath = path.join(__dirname, "..", "assets", "icon.png");
+    const notification = new Notification({
+      title: title,
+      body: body,
+      silent: false,
+      icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    });
+    notification.on("click", () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+        if (process.platform === "darwin") {
+          app.dock.show();
         }
-      });
-      notification.show();
-    }
+      }
+    });
+    notification.show();
   });
   ipcMain.handle("app:quit", () => {
     isQuitting = true;
