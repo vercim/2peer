@@ -82,7 +82,7 @@ function buildTrayMenu() {
     ...(lastCalled
       ? [
           {
-            label: "Call last id",
+            label: "Call last",
             click: () => {
               if (mainWindow) {
                 mainWindow.show();

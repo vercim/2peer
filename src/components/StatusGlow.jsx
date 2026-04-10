@@ -16,8 +16,15 @@ export function StatusGlow({ color = "#888", trigger = 0 }) {
   return (
     <div
       key={keyRef.current}
-      className="fixed inset-0 pointer-events-none z-[99] animate-glow"
+      className="animate-glow"
       style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 999,
+        pointerEvents: "none",
         boxShadow: `inset 0 0 70px 40px ${color}30`,
       }}
     />
