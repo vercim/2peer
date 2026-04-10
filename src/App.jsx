@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar.jsx";
 import { VideoPanel } from "./components/VideoPanel.jsx";
 import { SourcePicker } from "./components/SourcePicker.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
+import { StatusGlow } from "./components/StatusGlow.jsx";
 import { soundManager } from "./utils/SoundManager.js";
 
 const rtcConfig = {
@@ -27,7 +28,8 @@ const rtcConfig = {
       credential: "your-turn-credential",
     },
   ],
-  iceCandidatePoolSize: 0,
+  iceCandidatePoolSize: 10,
+  iceTransportPolicy: "all",
   sdpSemantics: "unified-plan",
   bundlePolicy: "max-bundle",
   rtcpMuxPolicy: "require",
@@ -200,6 +202,13 @@ export default function App({ version = "" }) {
   const [statusDotColor, setStatusDotColor] = useState("#444");
   const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
+  const [glowTrigger, setGlowTrigger] = useState(0);
+  useEffect(() => {
+    if (statusDotColor !== "#444" && statusDotColor !== "#888") {
+      setGlowTrigger((prev) => prev + 1);
+    }
+  }, [statusDotColor]);
+
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     message: "",
@@ -699,6 +708,16 @@ export default function App({ version = "" }) {
         `<strong style="font-family:monospace">${msg.from}</strong> declined the call.`,
       );
       hangup(false);
+    }
+
+    if (msg.type === "cancel") {
+      soundManager.stopIncomingLoop();
+      setIncomingCall(null);
+      setCallStatus("idle");
+      setStatusDotColor("#888");
+      addStatus(
+        `<strong style="font-family:monospace">${msg.from}</strong> cancelled the call.`,
+      );
     }
 
     if (msg.type === "hangup") {
@@ -1243,6 +1262,11 @@ export default function App({ version = "" }) {
   };
 
   const handleCancelCall = () => {
+    if (incomingCall) {
+      sendSignal({ type: "cancel", to: incomingCall.from });
+    } else if (currentPeerId) {
+      sendSignal({ type: "cancel", to: currentPeerId });
+    }
     if (outChannelRef.current) {
       supabaseClientRef.current
         ?.removeChannel(outChannelRef.current)
@@ -1257,6 +1281,7 @@ export default function App({ version = "" }) {
 
   return (
     <div className="h-screen flex flex-col bg-bg text-text font-sans text-[13px] antialiased overflow-hidden">
+      <StatusGlow color={statusDotColor} trigger={glowTrigger} />
       <TitleBar
         statusDotColor={statusDotColor}
         connectionStatus={callStatus}
