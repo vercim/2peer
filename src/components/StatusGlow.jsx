@@ -25,7 +25,7 @@ export function StatusGlow({ color = "#888", trigger = 0 }) {
         // Ключевой фикс для Windows:
         border: `1px solid transparent`,
         outline: `1px solid transparent`,
-        boxShadow: `inset 0 0 80px 30px ${color}30`,
+        boxShadow: `inset 0 0 82px 30px ${color}38`,
         // Форс отдельного слоя:
         transform: "translate3d(0,0,0)",
         isolation: "isolate",
