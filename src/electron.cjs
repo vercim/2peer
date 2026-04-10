@@ -119,6 +119,9 @@ if (!gotTheLock) {
         if (mainWindow) {
           mainWindow.show();
           mainWindow.focus();
+          if (process.platform === "darwin") {
+            app.dock.show();
+          }
         }
       });
     }
@@ -193,6 +196,15 @@ function createWindow() {
     if (!isQuitting) {
       event.preventDefault();
       mainWindow.hide();
+      if (process.platform === "darwin") {
+        app.dock.hide();
+      }
+    }
+  });
+
+  mainWindow.on("show", () => {
+    if (process.platform === "darwin") {
+      app.dock.show();
     }
   });
 
@@ -258,6 +270,9 @@ function registerIpcHandlers() {
         if (mainWindow) {
           mainWindow.show();
           mainWindow.focus();
+          if (process.platform === "darwin") {
+            app.dock.show();
+          }
         }
       });
       notification.show();
