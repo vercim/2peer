@@ -21,10 +21,17 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    minify: "esbuild",
+    sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom"],
+        manualChunks: (id) => {
+          if (id.includes("node_modules")) {
+            if (id.includes("react")) return "react-vendor";
+            if (id.includes("supabase")) return "supabase-vendor";
+            if (id.includes("lucide")) return "icons-vendor";
+            return "deps-vendor";
+          }
         },
       },
     },

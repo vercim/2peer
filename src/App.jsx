@@ -27,7 +27,7 @@ const rtcConfig = {
       credential: "your-turn-credential",
     },
   ],
-  iceCandidatePoolSize: 10,
+  iceCandidatePoolSize: 0,
   sdpSemantics: "unified-plan",
   bundlePolicy: "max-bundle",
   rtcpMuxPolicy: "require",
@@ -47,37 +47,6 @@ function getStunServers() {
   return stunIPs.map((ip) => ({
     urls: `stun:${ip}`,
   }));
-}
-
-async function gatherLocalCandidates(pc) {
-  try {
-    const pc2 = new RTCPeerConnection({ iceServers: [] });
-    const localIPs = [];
-
-    pc2.createDataChannel("temp");
-    const offer = await pc2.createOffer();
-    await pc2.setLocalDescription(offer);
-
-    pc2.onicecandidate = (e) => {
-      if (e.candidate?.candidate) {
-        const match = e.candidate.candidate.match(
-          /([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/,
-        );
-        if (match) localIPs.push(match[1]);
-      }
-    };
-
-    await new Promise((r) => setTimeout(r, 500));
-    pc2.close();
-
-    const uniqueIPs = [...new Set(localIPs)].filter(
-      (ip) => !ip.startsWith("127."),
-    );
-    return uniqueIPs;
-  } catch (e) {
-    console.warn("[PC] Local IP gathering failed:", e);
-    return [];
-  }
 }
 
 function streamHasVideo(stream) {
@@ -738,18 +707,9 @@ export default function App({ version = "" }) {
       window._prevBytesReceived = 0;
     }
 
-    const localIPs = await gatherLocalCandidates(pcRef.current || null);
-    const localStunServers = localIPs.map((ip) => ({
-      urls: `stun:${ip}:19302`,
-    }));
-
     const configWithIPs = {
       ...rtcConfig,
-      iceServers: [
-        ...rtcConfig.iceServers,
-        ...getStunServers(),
-        ...localStunServers,
-      ],
+      iceServers: [...rtcConfig.iceServers, ...getStunServers()],
     };
     const pc = new RTCPeerConnection(configWithIPs);
 
