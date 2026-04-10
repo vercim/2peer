@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TextMorph } from "torph/react";
 import { Zap, AlertTriangle } from "lucide-react";
 import StatusLog from "./StatusLog";
@@ -39,8 +39,9 @@ export function Sidebar({
   supabaseStatus = "disconnected",
   statusMessages = [],
   version = "",
+  remoteId = "",
+  onRemoteIdChange = null,
 }) {
-  const [remoteId, setRemoteId] = useState("");
   const [copied, setCopied] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const isCalling = connectionStatus === "connecting";
@@ -94,22 +95,23 @@ export function Sidebar({
         </span>
         <div className="relative">
           <div
-            className={`absolute inset-0 rounded-[5px] p-[9px_10px] text-[13px] font-mono pointer-events-none flex items-center text-[#444] transition-colors duration-140 ${
+            className={`absolute inset-0 rounded-[5px] p-[9px_10px] text-[13px] font-mono pointer-events-none flex items-center transition-colors duration-140 z-[1] ${
               remoteId || isInputFocused
-                ? "bg-panel-3 border border-[rgba(255,255,255,0.12)]"
-                : "bg-panel-2 border border-border"
+                ? "bg-panel-3 border border-[rgba(255,255,255,0.12)] text-[#888]"
+                : "bg-panel-2 border border-border text-[#444]"
             }`}
           >
-            {formatId(remoteId) || "Peer ID"}
+            {remoteId ? "" : "Peer ID"}
           </div>
           <input
-            className={`w-full bg-transparent border border-transparent rounded-[5px] p-[9px_10px] outline-none text-[13px] font-mono text-[#e0e0e0] transition-colors duration-140 ${
+            className={`w-full bg-transparent border border-transparent rounded-[5px] p-[9px_10px] outline-none text-[13px] font-mono text-text placeholder:text-transparent transition-colors duration-140 z-[2] relative ${
               remoteId || isInputFocused ? "bg-panel-3" : ""
             }`}
             value={remoteId}
-            onChange={(e) =>
-              setRemoteId(e.target.value.replace(/\./g, "").toUpperCase())
-            }
+            onChange={(e) => {
+              const val = e.target.value.replace(/\./g, "").toUpperCase();
+              onRemoteIdChange ? onRemoteIdChange(val) : null;
+            }}
             onKeyDown={handleKeyDown}
             maxLength={12}
             placeholder=""
@@ -183,13 +185,6 @@ export function Sidebar({
       </div>
 
       <div className="mt-auto flex flex-col gap-[10px]">
-        {version && (
-          <div className="bg-panel border border-border rounded-[8px] p-[10px_14px]">
-            <div className="text-[11px] text-[#666] font-mono overflow-hidden text-ellipsis whitespace-nowrap">
-              v{version}
-            </div>
-          </div>
-        )}
         <div className="bg-panel border border-border rounded-[8px] p-[10px_14px]">
           <div className="text-[11px] text-[#2e2e2e] font-mono overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-[6px]">
             {supabaseStatus === "connected" ? (

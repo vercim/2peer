@@ -12,4 +12,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   showNotification: (title, body) =>
     ipcRenderer.invoke("app:show-notification", { title, body }),
   quitApp: () => ipcRenderer.invoke("app:quit"),
+  setLastCalledId: (id) => ipcRenderer.invoke("profile:set-last-called", id),
+  onCallLast: (callback) => {
+    ipcRenderer.on("call-last", (_, lastCalledId) => callback(lastCalledId));
+  },
+  onSetRemoteId: (callback) => {
+    ipcRenderer.on("set-remote-id", (_, id) => callback(id));
+  },
 });

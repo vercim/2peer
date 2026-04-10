@@ -4,6 +4,7 @@ export function TitleBar({
   statusDotColor = "#444",
   connectionStatus = "idle",
   hasActiveCall = false,
+  version = "",
 }) {
   const handleMinimize = () => {
     if (window.electronAPI?.minimizeWindow) {
@@ -45,6 +46,11 @@ export function TitleBar({
         <TextMorph ease={{ stiffness: 200, damping: 20 }}>
           {getStatusText()}
         </TextMorph>
+        {version && (
+          <span className="text-[11px] text-[#555] font-mono ml-[4px]">
+            v{version}
+          </span>
+        )}
       </div>
       <div className="flex" style={{ WebkitAppRegion: "no-drag" }}>
         <button

@@ -266,6 +266,7 @@ export default function App({ version = "" }) {
   }, [streamQuality]);
 
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
+  const [remoteId, setRemoteId] = useState("");
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -427,6 +428,22 @@ export default function App({ version = "" }) {
       })();
     }
   }, [isElectronReady]);
+
+  useEffect(() => {
+    if (window.electronAPI?.onCallLast) {
+      window.electronAPI.onCallLast((lastCalledId) => {
+        if (lastCalledId && selfId) {
+          handleCall(lastCalledId);
+        }
+      });
+    }
+    if (window.electronAPI?.onSetRemoteId) {
+      window.electronAPI.onSetRemoteId((id) => {
+        setRemoteId(id);
+        setTimeout(() => handleCall(id), 100);
+      });
+    }
+  }, [selfId]);
 
   const connectSupabase = async (url, key, id) => {
     if (!window.supabase) {
@@ -898,6 +915,9 @@ export default function App({ version = "" }) {
     soundManager.playCall();
     setStatusDotColor("#f97316");
     setCallStatus("connecting");
+    if (window.electronAPI?.setLastCalledId) {
+      window.electronAPI.setLastCalledId(peerId);
+    }
   };
 
   const handleAcceptCall = async () => {
@@ -1241,6 +1261,7 @@ export default function App({ version = "" }) {
         statusDotColor={statusDotColor}
         connectionStatus={callStatus}
         hasActiveCall={hasActiveCall}
+        version={version}
       />
       <div className="h-[calc(100vh-38px)] grid grid-cols-[272px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden">
         <Sidebar
@@ -1259,6 +1280,8 @@ export default function App({ version = "" }) {
           supabaseStatus={supabaseStatus}
           statusMessages={statusLog}
           version={version}
+          remoteId={remoteId}
+          onRemoteIdChange={setRemoteId}
         />
         <main className="flex flex-col gap-[8px] min-h-0 overflow-hidden">
           <div className="flex-1 min-h-0 flex flex-col gap-[8px]">

@@ -29,7 +29,7 @@ function ensureProfile() {
   try {
     const parsed = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
     if (parsed && typeof parsed.id === "string" && parsed.id.length >= 8)
-      return parsed;
+      return { ...parsed, lastCalledId: parsed.lastCalledId || "" };
   } catch (_) {}
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let id = "";
@@ -37,7 +37,7 @@ function ensureProfile() {
   for (let i = 0; i < 12; i++) {
     id += chars[bytes[i] % chars.length];
   }
-  const profile = { id };
+  const profile = { id, lastCalledId: "" };
   fs.mkdirSync(path.dirname(getSettingsFile()), { recursive: true });
   fs.writeFileSync(getSettingsFile(), JSON.stringify(profile, null, 2));
   return profile;
@@ -46,12 +46,70 @@ function setProfile(profile) {
   fs.mkdirSync(path.dirname(getSettingsFile()), { recursive: true });
   fs.writeFileSync(getSettingsFile(), JSON.stringify(profile, null, 2));
 }
+function getLastCalledId() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
+    return parsed.lastCalledId || "";
+  } catch (_) {
+    return "";
+  }
+}
+function setLastCalledId(lastCalledId) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
+    parsed.lastCalledId = lastCalledId;
+    fs.writeFileSync(getSettingsFile(), JSON.stringify(parsed, null, 2));
+  } catch (_) {}
+}
 
 let pendingSourceId = null;
-
-let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+const args = process.argv.slice(1);
+
+function buildTrayMenu() {
+  const lastCalled = getLastCalledId();
+  const menuTemplate = [
+    {
+      label: "Show 2peer",
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      },
+    },
+    ...(lastCalled
+      ? [
+          {
+            label: "Call last id",
+            click: () => {
+              if (mainWindow) {
+                mainWindow.show();
+                mainWindow.focus();
+                mainWindow.webContents.send("set-remote-id", lastCalled);
+              }
+            },
+          },
+        ]
+      : []),
+    { type: "separator" },
+    {
+      label: "Quit",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ];
+  return Menu.buildFromTemplate(menuTemplate);
+}
+
+function updateTrayMenu() {
+  if (tray) {
+    tray.setContextMenu(buildTrayMenu());
+  }
+}
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -66,6 +124,18 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    if (process.platform === "darwin") {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+        openAsHidden: true,
+      });
+    } else if (process.platform === "win32") {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+        args: ["--hidden"],
+      });
+    }
+
     registerIpcHandlers();
 
     function createTray() {
@@ -92,28 +162,7 @@ if (!gotTheLock) {
       );
 
       tray.setToolTip("2peer");
-
-      const contextMenu = Menu.buildFromTemplate([
-        {
-          label: "Show 2peer",
-          click: () => {
-            if (mainWindow) {
-              mainWindow.show();
-              mainWindow.focus();
-            }
-          },
-        },
-        { type: "separator" },
-        {
-          label: "Quit",
-          click: () => {
-            isQuitting = true;
-            app.quit();
-          },
-        },
-      ]);
-
-      tray.setContextMenu(contextMenu);
+      tray.setContextMenu(buildTrayMenu());
 
       tray.on("double-click", () => {
         if (mainWindow) {
@@ -174,6 +223,7 @@ function createWindow() {
     preloadPath = path.join(__dirname, "preload.cjs");
   }
 
+  const isLaunchedAsHidden = args.includes("--hidden");
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 770,
@@ -182,6 +232,7 @@ function createWindow() {
     frame: false,
     backgroundColor: "#0a0a0a",
     autoHideMenuBar: true,
+    show: !isLaunchedAsHidden,
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -224,9 +275,15 @@ function registerIpcHandlers() {
     for (let i = 0; i < 12; i++) {
       id += chars[bytes[i] % chars.length];
     }
-    const profile = { id };
+    const current = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
+    const profile = { id, lastCalledId: current?.lastCalledId || "" };
     setProfile(profile);
     return profile;
+  });
+  ipcMain.handle("profile:get-last-called", () => getLastCalledId());
+  ipcMain.handle("profile:set-last-called", (_, lastCalledId) => {
+    setLastCalledId(lastCalledId);
+    updateTrayMenu();
   });
   const configHandler = () => ({
     supabaseUrl: "https://nsoavwoouwjkqktlxjyr.supabase.co",
@@ -283,36 +340,6 @@ function registerIpcHandlers() {
     app.quit();
   });
 }
-
-app.whenReady().then(() => {
-  registerIpcHandlers();
-  createTray();
-  session.defaultSession.setDisplayMediaRequestHandler(
-    async (_req, callback) => {
-      try {
-        const sources = await desktopCapturer.getSources({
-          types: ["screen", "window"],
-        });
-        let source;
-        if (pendingSourceId) {
-          source = sources.find((s) => s.id === pendingSourceId) || sources[0];
-          pendingSourceId = null;
-        } else {
-          source = sources[0];
-        }
-        callback({ video: source, audio: true });
-      } catch (err) {
-        console.error("[displayMedia] error:", err.message);
-        callback({ video: null, audio: false });
-      }
-    },
-    { useSystemPicker: true },
-  );
-  createWindow();
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
 
 app.on("window-all-closed", () => {
   if (process.platform === "darwin") {
