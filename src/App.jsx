@@ -148,17 +148,6 @@ function adaptBitrate(rtt, packetsLost, bitrate) {
   currentBitrate.target = newTarget;
   currentBitrate.value =
     currentBitrate.value + (newTarget - currentBitrate.value) * 0.3;
-
-  console.log(
-    "[Adaptive] Bitrate:",
-    currentBitrate.value,
-    "Target:",
-    newTarget,
-    "RTT:",
-    avgRtt,
-    "Lost:",
-    packetsLost,
-  );
 }
 
 const qualityOptions = {
@@ -1281,6 +1270,13 @@ export default function App({ version = "" }) {
         .catch(() => {});
       outChannelRef.current = null;
     }
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    pendingIceRef.current = [];
+    setCurrentPeerId("");
+    setHasActiveCall(false);
     setCallStatus("idle");
     setStatusDotColor("#888");
     soundManager.playCancel();

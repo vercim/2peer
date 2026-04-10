@@ -24,6 +24,8 @@ export function StatusGlow({ color = "#888", trigger = 0 }) {
         right: 0,
         bottom: 0,
         zIndex: 999,
+        transform: "translateZ(0)",
+        willChange: "box-shadow", 
         pointerEvents: "none",
         boxShadow: `inset 0 0 70px 40px ${color}30`,
       }}
