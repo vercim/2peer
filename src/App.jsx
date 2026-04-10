@@ -203,8 +203,10 @@ export default function App({ version = "" }) {
   const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
   const [glowTrigger, setGlowTrigger] = useState(0);
+  const [glowColor, setGlowColor] = useState("#888");
   useEffect(() => {
     if (statusDotColor !== "#444" && statusDotColor !== "#888") {
+      setGlowColor(statusDotColor);
       setGlowTrigger((prev) => prev + 1);
     }
   }, [statusDotColor]);
@@ -715,6 +717,8 @@ export default function App({ version = "" }) {
       setIncomingCall(null);
       setCallStatus("idle");
       setStatusDotColor("#888");
+      setGlowColor("#f87171");
+      setGlowTrigger((prev) => prev + 1);
       addStatus(
         `<strong style="font-family:monospace">${msg.from}</strong> cancelled the call.`,
       );
@@ -797,6 +801,8 @@ export default function App({ version = "" }) {
       if (st === "connected") {
         setHasActiveCall(true);
         setStatusDotColor("#4ade80");
+        setGlowColor("#4ade80");
+        setGlowTrigger((prev) => prev + 1);
         setCallStatus("connected");
         soundManager.playConnect();
 
@@ -1022,6 +1028,8 @@ export default function App({ version = "" }) {
     pendingIceRef.current = [];
     setIncomingCall(null);
     setStatusDotColor("#888");
+    setGlowColor("#f87171");
+    setGlowTrigger((prev) => prev + 1);
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       setLocalStream(null);
@@ -1281,7 +1289,7 @@ export default function App({ version = "" }) {
 
   return (
     <div className="h-screen flex flex-col bg-bg text-text font-sans text-[13px] antialiased overflow-hidden">
-      <StatusGlow color={statusDotColor} trigger={glowTrigger} />
+      <StatusGlow color={glowColor} trigger={glowTrigger} />
       <TitleBar
         statusDotColor={statusDotColor}
         connectionStatus={callStatus}
