@@ -192,10 +192,18 @@ export default function App({ version = "" }) {
   const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
   const [glowTrigger, setGlowTrigger] = useState(0);
-  const [glowColor, setGlowColor] = useState("#888");
+  const [glowColor, setGlowColor] = useState("rgba(136,136,136,0.3)");
+
+  const hexToRgba = (hex, alpha = 0.3) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  };
+
   useEffect(() => {
     if (statusDotColor !== "#444" && statusDotColor !== "#888") {
-      setGlowColor(statusDotColor);
+      setGlowColor(hexToRgba(statusDotColor));
       setGlowTrigger((prev) => prev + 1);
     }
   }, [statusDotColor]);
@@ -706,7 +714,7 @@ export default function App({ version = "" }) {
       setIncomingCall(null);
       setCallStatus("idle");
       setStatusDotColor("#888");
-      setGlowColor("#f87171");
+      setGlowColor(hexToRgba("#f87171"));
       setGlowTrigger((prev) => prev + 1);
       addStatus(
         `<strong style="font-family:monospace">${msg.from}</strong> cancelled the call.`,
@@ -790,7 +798,7 @@ export default function App({ version = "" }) {
       if (st === "connected") {
         setHasActiveCall(true);
         setStatusDotColor("#4ade80");
-        setGlowColor("#4ade80");
+        setGlowColor(hexToRgba("#4ade80"));
         setGlowTrigger((prev) => prev + 1);
         setCallStatus("connected");
         soundManager.playConnect();
@@ -1017,7 +1025,7 @@ export default function App({ version = "" }) {
     pendingIceRef.current = [];
     setIncomingCall(null);
     setStatusDotColor("#888");
-    setGlowColor("#f87171");
+    setGlowColor(hexToRgba("#f87171"));
     setGlowTrigger((prev) => prev + 1);
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());

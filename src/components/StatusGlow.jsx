@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 
-export function StatusGlow({ color = "#888", trigger = 0 }) {
+export function StatusGlow({ color = "rgba(136,136,136,0.3)", trigger = 0 }) {
   const [active, setActive] = useState(false);
   const keyRef = useRef(0);
 
@@ -24,10 +24,10 @@ export function StatusGlow({ color = "#888", trigger = 0 }) {
         right: 0,
         bottom: 0,
         zIndex: 999,
-        transform: "translateZ(0)",
-        willChange: "box-shadow", 
         pointerEvents: "none",
-        boxShadow: `inset 0 0 70px 40px ${color}30`,
+        boxShadow: `inset 0 0 70px 40px ${color}`,
+        transform: "translateZ(0)",
+        willChange: "box-shadow",
       }}
     />
   );
