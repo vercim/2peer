@@ -309,105 +309,94 @@ export default function App({ version = "" }) {
     }
   }, []);
 
-  const connectSupabase = useCallback(async (url, key, id) => {
-    if (!window.supabase) {
-      addStatus("Error: Supabase library not loaded.", true);
-      return;
-    }
-    let client = supabaseClientRef.current;
-    if (!client) {
-      try {
-        client = window.supabase.createClient(url, key, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        });
-        supabaseClientRef.current = client;
-        console.log("[Supabase] Client created, URL:", url);
-      } catch (e) {
-        console.error("[Supabase] Init error:", e);
-        setSupabaseStatus("error");
-        addStatus("Supabase init error: " + e.message, true);
+  const connectSupabase = useCallback(
+    async (url, key, id) => {
+      if (!window.supabase) {
+        addStatus("Error: Supabase library not loaded.", true);
         return;
       }
-    }
-    if (myChannelRef.current) {
-      try {
-        await client.removeChannel(myChannelRef.current);
-      } catch (_) {}
-      myChannelRef.current = null;
-      await new Promise((r) => setTimeout(r, 500));
-    }
-
-    const ch = client.channel(`peer:${id}`, {
-      config: { broadcast: { self: false } },
-    });
-    ch.on("broadcast", { event: "signal" }, ({ payload }) =>
-      handleSignalRef.current?.(payload),
-    );
-    ch.on("error", (err) => {
-      console.error("[Supabase] Channel error:", err);
-      addStatus("Channel error: " + (err?.message || "Unknown"), true);
-    });
-
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    ch.subscribe((status) => {
-      console.log("[Supabase] Subscribe status:", status);
-      if (status === "SUBSCRIBED") {
-        setSupabaseStatus("connected");
-        if (reconnectTimerRef.current) {
-          clearTimeout(reconnectTimerRef.current);
-          reconnectTimerRef.current = null;
-        }
-        addStatus('Ready. Share your ID and click "Call".');
-      }
-      if (status === "CHANNEL_ERROR") {
-        setSupabaseStatus("error");
-        addStatus("Channel error. Attempting to reconnect...", true);
-        if (retryCount < maxRetries) {
-          retryCount++;
-          setTimeout(() => ch.subscribe(), 1000);
-        } else {
-          addStatus("Connection failed. Please try again.", true);
-          retryCount = 0;
-        }
-      }
-      if (status === "TIMED_OUT") {
-        setSupabaseStatus("error");
-        addStatus("Connection timeout. Retrying...", true);
-        if (retryCount < maxRetries) {
-          retryCount++;
-          setTimeout(() => ch.subscribe(), 1500);
-        }
-      }
-      if (status === "CLOSED") {
-        console.log("[Supabase] Channel closed");
-        setSupabaseStatus("error");
-        addStatus("Connection closed.", true);
-        retryCount = 0;
-      }
-    });
-
-    myChannelRef.current = ch;
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        if (ch.state !== "joined") {
-          console.log("[Supabase] Timeout, channel state:", ch.state);
+      let client = supabaseClientRef.current;
+      if (!client) {
+        try {
+          client = window.supabase.createClient(url, key, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          supabaseClientRef.current = client;
+          console.log("[Supabase] Client created, URL:", url);
+        } catch (e) {
+          console.error("[Supabase] Init error:", e);
           setSupabaseStatus("error");
-          reject(new Error("Connection timeout"));
+          addStatus("Supabase init error: " + e.message, true);
+          return;
         }
-      }, 10000);
+      }
+      if (myChannelRef.current) {
+        try {
+          await client.removeChannel(myChannelRef.current);
+        } catch (_) {}
+        myChannelRef.current = null;
+        await new Promise((r) => setTimeout(r, 500));
+      }
 
-      const checkInterval = setInterval(() => {
-        if (ch.state === "joined" || ch.state === "subscribed") {
-          clearTimeout(timeout);
-          clearInterval(checkInterval);
-          resolve(ch);
+      const ch = client.channel(`peer:${id}`, {
+        config: { broadcast: { self: false } },
+      });
+      ch.on("broadcast", { event: "signal" }, ({ payload }) => {
+        console.log("[Supabase] Received signal:", payload?.type);
+        handleSignalRef.current?.(payload);
+      });
+      ch.on("error", (err) => {
+        console.error("[Supabase] Channel error:", err);
+        addStatus("Channel error: " + (err?.message || "Unknown"), true);
+      });
+
+      ch.subscribe((status) => {
+        console.log("[Supabase] Subscribe status:", status);
+        if (status === "SUBSCRIBED") {
+          setSupabaseStatus("connected");
+          if (reconnectTimerRef.current) {
+            clearTimeout(reconnectTimerRef.current);
+            reconnectTimerRef.current = null;
+          }
+          addStatus('Ready. Share your ID and click "Call".');
         }
-      }, 100);
-    });
-  }, []);
+        if (status === "CHANNEL_ERROR") {
+          setSupabaseStatus("error");
+          addStatus("Channel error.", true);
+        }
+        if (status === "TIMED_OUT") {
+          setSupabaseStatus("error");
+          addStatus("Connection timeout.", true);
+        }
+        if (status === "CLOSED") {
+          console.log("[Supabase] Channel closed");
+          setSupabaseStatus("error");
+          addStatus("Connection closed.", true);
+        }
+      });
+
+      myChannelRef.current = ch;
+
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          if (ch.state !== "joined") {
+            console.log("[Supabase] Timeout, channel state:", ch.state);
+            setSupabaseStatus("error");
+            reject(new Error("Connection timeout"));
+          }
+        }, 10000);
+
+        const checkInterval = setInterval(() => {
+          if (ch.state === "joined" || ch.state === "subscribed") {
+            clearTimeout(timeout);
+            clearInterval(checkInterval);
+            resolve(ch);
+          }
+        }, 100);
+      });
+    },
+    [handleSignalRef],
+  );
 
   useEffect(() => {
     if (isElectronReady) {
