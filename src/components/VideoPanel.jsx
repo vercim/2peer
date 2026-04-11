@@ -1,4 +1,5 @@
 import { forwardRef, useState } from "react";
+import { formatBitrate } from "../utils/streamUtils.js";
 
 export const VideoPanel = forwardRef(function VideoPanel(
   {
@@ -24,11 +25,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
   ref,
 ) {
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
-  const formatBitrate = (bps) => {
-    if (bps >= 8_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
-    if (bps >= 1_000) return `${(bps / 1_000).toFixed(0)} Kbps`;
-    return `${bps} bps`;
-  };
 
   const handleFullscreen = (e) => {
     e.stopPropagation();

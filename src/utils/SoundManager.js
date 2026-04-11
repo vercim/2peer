@@ -3,6 +3,7 @@ export class SoundManager {
     this.audioContext = null;
     this.initialized = false;
     this.incomingInterval = null;
+    this.volumeMultiplier = 1;
   }
 
   init() {
@@ -37,7 +38,10 @@ export class SoundManager {
     osc.frequency.exponentialRampToValueAtTime(frequency * 0.5, now + duration);
 
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(volume, now + 0.01);
+    gain.gain.linearRampToValueAtTime(
+      volume * this.volumeMultiplier,
+      now + 0.01,
+    );
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     osc.connect(gain);
