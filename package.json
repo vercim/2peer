@@ -1,6 +1,6 @@
 {
   "name": "2peer",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "2peer",
   "type": "module",
   "main": "src/electron.cjs",
