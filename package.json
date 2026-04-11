@@ -31,19 +31,19 @@
   "build": {
     "appId": "dev.vercim.2peer",
     "productName": "2peer",
+    "directories": {
+      "output": "release"
+    },
     "asar": true,
     "npmRebuild": true,
     "files": [
-      "dist/**/*",
-      "dist",
+      "dist/index.html",
+      "dist/assets/**/*",
       "src/electron.cjs",
       "src/preload.cjs",
-      "src/utils/**/*",
+      "src/utils/idUtils.cjs",
       "assets/**/*",
       "package.json"
-    ],
-    "asarUnpack": [
-      "node_modules/electron/**/*"
     ],
     "mac": {
       "icon": "assets/icon.icns",

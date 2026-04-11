@@ -8,9 +8,7 @@ import { StatusGlow } from "./components/StatusGlow.jsx";
 import { soundManager } from "./utils/soundManager.js";
 import {
   qualityOptions,
-  getResolutionByValue,
-  DEFAULT_BITRATES,
-  getFullRtcConfig,
+  getResolutionByValue
 } from "./utils/rtcConfig.js";
 import {
   applyMaxQualityEncoding,
