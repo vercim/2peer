@@ -11,7 +11,7 @@ const {
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const crypto = require("crypto");
+const { generateId, validateIdFormat } = require("./utils/idUtils.cjs");
 
 if (process.platform === "win32") {
   app.setAppUserModelId("2peer");
@@ -28,16 +28,10 @@ function getSettingsFile() {
 function ensureProfile() {
   try {
     const parsed = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
-    if (parsed && typeof parsed.id === "string" && parsed.id.length >= 8)
+    if (parsed && validateIdFormat(parsed.id))
       return { ...parsed, lastCalledId: parsed.lastCalledId || "" };
   } catch (_) {}
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let id = "";
-  const bytes = crypto.randomBytes(12);
-  for (let i = 0; i < 12; i++) {
-    id += chars[bytes[i] % chars.length];
-  }
-  const profile = { id, lastCalledId: "" };
+  const profile = { id: generateId(), lastCalledId: "" };
   fs.mkdirSync(path.dirname(getSettingsFile()), { recursive: true });
   fs.writeFileSync(getSettingsFile(), JSON.stringify(profile, null, 2));
   return profile;
@@ -79,14 +73,11 @@ function buildTrayMenu() {
     {
       label: "Update ID",
       click: () => {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        let id = "";
-        const bytes = crypto.randomBytes(12);
-        for (let i = 0; i < 12; i++) {
-          id += chars[bytes[i] % chars.length];
-        }
         const current = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
-        const profile = { id, lastCalledId: current?.lastCalledId || "" };
+        const profile = {
+          id: generateId(),
+          lastCalledId: current?.lastCalledId || "",
+        };
         setProfile(profile);
         updateTrayMenu();
         if (mainWindow) {
@@ -270,6 +261,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      webSecurity: true,
     },
   });
 
@@ -301,14 +293,11 @@ function createWindow() {
 function registerIpcHandlers() {
   ipcMain.handle("profile:get", () => ensureProfile());
   ipcMain.handle("profile:regen", () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let id = "";
-    const bytes = crypto.randomBytes(12);
-    for (let i = 0; i < 12; i++) {
-      id += chars[bytes[i] % chars.length];
-    }
     const current = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
-    const profile = { id, lastCalledId: current?.lastCalledId || "" };
+    const profile = {
+      id: generateId(),
+      lastCalledId: current?.lastCalledId || "",
+    };
     setProfile(profile);
     return profile;
   });

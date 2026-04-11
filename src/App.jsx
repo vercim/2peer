@@ -316,7 +316,9 @@ export default function App({ version = "" }) {
             auth: { persistSession: false, autoRefreshToken: false },
           });
           supabaseClientRef.current = client;
+          console.log("[Supabase] Client created, URL:", url);
         } catch (e) {
+          console.error("[Supabase] Init error:", e);
           setSupabaseStatus("error");
           addStatus("Supabase init error: " + e.message, true);
           return;
@@ -336,11 +338,16 @@ export default function App({ version = "" }) {
       ch.on("broadcast", { event: "signal" }, ({ payload }) =>
         handleSignal(payload),
       );
+      ch.on("error", (err) => {
+        console.error("[Supabase] Channel error:", err);
+        addStatus("Channel error: " + (err?.message || "Unknown"), true);
+      });
 
       let retryCount = 0;
       const maxRetries = 3;
 
       ch.subscribe((status) => {
+        console.log("[Supabase] Subscribe status:", status);
         if (status === "SUBSCRIBED") {
           setSupabaseStatus("connected");
           if (reconnectTimerRef.current) {
@@ -369,8 +376,9 @@ export default function App({ version = "" }) {
           }
         }
         if (status === "CLOSED") {
+          console.log("[Supabase] Channel closed");
           setSupabaseStatus("error");
-          addStatus("Connection closed.");
+          addStatus("Connection closed.", true);
           retryCount = 0;
         }
       });
@@ -380,6 +388,7 @@ export default function App({ version = "" }) {
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           if (ch.state !== "joined") {
+            console.log("[Supabase] Timeout, channel state:", ch.state);
             setSupabaseStatus("error");
             reject(new Error("Connection timeout"));
           }

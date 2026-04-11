@@ -50,9 +50,9 @@ export const qualityOptions = {
 };
 
 export const DEFAULT_BITRATES = {
-  "720p": 6_000_000,
-  "1080p": 12_000_000,
-  "1440p": 24_000_000,
+  "720p": 4_000_000,
+  "1080p": 6_000_000,
+  "1440p": 8_000_000,
 };
 
 export function getResolutionByValue(value) {

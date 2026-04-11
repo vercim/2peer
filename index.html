@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; connect-src wss://*.supabase.co; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';"
+      content="default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
     />
     <title>2peer</title>
     <meta name="version" content="{{VERSION}}" />
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.7/dist/umd/supabase.js"></script>
   </head>
   <body class="bg-bg text-text font-sans text-[13px] antialiased">
     <div id="root"></div>
