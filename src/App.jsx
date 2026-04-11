@@ -28,20 +28,20 @@ import { useBroadcast } from "./hooks/useBroadcast.js";
 export default function App({ version = "" }) {
   const [selfId, setSelfId] = useState("");
   const [supabaseStatus, setSupabaseStatus] = useState("disconnected");
-  const [statusDotColor, setStatusDotColor] = useState("#444");
+  const [statusDotState, setStatusDotState] = useState("idle");
   const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
   const [glowTrigger, setGlowTrigger] = useState(0);
-  const [glowColor, setGlowColor] = useState("#888");
+  const [glowState, setGlowState] = useState("idle");
 
   const { addStatus } = useStatusLog(statusLog, setStatusLog);
 
   useEffect(() => {
-    if (statusDotColor !== "#444" && statusDotColor !== "#888") {
-      setGlowColor(statusDotColor);
+    if (statusDotState !== "idle" && statusDotState !== "disconnected") {
+      setGlowState(statusDotState);
       setGlowTrigger((prev) => prev + 1);
     }
-  }, [statusDotColor]);
+  }, [statusDotState]);
 
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -126,8 +126,8 @@ export default function App({ version = "" }) {
       setRemoteMeta,
       setRemoteStream,
       setRemoteVideoWrapClass,
-      setStatusDotColor,
-      setGlowColor,
+      setStatusDotState,
+      setGlowState,
       setGlowTrigger,
       setCallStatus,
       setHasActiveCall,
@@ -149,8 +149,8 @@ export default function App({ version = "" }) {
     setRemoteMeta,
     setIncomingCall,
     setCallStatus,
-    setStatusDotColor,
-    setGlowColor,
+    setStatusDotState,
+    setGlowState,
     setGlowTrigger,
     onHangupRequested,
   });
@@ -448,8 +448,8 @@ export default function App({ version = "" }) {
       setHasActiveCall(false);
       pendingIceRef.current = [];
       setIncomingCall(null);
-      setStatusDotColor("#888");
-      setGlowColor("#f87171");
+      setStatusDotState("idle");
+      setGlowState("failed");
       setGlowTrigger((prev) => prev + 1);
       if (localStreamRef.current) {
         stopStreamTracks(localStreamRef.current);
@@ -486,8 +486,8 @@ export default function App({ version = "" }) {
       setIncomingCall,
       setCurrentPeerId,
       setHasActiveCall,
-      setStatusDotColor,
-      setGlowColor,
+      setStatusDotState,
+      setGlowState,
       setGlowTrigger,
     ],
   );
@@ -532,7 +532,7 @@ export default function App({ version = "" }) {
         `Calling <strong style="font-family:monospace">${peerId}</strong>...`,
       );
       soundManager.playCall();
-      setStatusDotColor("#f97316");
+      setStatusDotState("connecting");
       setCallStatus("connecting");
       if (window.electronAPI?.setLastCalledId) {
         window.electronAPI.setLastCalledId(peerId);
@@ -548,7 +548,7 @@ export default function App({ version = "" }) {
       addStatus,
       resetSignalingRefs,
       setCallStatus,
-      setStatusDotColor,
+      setStatusDotState,
     ],
   );
 
@@ -601,7 +601,7 @@ export default function App({ version = "" }) {
       `Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`,
     );
     soundManager.playConnecting();
-    setStatusDotColor("#f97316");
+    setStatusDotState("connecting");
     setCallStatus("connecting");
   }, [
     incomingCall,
@@ -612,7 +612,7 @@ export default function App({ version = "" }) {
     addStatus,
     resetSignalingRefs,
     setCallStatus,
-    setStatusDotColor,
+    setStatusDotState,
     setIncomingCall,
     setRemoteBitrate,
   ]);
@@ -742,7 +742,7 @@ export default function App({ version = "" }) {
     setCurrentPeerId("");
     setHasActiveCall(false);
     setCallStatus("idle");
-    setStatusDotColor("#888");
+    setStatusDotState("idle");
     soundManager.playCancel();
     addStatus("Call cancelled.");
   }, [
@@ -751,16 +751,16 @@ export default function App({ version = "" }) {
     sendSignal,
     addStatus,
     setCallStatus,
-    setStatusDotColor,
+    setStatusDotState,
     setCurrentPeerId,
     setHasActiveCall,
   ]);
 
   return (
     <div className="h-screen flex flex-col bg-bg text-text font-sans text-[13px] antialiased overflow-hidden">
-      <StatusGlow color={glowColor} trigger={glowTrigger} />
+      <StatusGlow state={glowState} trigger={glowTrigger} />
       <TitleBar
-        statusDotColor={statusDotColor}
+        status={statusDotState}
         connectionStatus={callStatus}
         hasActiveCall={hasActiveCall}
         version={version}

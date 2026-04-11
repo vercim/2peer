@@ -15,8 +15,8 @@ export function usePeerConnection({
   setRemoteMeta,
   setRemoteStream,
   setRemoteVideoWrapClass,
-  setStatusDotColor,
-  setGlowColor,
+  setStatusDotState,
+  setGlowState,
   setGlowTrigger,
   setCallStatus,
   setHasActiveCall,
@@ -62,7 +62,7 @@ export function usePeerConnection({
           settings.height || track?.getConstraints?.().height || "1080";
         const frameRate = settings.frameRate || "60";
         setRemoteMeta(`${width}×${height} @${Math.round(frameRate)}fps`);
-        setStatusDotColor("#4ade80");
+        setStatusDotState("connected");
         addStatus(
           `Connected to <strong style="font-family:monospace">${peerId}</strong>.`,
         );
@@ -87,8 +87,8 @@ export function usePeerConnection({
         const st = pc?.connectionState;
         if (st === "connected") {
           setHasActiveCall(true);
-          setStatusDotColor("#4ade80");
-          setGlowColor("#4ade80");
+          setStatusDotState("connected");
+          setGlowState("connected");
           setGlowTrigger((prev) => prev + 1);
           setCallStatus("connected");
           soundManager.playConnect();
@@ -144,13 +144,13 @@ export function usePeerConnection({
         }
         if (st === "failed") {
           setHasActiveCall(false);
-          setStatusDotColor("#f87171");
+          setStatusDotState("failed");
           setCallStatus("failed");
           addStatus("P2P connection failed.", true);
           pc.restartIce();
         }
         if (st === "disconnected") {
-          setStatusDotColor("#facc15");
+          setStatusDotState("disconnected");
           setCallStatus("connecting");
           addStatus("Connection lost. Attempting to reconnect...", true);
           setTimeout(() => {
@@ -159,7 +159,7 @@ export function usePeerConnection({
         }
         if (st === "closed") {
           setHasActiveCall(false);
-          setStatusDotColor("#888");
+          setStatusDotState("idle");
           setCallStatus("idle");
           addStatus("Connection closed.");
         }
@@ -187,8 +187,8 @@ export function usePeerConnection({
       setRemoteMeta,
       setRemoteStream,
       setRemoteVideoWrapClass,
-      setStatusDotColor,
-      setGlowColor,
+      setStatusDotState,
+      setGlowState,
       setGlowTrigger,
       setCallStatus,
       setHasActiveCall,

@@ -18,8 +18,8 @@ export function useSignaling({
   setRemoteMeta,
   setIncomingCall,
   setCallStatus,
-  setStatusDotColor,
-  setGlowColor,
+  setStatusDotState,
+  setGlowState,
   setGlowTrigger,
   onHangupRequested,
 }) {
@@ -207,8 +207,8 @@ export function useSignaling({
         soundManager.stopIncomingLoop();
         setIncomingCall(null);
         setCallStatus("idle");
-        setStatusDotColor("#888");
-        setGlowColor("#f87171");
+        setStatusDotState("idle");
+        setGlowState("failed");
         setGlowTrigger((prev) => prev + 1);
         addStatus(
           `<strong style="font-family:monospace">${msg.from}</strong> cancelled the call.`,
@@ -233,8 +233,8 @@ export function useSignaling({
       setRemoteMeta,
       setIncomingCall,
       setCallStatus,
-      setStatusDotColor,
-      setGlowColor,
+      setStatusDotState,
+      setGlowState,
       setGlowTrigger,
       addStatus,
       onHangupRequested,

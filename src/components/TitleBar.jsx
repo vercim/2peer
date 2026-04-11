@@ -1,11 +1,13 @@
 import { TextMorph } from "torph/react";
+import { STATUS_COLORS } from "../utils/statusStates.js";
 
 export function TitleBar({
-  statusDotColor = "#444",
+  status = "idle",
   connectionStatus = "idle",
   hasActiveCall = false,
   version = "",
 }) {
+  const statusDotColor = STATUS_COLORS[status] || STATUS_COLORS.idle;
   const handleMinimize = () => {
     if (window.electronAPI?.minimizeWindow) {
       window.electronAPI.minimizeWindow();

@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
+import { GLOW_COLORS, DEFAULT_GLOW_COLOR } from "../utils/statusStates.js";
 
-export function StatusGlow({ color = "#888", trigger = 0 }) {
+export function StatusGlow({ state = "idle", trigger = 0 }) {
+  const color = GLOW_COLORS[state] || DEFAULT_GLOW_COLOR;
   const [active, setActive] = useState(false);
   const keyRef = useRef(0);
 
