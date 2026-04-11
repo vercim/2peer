@@ -47,7 +47,6 @@ export function applyMaxQualityEncoding(
     enc.maxFramerate = fps;
     enc.priority = "high";
     enc.networkPriority = "high";
-    enc.rmsLevel = 0.01;
     enc.scaleResolutionDownBy = 1;
   });
 
