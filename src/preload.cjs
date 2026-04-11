@@ -19,4 +19,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onSetRemoteId: (callback) => {
     ipcRenderer.on("set-remote-id", (_, id) => callback(id));
   },
+  onProfileUpdated: (callback) => {
+    ipcRenderer.on("profile-updated", (_, profile) => callback(profile));
+  },
 });

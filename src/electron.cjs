@@ -69,7 +69,39 @@ const args = process.argv.slice(1);
 
 function buildTrayMenu() {
   const lastCalled = getLastCalledId();
+  const currentProfile = ensureProfile();
   const menuTemplate = [
+    {
+      label: `Your ID: ${currentProfile.id}`,
+      enabled: false,
+    },
+    { type: "separator" },
+    {
+      label: "Update ID",
+      click: () => {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        let id = "";
+        const bytes = crypto.randomBytes(12);
+        for (let i = 0; i < 12; i++) {
+          id += chars[bytes[i] % chars.length];
+        }
+        const current = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
+        const profile = { id, lastCalledId: current?.lastCalledId || "" };
+        setProfile(profile);
+        updateTrayMenu();
+        if (mainWindow) {
+          mainWindow.webContents.send("profile-updated", profile);
+        }
+      },
+    },
+    {
+      label: "Copy ID",
+      click: () => {
+        const profile = ensureProfile();
+        require("electron").clipboard.writeText(profile.id);
+      },
+    },
+    { type: "separator" },
     {
       label: "Show 2peer",
       click: () => {

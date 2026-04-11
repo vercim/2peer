@@ -428,7 +428,14 @@ export default function App({ version = "" }) {
         setTimeout(() => handleCall(id), 100);
       });
     }
-  }, [selfId]);
+    if (window.electronAPI?.onProfileUpdated) {
+      window.electronAPI.onProfileUpdated((profile) => {
+        setSelfId(profile.id);
+        window.__SELF_ID__ = profile.id;
+        addStatus("ID updated: " + profile.id);
+      });
+    }
+  }, [selfId, addStatus]);
 
   const hangup = useCallback(
     (notify = true) => {

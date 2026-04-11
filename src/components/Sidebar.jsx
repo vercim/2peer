@@ -91,7 +91,7 @@ export function Sidebar({
             className="flex-1 bg-[rgba(255,255,255,0.06)] text-text border border-border rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap"
             onClick={onRegenId}
           >
-            New ID
+            <TextMorph>Update</TextMorph>
           </button>
         </div>
       </div>
