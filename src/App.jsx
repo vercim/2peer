@@ -14,7 +14,6 @@ import {
 } from "./utils/rtcConfig.js";
 import {
   applyMaxQualityEncoding,
-  adaptBitrate,
   getDefaultBitrateForResolution,
   setUserManualBitrate,
 } from "./utils/bitrateManager.js";
@@ -69,7 +68,6 @@ export default function App({ version = "" }) {
     fps: 60,
   });
 
-  const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
   const [remoteId, setRemoteId] = useState("");
 
   const localVideoRef = useRef(null);
@@ -174,84 +172,6 @@ export default function App({ version = "" }) {
     sendSignal,
     attachLocalTracks,
   });
-
-  const monitorBitrate = useCallback(() => {
-    if (!pcRef.current || pcRef.current.connectionState !== "connected") {
-      setRemoteBitrate(0);
-      setRemoteMeta("—");
-      return;
-    }
-    pcRef.current.getStats().then((report) => {
-      let bytesReceived = 0;
-      let frameRate = 0;
-      let width = 0;
-      let height = 0;
-      let rtt = 0;
-      let packetsLost = 0;
-      let packetsReceived = 0;
-
-      report.forEach((item) => {
-        if (item.type === "inbound-rtp" && item.kind === "video") {
-          bytesReceived += item.bytesReceived || 0;
-          frameRate = item.framesPerSecond || frameRate;
-          width = item.frameWidth || width;
-          height = item.frameHeight || height;
-          packetsLost += item.packetsLost || 0;
-          packetsReceived += item.packetsReceived || 0;
-        }
-        if (item.type === "candidate-pair" && item.state === "succeeded") {
-          rtt = item.currentRoundTripTime
-            ? item.currentRoundTripTime * 1000
-            : 0;
-        }
-      });
-
-      if (width > 0 && height > 0) {
-        setRemoteMeta(
-          `${width}×${height} @${frameRate > 0 ? Math.round(frameRate) : "?"}fps`,
-        );
-      }
-
-      const now = Date.now();
-      if (!window._lastBitrateCheck) {
-        window._lastBitrateCheck = now;
-        window._prevBytesReceived = bytesReceived;
-        window._bitrateHistory = [];
-        return;
-      }
-
-      const timeDiff = (now - window._lastBitrateCheck) / 1000;
-      if (timeDiff < 0.5) return;
-
-      const bytesDiff = bytesReceived - window._prevBytesReceived;
-      window._prevBytesReceived = bytesReceived;
-      window._lastBitrateCheck = now;
-
-      const rawBitrate = timeDiff > 0 ? (bytesDiff * 8) / timeDiff : 0;
-
-      window._bitrateHistory = window._bitrateHistory || [];
-      window._bitrateHistory.push(rawBitrate);
-      if (window._bitrateHistory.length > 5) {
-        window._bitrateHistory.shift();
-      }
-
-      const avgBitrate =
-        window._bitrateHistory.reduce((a, b) => a + b, 0) /
-        window._bitrateHistory.length;
-
-      setRemoteBitrate(Math.round(avgBitrate));
-
-      adaptBitrate(rtt, packetsLost, avgBitrate);
-
-      if (pcRef.current && pcRef.current.connectionState === "connected") {
-        pcRef.current.getSenders().forEach((s) => {
-          if (s.track?.kind === "video") {
-            applyMaxQualityEncoding(s, streamQuality);
-          }
-        });
-      }
-    });
-  }, [setRemoteBitrate, setRemoteMeta, streamQuality]);
 
   useEffect(() => {
     const pc = pcRef.current;
