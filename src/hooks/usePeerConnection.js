@@ -22,6 +22,7 @@ export function usePeerConnection({
   setHasActiveCall,
   addStatus,
   remoteVideoRef,
+  sendSignal,
 }) {
   const createPeerConnection = useCallback(
     async (peerId, isPolite = false) => {
@@ -69,10 +70,9 @@ export function usePeerConnection({
       };
 
       pc.onicecandidate = ({ candidate }) => {
-        if (candidate && peerId) {
-          return { type: "candidate", candidate };
+        if (candidate && peerId && sendSignal) {
+          sendSignal({ type: "candidate", to: peerId, candidate });
         }
-        return null;
       };
 
       pc.onicecandidateerror = (event) => {
