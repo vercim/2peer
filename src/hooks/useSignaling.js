@@ -25,6 +25,7 @@ export function useSignaling({
 }) {
   const answerProcessedRef = useRef(false);
   const hangupProcessedRef = useRef(false);
+  const incomingProcessedRef = useRef(false);
 
   const ensureOutChannel = useCallback(
     async (peerId) => {
@@ -92,6 +93,10 @@ export function useSignaling({
   const handleSignal = useCallback(
     async (msg) => {
       if (msg.type === "call") {
+        if (incomingProcessedRef.current) return;
+        if (pcRef.current?.connectionState === "connected") return;
+        if (pcRef.current?.signalingState === "have-local-offer") return;
+        incomingProcessedRef.current = true;
         setIncomingCall({ from: msg.from, offer: msg.offer });
         soundManager.playIncomingLoop();
         if (window.electronAPI?.showNotification) {
@@ -245,6 +250,7 @@ export function useSignaling({
   const resetSignalingRefs = useCallback(() => {
     answerProcessedRef.current = false;
     hangupProcessedRef.current = false;
+    incomingProcessedRef.current = false;
   }, []);
 
   return { sendSignal, handleSignal, resetSignalingRefs };
