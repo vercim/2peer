@@ -194,9 +194,9 @@
 
 @keyframes glowFade {
   0% {
-    opacity: 0;
+    opacity: 0.2;
   }
-  6% {
+  5% {
     opacity: 1;
   }
   100% {

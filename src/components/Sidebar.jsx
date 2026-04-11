@@ -62,6 +62,13 @@ export function Sidebar({
     if (e.key === "Enter" && remoteId.length === 12 && !isCalling) {
       handleCall();
     }
+    if (e.key === "Escape") {
+      if (isCalling) {
+        onCancelCall();
+      } else if (hasIncomingCall) {
+        onDecline();
+      }
+    }
   };
 
   return (

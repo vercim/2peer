@@ -17,16 +17,6 @@ const rtcConfig = {
     { urls: "stun:openrelay.metered.ca:443" },
     { urls: "stun:stun.stunprotocol.org:3478" },
     { urls: "stun:stun.antisip.com:3478" },
-    {
-      urls: "stun:openrelay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:global.stun.twilio.com:3478",
-      username: "skuto",
-      credential: "your-turn-credential",
-    },
   ],
   iceCandidatePoolSize: 10,
   iceTransportPolicy: "all",
@@ -1048,8 +1038,8 @@ export default function App({ version = "" }) {
       const senders = pcRef.current.getSenders();
       let hasVideo = false;
       for (const sender of senders) {
-        if (sender.track && sender.track.kind === "video") {
-          hasVideo = true;
+        if (sender.track) {
+          if (sender.track.kind === "video") hasVideo = true;
           try {
             pcRef.current.removeTrack(sender);
           } catch (_) {}
