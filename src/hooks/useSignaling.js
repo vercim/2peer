@@ -203,6 +203,9 @@ export function useSignaling({
 
       if (msg.type === "decline") {
         incomingProcessedRef.current.value = false;
+        setIncomingCall(null);
+        setCallStatus("idle");
+        setStatusDotState("idle");
         addStatus(
           `<strong style="font-family:monospace">${msg.from}</strong> declined the call.`,
         );
