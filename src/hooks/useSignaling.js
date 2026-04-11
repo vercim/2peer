@@ -25,7 +25,7 @@ export function useSignaling({
 }) {
   const answerProcessedRef = useRef(false);
   const hangupProcessedRef = useRef(false);
-  const incomingProcessedRef = useRef(false);
+  const incomingProcessedRef = useRef({ value: false });
 
   const ensureOutChannel = useCallback(
     async (peerId) => {
@@ -93,10 +93,10 @@ export function useSignaling({
   const handleSignal = useCallback(
     async (msg) => {
       if (msg.type === "call") {
-        if (incomingProcessedRef.current) return;
+        if (incomingProcessedRef.current.value) return;
         if (pcRef.current?.connectionState === "connected") return;
         if (pcRef.current?.signalingState === "have-local-offer") return;
-        incomingProcessedRef.current = true;
+        incomingProcessedRef.current.value = true;
         setIncomingCall({ from: msg.from, offer: msg.offer });
         soundManager.playIncomingLoop();
         if (window.electronAPI?.showNotification) {
@@ -202,6 +202,7 @@ export function useSignaling({
       }
 
       if (msg.type === "decline") {
+        incomingProcessedRef.current.value = false;
         addStatus(
           `<strong style="font-family:monospace">${msg.from}</strong> declined the call.`,
         );
@@ -210,6 +211,7 @@ export function useSignaling({
 
       if (msg.type === "cancel") {
         soundManager.stopIncomingLoop();
+        incomingProcessedRef.current.value = false;
         setIncomingCall(null);
         setCallStatus("idle");
         setStatusDotState("idle");
@@ -223,6 +225,7 @@ export function useSignaling({
       if (msg.type === "hangup") {
         if (hangupProcessedRef.current) return;
         hangupProcessedRef.current = true;
+        incomingProcessedRef.current.value = false;
         addStatus(
           `<strong style="font-family:monospace">${msg.from}</strong> ended the call.`,
         );
@@ -250,7 +253,7 @@ export function useSignaling({
   const resetSignalingRefs = useCallback(() => {
     answerProcessedRef.current = false;
     hangupProcessedRef.current = false;
-    incomingProcessedRef.current = false;
+    incomingProcessedRef.current.value = false;
   }, []);
 
   return { sendSignal, handleSignal, resetSignalingRefs };
