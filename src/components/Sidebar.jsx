@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { TextMorph } from "torph/react";
-import { Zap } from "lucide-react";
 import StatusLog from "./StatusLog";
 
 function formatId(id) {
@@ -63,7 +62,7 @@ export function Sidebar({
       handleCall();
     }
     if (e.key === "Escape" && isCalling) {
-        onCancelCall();
+      onCancelCall();
     }
   };
 
@@ -191,7 +190,19 @@ export function Sidebar({
         <div className="bg-panel border border-border rounded-[8px] p-[10px_14px]">
           <div className="text-[11px] text-[#555] font-mono overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-[6px]">
             {supabaseStatus === "connected" ? (
-              <Zap size={14} className="text-[#555]" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-[#555]"
+              >
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
             ) : (
               <svg
                 width="14"

@@ -29,7 +29,6 @@ export default defineConfig({
           if (id.includes("node_modules")) {
             if (id.includes("react")) return "react-vendor";
             if (id.includes("supabase")) return "supabase-vendor";
-            if (id.includes("lucide")) return "icons-vendor";
             return "deps-vendor";
           }
         },
