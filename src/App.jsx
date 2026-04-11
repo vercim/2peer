@@ -316,7 +316,6 @@ export default function App({ version = "" }) {
             auth: { persistSession: false, autoRefreshToken: false },
           });
           supabaseClientRef.current = client;
-          setSupabaseStatus("connected");
         } catch (e) {
           setSupabaseStatus("error");
           addStatus("Supabase init error: " + e.message, true);
@@ -343,6 +342,7 @@ export default function App({ version = "" }) {
 
       ch.subscribe((status) => {
         if (status === "SUBSCRIBED") {
+          setSupabaseStatus("connected");
           if (reconnectTimerRef.current) {
             clearTimeout(reconnectTimerRef.current);
             reconnectTimerRef.current = null;
@@ -350,6 +350,7 @@ export default function App({ version = "" }) {
           addStatus('Ready. Share your ID and click "Call".');
         }
         if (status === "CHANNEL_ERROR") {
+          setSupabaseStatus("error");
           addStatus("Channel error. Attempting to reconnect...", true);
           if (retryCount < maxRetries) {
             retryCount++;
@@ -360,6 +361,7 @@ export default function App({ version = "" }) {
           }
         }
         if (status === "TIMED_OUT") {
+          setSupabaseStatus("error");
           addStatus("Connection timeout. Retrying...", true);
           if (retryCount < maxRetries) {
             retryCount++;
@@ -367,6 +369,7 @@ export default function App({ version = "" }) {
           }
         }
         if (status === "CLOSED") {
+          setSupabaseStatus("error");
           addStatus("Connection closed.");
           retryCount = 0;
         }
@@ -376,7 +379,10 @@ export default function App({ version = "" }) {
 
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          if (ch.state !== "joined") reject(new Error("Connection timeout"));
+          if (ch.state !== "joined") {
+            setSupabaseStatus("error");
+            reject(new Error("Connection timeout"));
+          }
         }, 10000);
 
         const checkInterval = setInterval(() => {
