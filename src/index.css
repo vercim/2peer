@@ -196,7 +196,7 @@
   0% {
     opacity: 0.2;
   }
-  5% {
+  8% {
     opacity: 1;
   }
   100% {
@@ -205,5 +205,5 @@
 }
 
 .animate-glow {
-  animation: glowFade 3s ease-out forwards;
+  animation: glowFade 2.8s ease-out forwards;
 }

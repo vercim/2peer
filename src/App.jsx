@@ -138,6 +138,10 @@ export default function App({ version = "" }) {
     onHangupRequested,
   });
 
+  useEffect(() => {
+    handleSignalRef.current = handleSignal;
+  }, [handleSignal]);
+
   const { createPeerConnection, attachLocalTracks, closePeerConnection } =
     usePeerConnection({
       pcRef,
