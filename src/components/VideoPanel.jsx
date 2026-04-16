@@ -28,6 +28,10 @@ export const VideoPanel = forwardRef(function VideoPanel(
     isDisabled = false,
     isMicMuted = true,
     hasMic = false,
+    micVolume = 1,
+    onMicVolumeChange,
+    remoteMicVolume = 1,
+    onRemoteMicVolumeChange,
   },
   ref,
 ) {
@@ -51,7 +55,33 @@ export const VideoPanel = forwardRef(function VideoPanel(
       className={`flex-1 min-h-0 bg-panel border border-border rounded-[8px] flex flex-col overflow-hidden ${className}`}
     >
       <div className="flex items-center justify-between p-[8px_12px] border-b border-border shrink-0">
-        <span className="text-[11px] text-muted">{title}</span>
+        <div className="flex items-center gap-[8px]">
+          <span className="text-[11px] text-muted">{title}</span>
+          {isLocal && canBroadcast && hasMic && !isMicMuted && (
+            <div className="flex items-center gap-[2px] h-[16px]">
+              <div
+                className="w-[3px] h-full bg-[#555] rounded-sm"
+                style={{ opacity: micVolume > 0.1 ? 1 : 0.3 }}
+              />
+              <div
+                className="w-[3px] h-full bg-[#555] rounded-sm"
+                style={{ opacity: micVolume > 0.3 ? 1 : 0.3 }}
+              />
+              <div
+                className="w-[3px] h-full bg-[#555] rounded-sm"
+                style={{ opacity: micVolume > 0.5 ? 1 : 0.3 }}
+              />
+              <div
+                className="w-[3px] h-full bg-[#555] rounded-sm"
+                style={{ opacity: micVolume > 0.7 ? 1 : 0.3 }}
+              />
+              <div
+                className="w-[3px] h-full bg-[#555] rounded-sm"
+                style={{ opacity: micVolume > 0.9 ? 1 : 0.3 }}
+              />
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-[5px]">
           <span className="text-[10px] text-[#2e2e2e] font-mono">{meta}</span>
           {bitrate > 0 && (
@@ -210,6 +240,32 @@ export const VideoPanel = forwardRef(function VideoPanel(
                 </svg>
                 {isMuted ? "Unmute" : "Mute"}
               </button>
+              {!isDisabled && (
+                <div className="flex items-center gap-[4px]">
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-[#555]"
+                  >
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  </svg>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={remoteMicVolume}
+                    onChange={(e) =>
+                      onRemoteMicVolumeChange?.(parseFloat(e.target.value))
+                    }
+                    className="w-[60px] h-[4px] bg-[#333] rounded-sm appearance-none cursor-pointer"
+                  />
+                </div>
+              )}
               <button
                 className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 ${isDisabled ? "opacity-40" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
                 onClick={isDisabled ? undefined : onPiP}

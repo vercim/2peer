@@ -58,6 +58,8 @@ export default function App({ version = "" }) {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [isRemoteMuted, setIsRemoteMuted] = useState(false);
+  const [micVolume, setMicVolume] = useState(1);
+  const [remoteMicVolume, setRemoteMicVolume] = useState(1);
   const [config, setConfig] = useState(null);
   const [remoteVideoWrapClass, setRemoteVideoWrapClass] = useState(
     "flex-1 min-h-0 relative bg-[#050505] placeholder",
@@ -194,6 +196,47 @@ export default function App({ version = "" }) {
   });
 
   const [micStreamTrack, setMicStreamTrack] = useState(null);
+
+  useEffect(() => {
+    if (!micStream) {
+      setMicVolume(0);
+      return;
+    }
+    const audioTrack = micStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+
+    let animationId;
+    try {
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(micStream);
+      source.connect(analyser);
+      analyser.fftSize = 256;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const updateVolume = () => {
+        analyser.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        const volume = Math.min(average / 128, 1);
+        setMicVolume(volume);
+        animationId = requestAnimationFrame(updateVolume);
+      };
+      updateVolume();
+
+      return () => {
+        cancelAnimationFrame(animationId);
+        audioContext.close();
+      };
+    } catch (e) {
+      console.warn("[MicVolume] AudioContext failed:", e);
+    }
+  }, [micStream]);
+
+  useEffect(() => {
+    const videoEl = remoteVideoRef.current;
+    if (!videoEl) return;
+    videoEl.volume = remoteMicVolume;
+  }, [remoteMicVolume]);
 
   useEffect(() => {
     const pc = pcRef.current;
@@ -840,6 +883,7 @@ export default function App({ version = "" }) {
               isMicMuted={isMicMuted}
               onToggleMicMute={() => setIsMicMuted(!isMicMuted)}
               hasMic={hasMicTrack}
+              micVolume={micVolume}
             />
             <VideoPanel
               ref={remoteVideoRef}
@@ -855,6 +899,8 @@ export default function App({ version = "" }) {
               isMuted={isRemoteMuted}
               onToggleMute={() => setIsRemoteMuted(!isRemoteMuted)}
               isDisabled={!hasActiveCall}
+              remoteMicVolume={remoteMicVolume}
+              onRemoteMicVolumeChange={setRemoteMicVolume}
             />
           </div>
         </main>
