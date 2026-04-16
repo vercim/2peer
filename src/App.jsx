@@ -422,7 +422,7 @@ export default function App({ version = "" }) {
       setIsRemoteMuted(false);
       setIsMicMuted(true);
       setMicDeviceId(null);
-      setHasAudioTrack(false);
+      setHasMicTrack(false);
       setRemoteMeta("");
       setRemoteVideoWrapClass(
         "flex-1 min-h-0 relative bg-[#050505] placeholder",
