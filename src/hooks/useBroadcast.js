@@ -171,7 +171,7 @@ export function useBroadcast({
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
-    setLocalMeta("—-");
+    setLocalMeta("");
     addStatus("Broadcast stopped.");
     if (currentPeerId && pcRef.current?.connectionState === "connected")
       sendSignal({ type: "stop-broadcast", to: currentPeerId });

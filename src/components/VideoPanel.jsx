@@ -101,7 +101,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
                     Change
                   </button>
                   <button
-                    className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px] flex items-center transition-colors duration-120 ${hasMic ? (isMicMuted ? "text-red-400 hover:text-text cursor-pointer" : "text-green-400 hover:text-text cursor-pointer") : !canBroadcast ? "opacity-40" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
+                    className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] flex items-center transition-colors duration-120 ${hasMic ? (isMicMuted ? "text-red-400 hover:text-text cursor-pointer" : "text-green-400 hover:text-text cursor-pointer") : !canBroadcast ? "opacity-40" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
                     onClick={handleMicClick}
                     disabled={!canBroadcast && !hasMic}
                     title={
@@ -218,6 +218,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
                   fill={isMuted ? "none" : "currentColor"}
                   stroke="currentColor"
                   strokeWidth="2"
+                  className="w-full h-full"
                 >
                   {isMuted ? (
                     <>
@@ -282,7 +283,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
       <div
         id="remoteVideoWrap"
         ref={containerRef}
-        className="flex-1 min-h-0 relative bg-[#050505]"
+        className={`flex-1 min-h-0 relative ${showPlaceholder ? "bg-transparent" : "bg-[#050505]"}`}
       >
         {showPlaceholder && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -306,7 +307,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
             if (videoRef) videoRef.current = el;
           }}
           id={isLocal ? undefined : "remoteVideo"}
-          className="absolute inset-0 w-full h-full object-contain"
+          className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-200 ${showPlaceholder ? "opacity-0" : "opacity-100"}`}
           autoPlay
           playsInline
           muted={isLocal || isMuted}

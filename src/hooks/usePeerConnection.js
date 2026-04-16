@@ -41,6 +41,15 @@ export function usePeerConnection({
       const pc = new RTCPeerConnection(configWithIPs);
 
       pc.ontrack = (event) => {
+        console.log("[PC] ontrack event:", {
+          trackKind: event.track?.kind,
+          trackId: event.track?.id,
+          streams: event.streams?.length,
+          streamsDetail: event.streams?.map((s) => ({
+            id: s.id,
+            tracks: s.getTracks().map((t) => t.kind),
+          })),
+        });
         setRemoteVideoWrapClass("flex-1 min-h-0 relative bg-[#050505]");
         let stream = event?.streams?.[0] || null;
         if (!stream && event?.track) {
