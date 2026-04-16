@@ -19,6 +19,7 @@ import { useStatusLog } from "./hooks/useStatusLog.js";
 import { useSignaling } from "./hooks/useSignaling.js";
 import { usePeerConnection } from "./hooks/usePeerConnection.js";
 import { useBroadcast } from "./hooks/useBroadcast.js";
+import { useMicrophone } from "./hooks/useMicrophone.js";
 
 export default function App({ version = "" }) {
   const [selfId, setSelfId] = useState("");
@@ -46,7 +47,8 @@ export default function App({ version = "" }) {
   const [micPickerOpen, setMicPickerOpen] = useState(false);
   const [micDeviceId, setMicDeviceId] = useState(null);
   const [isMicMuted, setIsMicMuted] = useState(true);
-  const [hasAudioTrack, setHasAudioTrack] = useState(false);
+  const [hasMicTrack, setHasMicTrack] = useState(false);
+  const [micStream, setMicStream] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
   const [localMeta, setLocalMeta] = useState("");
   const [remoteMeta, setRemoteMeta] = useState("");
@@ -117,21 +119,6 @@ export default function App({ version = "" }) {
     }
   }, [localStream, localVideoWrapClass]);
 
-  useEffect(() => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !isMicMuted;
-      }
-    }
-  }, [isMicMuted, localStream]);
-
-  useEffect(() => {
-    if (!localStream) {
-      setIsMicMuted(true);
-    }
-  }, [localStream]);
-
   const { sendSignal, handleSignal, resetSignalingRefs } = useSignaling({
     pcRef,
     selfId,
@@ -187,11 +174,26 @@ export default function App({ version = "" }) {
     addStatus,
     sendSignal,
     attachLocalTracks,
-    micDeviceId,
+  });
+
+  const {
+    startMicrophone,
+    stopMicrophone,
+    toggleMicrophone,
+    changeMicrophone,
+  } = useMicrophone({
+    pcRef,
+    currentPeerId,
+    streamQuality,
+    localStreamRef,
+    addStatus,
+    sendSignal,
     isMicMuted,
     setIsMicMuted,
-    setHasAudioTrack,
+    setHasMicTrack,
   });
+
+  const [micStreamTrack, setMicStreamTrack] = useState(null);
 
   useEffect(() => {
     const pc = pcRef.current;
@@ -599,14 +601,40 @@ export default function App({ version = "" }) {
     [],
   );
 
+  const handleStartMic = useCallback(async () => {
+    const result = await startMicrophone(micDeviceId);
+    if (result) {
+      setMicStream(result.stream);
+    }
+  }, [startMicrophone, micDeviceId]);
+
+  const handleStopMic = useCallback(async () => {
+    if (micStream) {
+      await stopMicrophone(micStream, micStream.getAudioTracks()[0]);
+      setMicStream(null);
+    }
+  }, [stopMicrophone, micStream]);
+
+  const handleToggleMic = useCallback(() => {
+    if (micStream) {
+      const track = micStream.getAudioTracks()[0];
+      if (track) {
+        toggleMicrophone(track);
+      }
+    }
+  }, [toggleMicrophone, micStream]);
+
   const handleMicSelect = useCallback(
     async (deviceId) => {
       setMicDeviceId(deviceId);
-      if (localStream && pcRef.current?.connectionState === "connected") {
-        await changeMic(deviceId, localStream, pcRef.current);
+      if (micStream && pcRef.current?.connectionState === "connected") {
+        const result = await changeMicrophone(deviceId, micStream);
+        if (result) {
+          setMicStream(result.stream);
+        }
       }
     },
-    [localStream, changeMic],
+    [micStream, changeMicrophone],
   );
 
   const handlePiP = useCallback(async () => {
@@ -767,6 +795,9 @@ export default function App({ version = "" }) {
               onBroadcast={localStream ? stopBroadcast : handleBroadcast}
               onChangeSource={handleChangeSource}
               onChangeMic={() => setMicPickerOpen(true)}
+              onStartMic={handleStartMic}
+              onStopMic={handleStopMic}
+              onToggleMic={handleToggleMic}
               showPlaceholder={!streamHasVideo(localStream)}
               videoRef={localVideoRef}
               containerRef={localContainerRef}
@@ -776,7 +807,7 @@ export default function App({ version = "" }) {
               qualityOptions={qualityOptions}
               isMicMuted={isMicMuted}
               onToggleMicMute={() => setIsMicMuted(!isMicMuted)}
-              hasMic={hasAudioTrack}
+              hasMic={hasMicTrack}
             />
             <VideoPanel
               ref={remoteVideoRef}
@@ -799,9 +830,7 @@ export default function App({ version = "" }) {
       <SourcePicker
         isOpen={sourcePickerOpen}
         onClose={() => setSourcePickerOpen(false)}
-        onSelect={(sourceId) =>
-          handleSourceSelected(sourceId, micDeviceId, isMicMuted)
-        }
+        onSelect={handleSourceSelected}
       />
       <MicPicker
         isOpen={micPickerOpen}
