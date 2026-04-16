@@ -109,7 +109,7 @@ export function monitorBitrate(
 ) {
   if (!pcRef.current || pcRef.current.connectionState !== "connected") {
     setRemoteBitrate(0);
-    setRemoteMeta("—");
+    setRemoteMeta("");
     return () => {};
   }
 

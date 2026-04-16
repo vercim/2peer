@@ -3,13 +3,11 @@ import { TitleBar } from "./components/TitleBar.jsx";
 import { Sidebar } from "./components/Sidebar.jsx";
 import { VideoPanel } from "./components/VideoPanel.jsx";
 import { SourcePicker } from "./components/SourcePicker.jsx";
+import { MicPicker } from "./components/MicPicker.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
 import { StatusGlow } from "./components/StatusGlow.jsx";
 import { soundManager } from "./utils/soundManager.js";
-import {
-  qualityOptions,
-  getResolutionByValue
-} from "./utils/rtcConfig.js";
+import { qualityOptions, getResolutionByValue } from "./utils/rtcConfig.js";
 import {
   applyMaxQualityEncoding,
   getDefaultBitrateForResolution,
@@ -45,14 +43,18 @@ export default function App({ version = "" }) {
     message: "",
   });
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
+  const [micPickerOpen, setMicPickerOpen] = useState(false);
+  const [micDeviceId, setMicDeviceId] = useState(null);
+  const [isMicMuted, setIsMicMuted] = useState(true);
   const [incomingCall, setIncomingCall] = useState(null);
-  const [localMeta, setLocalMeta] = useState("—-");
-  const [remoteMeta, setRemoteMeta] = useState("—-");
+  const [localMeta, setLocalMeta] = useState("");
+  const [remoteMeta, setRemoteMeta] = useState("");
   const [remoteBitrate, setRemoteBitrate] = useState(0);
   const [currentPeerId, setCurrentPeerId] = useState("");
   const [hasActiveCall, setHasActiveCall] = useState(false);
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
+  const [isRemoteMuted, setIsRemoteMuted] = useState(false);
   const [config, setConfig] = useState(null);
   const [remoteVideoWrapClass, setRemoteVideoWrapClass] = useState(
     "flex-1 min-h-0 relative bg-[#050505] placeholder",
@@ -114,6 +116,21 @@ export default function App({ version = "" }) {
     }
   }, [localStream, localVideoWrapClass]);
 
+  useEffect(() => {
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !isMicMuted;
+      }
+    }
+  }, [isMicMuted, localStream]);
+
+  useEffect(() => {
+    if (!localStream) {
+      setIsMicMuted(true);
+    }
+  }, [localStream]);
+
   const { sendSignal, handleSignal, resetSignalingRefs } = useSignaling({
     pcRef,
     selfId,
@@ -157,7 +174,7 @@ export default function App({ version = "" }) {
       sendSignal,
     });
 
-  const { handleSourceSelected, stopBroadcast } = useBroadcast({
+  const { handleSourceSelected, stopBroadcast, changeMic } = useBroadcast({
     pcRef,
     currentPeerId,
     streamQuality,
@@ -169,6 +186,9 @@ export default function App({ version = "" }) {
     addStatus,
     sendSignal,
     attachLocalTracks,
+    micDeviceId,
+    isMicMuted,
+    setIsMicMuted,
   });
 
   useEffect(() => {
@@ -387,7 +407,7 @@ export default function App({ version = "" }) {
         stopStreamTracks(localStreamRef.current);
         setLocalStream(null);
         localStreamRef.current = null;
-        setLocalMeta("—-");
+        setLocalMeta("");
         setLocalVideoWrapClass(
           "flex-1 min-h-0 relative bg-[#050505] placeholder",
         );
@@ -395,7 +415,10 @@ export default function App({ version = "" }) {
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
       setRemoteStream(null);
-      setRemoteMeta("—-");
+      setIsRemoteMuted(false);
+      setIsMicMuted(true);
+      setMicDeviceId(null);
+      setRemoteMeta("");
       setRemoteVideoWrapClass(
         "flex-1 min-h-0 relative bg-[#050505] placeholder",
       );
@@ -413,6 +436,7 @@ export default function App({ version = "" }) {
       setLocalMeta,
       setLocalVideoWrapClass,
       setRemoteStream,
+      setIsRemoteMuted,
       setRemoteMeta,
       setRemoteVideoWrapClass,
       setIncomingCall,
@@ -421,6 +445,8 @@ export default function App({ version = "" }) {
       setStatusDotState,
       setGlowState,
       setGlowTrigger,
+      setIsMicMuted,
+      setMicDeviceId,
     ],
   );
 
@@ -568,6 +594,16 @@ export default function App({ version = "" }) {
   const handleChangeSource = useCallback(
     async () => setSourcePickerOpen(true),
     [],
+  );
+
+  const handleMicSelect = useCallback(
+    async (deviceId) => {
+      setMicDeviceId(deviceId);
+      if (localStream && pcRef.current?.connectionState === "connected") {
+        await changeMic(deviceId, localStream, pcRef.current);
+      }
+    },
+    [localStream, changeMic],
   );
 
   const handlePiP = useCallback(async () => {
@@ -727,6 +763,7 @@ export default function App({ version = "" }) {
               isBroadcasting={!!localStream}
               onBroadcast={localStream ? stopBroadcast : handleBroadcast}
               onChangeSource={handleChangeSource}
+              onChangeMic={() => setMicPickerOpen(true)}
               showPlaceholder={!streamHasVideo(localStream)}
               videoRef={localVideoRef}
               containerRef={localContainerRef}
@@ -734,6 +771,9 @@ export default function App({ version = "" }) {
               streamQuality={streamQuality}
               onQualityChange={setStreamQuality}
               qualityOptions={qualityOptions}
+              isMicMuted={isMicMuted}
+              onToggleMicMute={() => setIsMicMuted(!isMicMuted)}
+              hasMic={!!micDeviceId}
             />
             <VideoPanel
               ref={remoteVideoRef}
@@ -746,6 +786,9 @@ export default function App({ version = "" }) {
               className={remoteVideoWrapClass}
               videoRef={remoteVideoRef}
               containerRef={remoteContainerRef}
+              isMuted={isRemoteMuted}
+              onToggleMute={() => setIsRemoteMuted(!isRemoteMuted)}
+              isDisabled={!hasActiveCall}
             />
           </div>
         </main>
@@ -753,7 +796,15 @@ export default function App({ version = "" }) {
       <SourcePicker
         isOpen={sourcePickerOpen}
         onClose={() => setSourcePickerOpen(false)}
-        onSelect={handleSourceSelected}
+        onSelect={(sourceId) =>
+          handleSourceSelected(sourceId, micDeviceId, isMicMuted)
+        }
+      />
+      <MicPicker
+        isOpen={micPickerOpen}
+        onClose={() => setMicPickerOpen(false)}
+        onSelect={handleMicSelect}
+        selectedDeviceId={micDeviceId}
       />
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}

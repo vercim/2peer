@@ -16,9 +16,12 @@ export function useBroadcast({
   addStatus,
   sendSignal,
   attachLocalTracks,
+  micDeviceId,
+  isMicMuted,
+  setIsMicMuted,
 }) {
   const handleSourceSelected = useCallback(
-    async (sourceId) => {
+    async (sourceId, micDeviceIdParam, micMutedParam) => {
       if (localStreamRef.current) {
         stopStreamTracks(localStreamRef.current);
         setLocalStream(null);
@@ -27,7 +30,7 @@ export function useBroadcast({
 
       const res = getResolutionByValue(streamQuality.resolution);
 
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const streamConstraints = {
         video: {
           mandatory: {
             chromeMediaSource: "desktop",
@@ -37,16 +40,34 @@ export function useBroadcast({
             maxFrameRate: streamQuality.fps,
           },
         },
-        audio: {
+      };
+
+      if (micDeviceIdParam) {
+        streamConstraints.audio = {
+          deviceId: { exact: micDeviceIdParam },
+        };
+      } else {
+        streamConstraints.audio = {
           mandatory: {
             chromeMediaSource: "desktop",
             chromeMediaSourceId: sourceId,
           },
-        },
-      });
+        };
+      }
 
-      const [track] = stream.getVideoTracks();
-      track.onended = () => {
+      const stream =
+        await navigator.mediaDevices.getUserMedia(streamConstraints);
+
+      let micTrack = null;
+      if (micDeviceIdParam) {
+        micTrack = stream.getAudioTracks()[0];
+        if (micTrack) {
+          micTrack.enabled = micMutedParam === false;
+        }
+      }
+
+      const [videoTrack] = stream.getVideoTracks();
+      videoTrack.onended = () => {
         if (localStreamRef.current) {
           stopStreamTracks(localStreamRef.current);
         }
@@ -112,6 +133,44 @@ export function useBroadcast({
     ],
   );
 
+  const changeMic = useCallback(
+    async (newMicDeviceId, stream, pc) => {
+      if (!pc || !stream) return;
+
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: { exact: newMicDeviceId } },
+        });
+        const newTrack = newStream.getAudioTracks()[0];
+        if (!newTrack) return;
+
+        newTrack.enabled = stream.getAudioTracks()[0]?.enabled ?? false;
+
+        const senders = pc.getSenders();
+        const audioSender = senders.find((s) => s.track?.kind === "audio");
+        if (audioSender) {
+          await audioSender.replaceTrack(newTrack);
+        } else {
+          pc.addTrack(newTrack, stream);
+        }
+
+        const oldAudioTrack = stream.getAudioTracks()[0];
+        if (oldAudioTrack) {
+          oldAudioTrack.stop();
+        }
+
+        stream.removeTrack(stream.getAudioTracks()[0]);
+        stream.addTrack(newTrack);
+
+        addStatus("Microphone changed.");
+      } catch (err) {
+        console.error("[ChangeMic] Error:", err);
+        addStatus("Failed to change microphone.", true);
+      }
+    },
+    [addStatus],
+  );
+
   const stopBroadcast = useCallback(() => {
     if (pcRef.current && pcRef.current.connectionState === "connected") {
       const senders = pcRef.current.getSenders();
@@ -170,5 +229,5 @@ export function useBroadcast({
     sendSignal,
   ]);
 
-  return { handleSourceSelected, stopBroadcast };
+  return { handleSourceSelected, stopBroadcast, changeMic };
 }

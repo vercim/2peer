@@ -9,6 +9,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
     isLocal = false,
     onBroadcast,
     onChangeSource,
+    onChangeMic,
     onPiP,
     onFullscreen,
     isBroadcasting = false,
@@ -20,6 +21,12 @@ export const VideoPanel = forwardRef(function VideoPanel(
     streamQuality,
     onQualityChange,
     qualityOptions,
+    isMuted = false,
+    onToggleMute,
+    isDisabled = false,
+    isMicMuted = true,
+    onToggleMicMute,
+    hasMic = false,
   },
   ref,
 ) {
@@ -82,6 +89,64 @@ export const VideoPanel = forwardRef(function VideoPanel(
                     </svg>
                     Change
                   </button>
+                  {hasMic && (
+                    <>
+                      <button
+                        className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 whitespace-nowrap ${isMicMuted ? "text-red-400 hover:text-text cursor-pointer" : "text-green-400 hover:text-text cursor-pointer"}`}
+                        onClick={onToggleMicMute}
+                      >
+                        {isMicMuted ? (
+                          <svg
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                            <line x1="12" y1="19" x2="12" y2="23" />
+                            <line x1="8" y1="23" x2="16" y2="23" />
+                          </svg>
+                        ) : (
+                          <svg
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                            <line x1="12" y1="19" x2="12" y2="23" />
+                            <line x1="8" y1="23" x2="16" y2="23" />
+                          </svg>
+                        )}
+                        {isMicMuted ? "Unmute" : "Mute"}
+                      </button>
+                      <button
+                        className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap"
+                        onClick={onChangeMic}
+                      >
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                          <line x1="12" y1="19" x2="12" y2="23" />
+                          <line x1="8" y1="23" x2="16" y2="23" />
+                        </svg>
+                        Mic
+                      </button>
+                    </>
+                  )}
                   {streamQuality && qualityOptions && (
                     <div className="relative">
                       <button
@@ -150,8 +215,41 @@ export const VideoPanel = forwardRef(function VideoPanel(
           {!isLocal && (
             <>
               <button
-                className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap"
-                onClick={onPiP}
+                className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 whitespace-nowrap ${isDisabled ? "opacity-40 cursor-not-allowed" : isMuted ? "text-red-400 hover:text-text cursor-pointer" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
+                onClick={isDisabled ? undefined : onToggleMute}
+              >
+                {isMuted ? (
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    <line x1="23" y1="9" x2="17" y2="15" />
+                    <line x1="17" y1="9" x2="23" y2="15" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  </svg>
+                )}
+                {isMuted ? "Unmute" : "Mute"}
+              </button>
+              <button
+                className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 whitespace-nowrap ${isDisabled ? "opacity-40 cursor-not-allowed" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
+                onClick={isDisabled ? undefined : onPiP}
               >
                 <svg
                   width="11"
@@ -175,8 +273,8 @@ export const VideoPanel = forwardRef(function VideoPanel(
                 PiP
               </button>
               <button
-                className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)] hover:opacity-100 whitespace-nowrap"
-                onClick={handleFullscreen}
+                className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 whitespace-nowrap ${isDisabled ? "opacity-40 cursor-not-allowed" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
+                onClick={isDisabled ? undefined : handleFullscreen}
               >
                 <svg
                   width="11"
@@ -188,7 +286,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
                 >
                   <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
                 </svg>
-                Fullscreen
+                Full
               </button>
             </>
           )}
@@ -224,7 +322,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
           className="absolute inset-0 w-full h-full object-contain"
           autoPlay
           playsInline
-          muted={isLocal}
+          muted={isLocal || isMuted}
         />
       </div>
     </div>

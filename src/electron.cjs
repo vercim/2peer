@@ -248,10 +248,10 @@ function createWindow() {
 
   const isLaunchedAsHidden = args.includes("--hidden");
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 770,
+    width: 1050,
+    height: 780,
     minWidth: 800,
-    minHeight: 600,
+    minHeight: 700,
     frame: false,
     backgroundColor: "#0a0a0a",
     autoHideMenuBar: true,
