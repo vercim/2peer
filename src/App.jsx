@@ -478,6 +478,7 @@ export default function App({ version = "" }) {
       }
 
       if (!micStream && pcRef.current?.connectionState === "connected") {
+        console.log("[App] Starting microphone, deviceId:", micDeviceId);
         const micResult = await startMicrophone(micDeviceId);
         if (micResult) {
           setMicStream(micResult.stream);
@@ -557,6 +558,7 @@ export default function App({ version = "" }) {
     }
 
     if (!micStream && pcRef.current?.connectionState === "connected") {
+      console.log("[App] Starting microphone (accept), deviceId:", micDeviceId);
       const micResult = await startMicrophone(micDeviceId);
       if (micResult) {
         setMicStream(micResult.stream);
