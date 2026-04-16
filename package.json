@@ -29,7 +29,7 @@
     "vite": "^6.2.0"
   },
   "build": {
-    "appId": "dev.vercim.2peer",
+    "appId": "dev.vercim.twopeer",
     "productName": "2peer",
     "directories": {
       "output": "release"
