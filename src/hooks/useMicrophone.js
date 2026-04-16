@@ -36,11 +36,11 @@ export function useMicrophone({
 
         if (pcRef.current?.connectionState === "connected") {
           const senders = pcRef.current.getSenders();
-          const existingSender = senders.find((s) => s.track?.kind === "audio");
+          const existingMicSender = senders.find(
+            (s) => s.track?.kind === "audio" && s.track.id !== audioTrack.id,
+          );
 
-          if (existingSender) {
-            await existingSender.replaceTrack(audioTrack);
-          } else if (localStreamRef.current) {
+          if (!existingMicSender && localStreamRef.current) {
             pcRef.current.addTrack(audioTrack, localStreamRef.current);
           }
 
