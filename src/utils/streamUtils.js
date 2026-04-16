@@ -1,10 +1,9 @@
 export function streamHasVideo(stream) {
   try {
+    if (!stream || !stream.active || !stream.getVideoTracks) return false;
+    const videoTracks = stream.getVideoTracks();
     return (
-      stream &&
-      stream.active &&
-      stream.getVideoTracks &&
-      stream.getVideoTracks().length > 0
+      videoTracks.length > 0 && videoTracks.some((t) => t.readyState === "live")
     );
   } catch {
     return false;

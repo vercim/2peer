@@ -35,7 +35,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
 
   const handleMicClick = () => {
-    if (!canBroadcast) return;
     if (hasMic && onToggleMic) {
       onToggleMic();
     } else if (onStartMic) {
@@ -81,11 +80,68 @@ export const VideoPanel = forwardRef(function VideoPanel(
                 </svg>
                 {isBroadcasting ? "Stop" : "Broadcast"}
               </button>
+              <button
+                className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px] flex items-center transition-colors duration-120 text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"
+                onClick={handleMicClick}
+                title={hasMic ? (isMicMuted ? "Unmute" : "Mute") : "Start Mic"}
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill={hasMic && !isMicMuted ? "currentColor" : "none"}
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              </button>
+              {hasMic && (
+                <button
+                  className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px] flex items-center transition-colors duration-120 text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"
+                  onClick={onChangeMic}
+                  title="Change Mic"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  </svg>
+                </button>
+              )}
               {isBroadcasting && (
-                <>
+                <button
+                  className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)]"
+                  onClick={onChangeSource}
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Change
+                </button>
+              )}
+              {streamQuality && qualityOptions && (
+                <div className="relative">
                   <button
-                    className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)]"
-                    onClick={onChangeSource}
+                    className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)]"
+                    onClick={() => setQualityMenuOpen(!qualityMenuOpen)}
                   >
                     <svg
                       width="11"
@@ -95,118 +151,57 @@ export const VideoPanel = forwardRef(function VideoPanel(
                       stroke="currentColor"
                       strokeWidth="2"
                     >
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                    Change
-                  </button>
-                  <button
-                    className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] flex items-center transition-colors duration-120 ${hasMic ? (isMicMuted ? "text-red-400 hover:text-text cursor-pointer" : "text-green-400 hover:text-text cursor-pointer") : !canBroadcast ? "opacity-40" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
-                    onClick={handleMicClick}
-                    disabled={!canBroadcast && !hasMic}
-                    title={
-                      hasMic ? (isMicMuted ? "Unmute" : "Mute") : "Start Mic"
-                    }
-                  >
-                    <svg
-                      width="11"
-                      height="11"
-                      viewBox="0 0 24 24"
-                      fill={hasMic && !isMicMuted ? "currentColor" : "none"}
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                      <line x1="12" y1="19" x2="12" y2="23" />
-                      <line x1="8" y1="23" x2="16" y2="23" />
+                      <circle cx="12" cy="12" r="3" />
                     </svg>
                   </button>
-                  {hasMic && (
-                    <button
-                      className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center gap-[4px] transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)]"
-                      onClick={onChangeMic}
-                    >
-                      <svg
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
+                  {qualityMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-border rounded-[6px] p-2 z-50 min-w-[160px]">
+                      <div className="text-[10px] text-muted mb-1">
+                        Resolution
+                      </div>
+                      <select
+                        className="w-full bg-[#0a0a0a] border border-border rounded-[4px] p-1 text-[11px] text-text mb-2"
+                        value={streamQuality.resolution}
+                        onChange={(e) =>
+                          onQualityChange({
+                            ...streamQuality,
+                            resolution: e.target.value,
+                          })
+                        }
                       >
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                      </svg>
-                    </button>
-                  )}
-                  {streamQuality && qualityOptions && (
-                    <div className="relative">
-                      <button
-                        className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[#555] text-[11px] cursor-pointer flex items-center transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)]"
-                        onClick={() => setQualityMenuOpen(!qualityMenuOpen)}
+                        {qualityOptions.resolution.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="text-[10px] text-muted mb-1">FPS</div>
+                      <select
+                        className="w-full bg-[#0a0a0a] border border-border rounded-[4px] p-1 text-[11px] text-text mb-2"
+                        value={streamQuality.fps}
+                        onChange={(e) =>
+                          onQualityChange({
+                            ...streamQuality,
+                            fps: parseInt(e.target.value),
+                          })
+                        }
                       >
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      </button>
-                      {qualityMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-border rounded-[6px] p-2 z-50 min-w-[160px]">
-                          <div className="text-[10px] text-muted mb-1">
-                            Resolution
-                          </div>
-                          <select
-                            className="w-full bg-[#0a0a0a] border border-border rounded-[4px] p-1 text-[11px] text-text mb-2"
-                            value={streamQuality.resolution}
-                            onChange={(e) =>
-                              onQualityChange({
-                                ...streamQuality,
-                                resolution: e.target.value,
-                              })
-                            }
-                          >
-                            {qualityOptions.resolution.map((r) => (
-                              <option key={r.value} value={r.value}>
-                                {r.label}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="text-[10px] text-muted mb-1">FPS</div>
-                          <select
-                            className="w-full bg-[#0a0a0a] border border-border rounded-[4px] p-1 text-[11px] text-text mb-2"
-                            value={streamQuality.fps}
-                            onChange={(e) =>
-                              onQualityChange({
-                                ...streamQuality,
-                                fps: parseInt(e.target.value),
-                              })
-                            }
-                          >
-                            {qualityOptions.fps.map((f) => (
-                              <option key={f} value={f}>
-                                {f} FPS
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                        {qualityOptions.fps.map((f) => (
+                          <option key={f} value={f}>
+                            {f} FPS
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
-                </>
+                </div>
               )}
             </>
           )}
           {!isLocal && (
             <>
               <button
-                className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px] flex items-center transition-colors duration-120 ${isDisabled ? "opacity-40" : isMuted ? "text-red-400 hover:text-text cursor-pointer" : "text-green-400 hover:text-text cursor-pointer"}`}
+                className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px] flex items-center transition-colors duration-120 ${isDisabled ? "opacity-40" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
                 onClick={isDisabled ? undefined : onToggleMute}
                 disabled={isDisabled}
                 title={isMuted ? "Unmute" : "Mute"}
@@ -218,7 +213,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
                   fill={isMuted ? "none" : "currentColor"}
                   stroke="currentColor"
                   strokeWidth="2"
-                  className="w-full h-full"
                 >
                   {isMuted ? (
                     <>

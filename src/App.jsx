@@ -473,10 +473,21 @@ export default function App({ version = "" }) {
       resetSignalingRefs();
 
       await createPeerConnection(peerId, false);
-      await attachLocalTracks(localStreamRef.current);
+      if (localStreamRef.current) {
+        await attachLocalTracks(localStreamRef.current);
+      }
+
+      if (!micStream && pcRef.current?.connectionState === "connected") {
+        const micResult = await startMicrophone(micDeviceId);
+        if (micResult) {
+          setMicStream(micResult.stream);
+          setMicStreamTrack(micResult.track);
+        }
+      }
 
       const offer = await pcRef.current.createOffer({
         offerToReceiveVideo: true,
+        offerToReceiveAudio: true,
       });
       const modifiedOffer = {
         ...offer,
@@ -512,6 +523,11 @@ export default function App({ version = "" }) {
       resetSignalingRefs,
       setCallStatus,
       setStatusDotState,
+      startMicrophone,
+      micDeviceId,
+      micStream,
+      setMicStream,
+      setMicStreamTrack,
     ],
   );
 
@@ -536,7 +552,17 @@ export default function App({ version = "" }) {
     resetSignalingRefs();
 
     await createPeerConnection(from, true);
-    await attachLocalTracks(localStreamRef.current);
+    if (localStreamRef.current) {
+      await attachLocalTracks(localStreamRef.current);
+    }
+
+    if (!micStream && pcRef.current?.connectionState === "connected") {
+      const micResult = await startMicrophone(micDeviceId);
+      if (micResult) {
+        setMicStream(micResult.stream);
+        setMicStreamTrack(micResult.track);
+      }
+    }
 
     setCurrentPeerId(from);
 
@@ -578,6 +604,11 @@ export default function App({ version = "" }) {
     setStatusDotState,
     setIncomingCall,
     setRemoteBitrate,
+    startMicrophone,
+    micDeviceId,
+    micStream,
+    setMicStream,
+    setMicStreamTrack,
   ]);
 
   const handleDeclineCall = useCallback(() => {
