@@ -204,14 +204,25 @@ export function usePeerConnection({
       const senders = peerConnection.getSenders() || [];
       const tracks = streamToAttach.getTracks();
 
+      console.log(
+        "[AttachLocalTracks] Stream tracks:",
+        tracks.map((t) => ({ kind: t.kind, id: t.id })),
+      );
+      console.log(
+        "[AttachLocalTracks] Current senders:",
+        senders.map((s) => s.track?.kind),
+      );
+
       for (const track of tracks) {
         const existingSender = senders.find(
           (s) => s.track?.kind === track.kind,
         );
         if (existingSender) {
+          console.log("[AttachLocalTracks] Replacing track:", track.kind);
           await existingSender.replaceTrack(track);
           applyMaxQualityEncoding(existingSender, streamQuality);
         } else {
+          console.log("[AttachLocalTracks] Adding track:", track.kind);
           const sender = peerConnection.addTrack(track, streamToAttach);
           applyMaxQualityEncoding(sender, streamQuality);
         }

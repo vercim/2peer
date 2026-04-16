@@ -46,6 +46,7 @@ export default function App({ version = "" }) {
   const [micPickerOpen, setMicPickerOpen] = useState(false);
   const [micDeviceId, setMicDeviceId] = useState(null);
   const [isMicMuted, setIsMicMuted] = useState(true);
+  const [hasAudioTrack, setHasAudioTrack] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
   const [localMeta, setLocalMeta] = useState("");
   const [remoteMeta, setRemoteMeta] = useState("");
@@ -189,6 +190,7 @@ export default function App({ version = "" }) {
     micDeviceId,
     isMicMuted,
     setIsMicMuted,
+    setHasAudioTrack,
   });
 
   useEffect(() => {
@@ -418,6 +420,7 @@ export default function App({ version = "" }) {
       setIsRemoteMuted(false);
       setIsMicMuted(true);
       setMicDeviceId(null);
+      setHasAudioTrack(false);
       setRemoteMeta("");
       setRemoteVideoWrapClass(
         "flex-1 min-h-0 relative bg-[#050505] placeholder",
@@ -773,7 +776,7 @@ export default function App({ version = "" }) {
               qualityOptions={qualityOptions}
               isMicMuted={isMicMuted}
               onToggleMicMute={() => setIsMicMuted(!isMicMuted)}
-              hasMic={!!micDeviceId}
+              hasMic={hasAudioTrack}
             />
             <VideoPanel
               ref={remoteVideoRef}
