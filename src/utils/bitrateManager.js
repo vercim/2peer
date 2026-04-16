@@ -62,12 +62,6 @@ export function applyMaxQualityEncoding(
   }
 
   sender.setParameters(params).catch(console.error);
-
-  console.log("[Encoding] Applied quality:", {
-    resolution: res.value,
-    bitrate: autoBitrate,
-    fps,
-  });
 }
 
 export function adaptBitrate(rtt, packetsLost, avgBitrate, defaultBitrate) {

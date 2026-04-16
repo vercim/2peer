@@ -59,10 +59,6 @@ export function useBroadcast({
       const stream =
         await navigator.mediaDevices.getUserMedia(streamConstraints);
 
-      console.log("[Broadcast] Stream constraints:", streamConstraints);
-      console.log("[Broadcast] Video tracks:", stream.getVideoTracks().length);
-      console.log("[Broadcast] Audio tracks:", stream.getAudioTracks().length);
-
       const hasAudio = stream.getAudioTracks().length > 0;
       if (setHasAudioTrack) {
         setHasAudioTrack(hasAudio);
