@@ -9,7 +9,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
     isLocal = false,
     onBroadcast,
     onChangeSource,
-    onChangeMic,
     onStartMic,
     onStopMic,
     onToggleMic,
@@ -52,13 +51,18 @@ export const VideoPanel = forwardRef(function VideoPanel(
       className={`flex-1 min-h-0 bg-panel border border-border rounded-[8px] flex flex-col overflow-hidden ${className}`}
     >
       <div className="flex items-center justify-between p-[8px_12px] border-b border-border shrink-0">
-        <div className="flex items-center gap-[8px]">
-          <span className="text-[11px] text-muted">{title}</span>
-          {isLocal && (
+        <span className="text-[11px] text-muted">{title}</span>
+        <div className="flex items-center gap-[5px]">
+          <span className="text-[10px] text-[#2e2e2e] font-mono">{meta}</span>
+          {bitrate > 0 && (
+            <span className="text-[10px] text-[#888] font-mono">
+              {formatBitrate(bitrate)}
+            </span>
+          )}
+          {isLocal && canBroadcast && (
             <button
-              className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 ${!canBroadcast ? "opacity-40 cursor-not-allowed" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
-              onClick={canBroadcast ? handleMicClick : undefined}
-              disabled={!canBroadcast}
+              className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 ${hasMic && !isMicMuted ? "text-white hover:text-text" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)]"} cursor-pointer`}
+              onClick={handleMicClick}
             >
               <svg
                 width="11"
@@ -76,35 +80,8 @@ export const VideoPanel = forwardRef(function VideoPanel(
               {hasMic ? (isMicMuted ? "Unmute" : "Mute") : "Mic"}
             </button>
           )}
-        </div>
-        <div className="flex items-center gap-[5px]">
-          <span className="text-[10px] text-[#2e2e2e] font-mono">{meta}</span>
-          {bitrate > 0 && (
-            <span className="text-[10px] text-[#888] font-mono">
-              {formatBitrate(bitrate)}
-            </span>
-          )}
           {isLocal && canBroadcast && (
             <>
-              {hasMic && (
-                <button
-                  className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"
-                  onClick={onChangeMic}
-                >
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  </svg>
-                  Mic
-                </button>
-              )}
               <button
                 className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 whitespace-nowrap ${!canBroadcast ? "opacity-40 cursor-not-allowed" : isBroadcasting ? "text-green-400 hover:text-text cursor-pointer" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)] cursor-pointer"}`}
                 onClick={onBroadcast}

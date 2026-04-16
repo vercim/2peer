@@ -40,8 +40,12 @@ export function useMicrophone({
             (s) => s.track?.kind === "audio" && s.track.id !== audioTrack.id,
           );
 
-          if (!existingMicSender && localStreamRef.current) {
-            pcRef.current.addTrack(audioTrack, localStreamRef.current);
+          if (!existingMicSender) {
+            if (localStreamRef.current) {
+              pcRef.current.addTrack(audioTrack, localStreamRef.current);
+            } else {
+              pcRef.current.addTrack(audioTrack);
+            }
           }
 
           pcRef.current.getSenders().forEach((s) => {

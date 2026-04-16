@@ -825,7 +825,6 @@ export default function App({ version = "" }) {
               isBroadcasting={!!localStream}
               onBroadcast={localStream ? stopBroadcast : handleBroadcast}
               onChangeSource={handleChangeSource}
-              onChangeMic={() => setMicPickerOpen(true)}
               onStartMic={handleStartMic}
               onStopMic={handleStopMic}
               onToggleMic={handleToggleMic}
@@ -862,12 +861,6 @@ export default function App({ version = "" }) {
         isOpen={sourcePickerOpen}
         onClose={() => setSourcePickerOpen(false)}
         onSelect={handleSourceSelected}
-      />
-      <MicPicker
-        isOpen={micPickerOpen}
-        onClose={() => setMicPickerOpen(false)}
-        onSelect={handleMicSelect}
-        selectedDeviceId={micDeviceId}
       />
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
