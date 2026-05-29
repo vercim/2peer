@@ -29,7 +29,3 @@ A peer-to-peer screen streaming application that connects two computers directly
 - Windows, macOS
 - Internet access
 - Screen capture permission
-
-## Technical details
-
-The app uses WebRTC for direct P2P connection. Supabase is only used as a signaling server to establish the connection — no data passes through it.
