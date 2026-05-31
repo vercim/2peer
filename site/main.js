@@ -111,7 +111,7 @@
     // links already point at RELEASES_PAGE in the markup; nothing to break.
     const status = document.getElementById("dl-status");
     if (status) {
-      status.innerHTML = `Builds are published on GitHub. <a href="${RELEASES_PAGE}" target="_blank" rel="noopener" class="inline-link">Open the releases page →</a>`;
+      status.innerHTML = 'Builds are published on GitHub'
     }
   }
 
