@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>2peer — direct screen sharing, two computers, no server in the middle</title>
+    <meta
+      name="description"
+      content="2peer is a peer-to-peer screen sharing app for two. Video and audio flow directly between you and one other person over WebRTC — no accounts, no media servers."
+    />
+    <link rel="icon" type="image/png" href="./assets/icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="2peer — direct screen sharing for two" />
+    <meta
+      property="og:description"
+      content="Share your ID, place a call, broadcast your screen. Media travels peer-to-peer over WebRTC. macOS and Windows."
+    />
+    <meta property="og:image" content="./assets/icon.png" />
+
+    <link rel="preconnect" href="https://api.github.com" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-repo="vercim/2peer" data-fallback-version="1.0.19">
+    <!-- ───────────────────────── NAV ───────────────────────── -->
+    <header class="nav" id="nav">
+      <a class="nav__brand" href="#top" aria-label="2peer home">
+        <img src="./assets/icon.png" alt="" class="nav__logo" />
+        <span>2peer</span>
+      </a>
+      <nav class="nav__links">
+        <a href="#product">Product</a>
+        <a href="#tech">Technical</a>
+        <a href="#download">Download</a>
+        <a href="https://github.com/vercim/2peer" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <a class="btn btn--sm" href="#download">Download</a>
+    </header>
+
+    <!-- ───────────────────────── HERO ──────────────────────── -->
+    <main id="top">
+      <section class="hero">
+        <div class="hero__glow" aria-hidden="true"></div>
+        <div class="hero__inner">
+          <span class="pill" id="version-pill">
+            <span class="pill__dot"></span>
+            <span id="version-label">version&nbsp;1.0.19</span>
+          </span>
+          <h1 class="hero__title">
+            Two screens.<br />
+            <span class="accent-text">One direct line.</span>
+          </h1>
+          <p class="hero__sub">
+            Share your screen with one other person. Video and audio go straight
+            between your two machines — no server in the middle, no sign-up.
+          </p>
+
+          <div class="hero__cta">
+            <a class="btn btn--primary" id="hero-download" href="#download">
+              <svg viewBox="0 0 16 16" class="btn__icon" aria-hidden="true">
+                <path d="M8 1v8.5M8 9.5 4.5 6M8 9.5 11.5 6M2 12.5h12" />
+              </svg>
+              <span id="hero-download-label">Download for your Mac</span>
+            </a>
+            <a class="btn btn--ghost" href="#product">See how it works</a>
+          </div>
+
+          <p class="hero__meta">
+            <span id="hero-platforms">macOS&nbsp;&amp;&nbsp;Windows</span>
+            &nbsp;·&nbsp; Free &amp; open source
+          </p>
+        </div>
+
+        <!-- Connection diagram -->
+        <div class="wire" aria-hidden="true">
+          <div class="wire__node">
+            <div class="wire__screen">
+              <span class="wire__dot"></span><span class="wire__dot"></span><span class="wire__dot"></span>
+            </div>
+            <span class="wire__id">7QF2-X91K-AB3D</span>
+          </div>
+
+          <div class="wire__link">
+            <span class="wire__pulse"></span>
+            <span class="wire__star">✻</span>
+            <small>peer-to-peer</small>
+          </div>
+
+          <div class="wire__node">
+            <div class="wire__screen wire__screen--live">
+              <span class="wire__play"></span>
+            </div>
+            <span class="wire__id">M4K8-2PJW-ZC7Q</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────── PRODUCT ─────────────────────── -->
+      <section class="section" id="product">
+        <div class="section__head">
+          <span class="eyebrow">The product</span>
+          <h2>Built to do one thing, completely.</h2>
+          <p>
+            Not a meeting room. 2peer links two people and gets out of the way:
+            share your ID, they accept, you broadcast — up to 1440p.
+          </p>
+        </div>
+
+        <div class="features">
+          <article class="feature">
+            <span class="feature__num">01</span>
+            <h3>Direct, by design</h3>
+            <p>
+              WebRTC streams straight between the two machines. The relay only
+              introduces the peers — it never sees your video or audio.
+            </p>
+          </article>
+          <article class="feature">
+            <span class="feature__num">02</span>
+            <h3>No account, no profile</h3>
+            <p>
+              Your identity is a random 12-character ID, stored locally. Share it,
+              regenerate it, done.
+            </p>
+          </article>
+          <article class="feature">
+            <span class="feature__num">03</span>
+            <h3>Watch it your way</h3>
+            <p>
+              Full-screen the peer's view on a second monitor, or pin it as
+              picture-in-picture while you work.
+            </p>
+          </article>
+          <article class="feature">
+            <span class="feature__num">04</span>
+            <h3>Lives in the tray</h3>
+            <p>
+              Closing the window drops 2peer to the tray, line still ready. Launches
+              at login, wakes on an incoming call.
+            </p>
+          </article>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats">
+          <div class="stat">
+            <span class="stat__num">∞</span>
+            <span class="stat__label">quality<sup class="stat__ref">*</sup></span>
+          </div>
+          <div class="stat">
+            <span class="stat__num" id="stat-size">~90 MB</span>
+            <span class="stat__label">installer</span>
+          </div>
+          <div class="stat">
+            <span class="stat__num">2</span>
+            <span class="stat__label">peers, exactly</span>
+          </div>
+          <div class="stat">
+            <span class="stat__num">0</span>
+            <span class="stat__label">media servers</span>
+          </div>
+        </div>
+        <p class="stats__note">
+          <span class="stats__star">*</span> Stream quality is uncapped by the app —
+          in practice it's limited only by your and your peer's connection.
+        </p>
+      </section>
+
+      <!-- ───────────────────────── TECH ──────────────────────── -->
+      <section class="section section--dark" id="tech">
+        <div class="section__head">
+          <span class="eyebrow eyebrow--light">Under the hood</span>
+          <h2>The technical details, not hidden.</h2>
+          <p>
+            An Electron app with a React renderer. Here's what governs the
+            connection and the picture.
+          </p>
+        </div>
+
+        <div class="tech-grid">
+          <!-- Quality presets -->
+          <article class="card card--wide">
+            <header class="card__head">
+              <h3>Quality presets</h3>
+              <span class="card__tag">SDP&nbsp;b=AS&nbsp;+&nbsp;sender encodings</span>
+            </header>
+            <table class="qtable">
+              <thead>
+                <tr><th>Resolution</th><th>Frame rate</th><th>Target bitrate</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>720p&nbsp;HD</td><td>30 / 60 fps</td><td><span class="bar" style="--w:25%"></span>6 Mbps</td></tr>
+                <tr><td>1080p&nbsp;FHD</td><td>30 / 60 fps</td><td><span class="bar" style="--w:50%"></span>12 Mbps</td></tr>
+                <tr><td>1440p&nbsp;QHD</td><td>30 / 60 fps</td><td><span class="bar" style="--w:100%"></span>24 Mbps</td></tr>
+              </tbody>
+            </table>
+          </article>
+
+          <article class="card card--wide">
+            <header class="card__head"><h3>Connectivity</h3></header>
+            <p class="card__lead">8 STUN servers, IP-pinned fallback.</p>
+            <ul class="ticks">
+              <li>Google, Twilio, Metered &amp; more</li>
+              <li>Hardcoded IPs if DNS fails</li>
+              <li>Auto <code>restartIce()</code> on drop</li>
+              <li class="ticks__warn">No TURN — symmetric NAT may fail</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <!-- ─────────────────────── DOWNLOAD ────────────────────── -->
+      <section class="section section--download" id="download">
+        <div class="section__head">
+          <span class="eyebrow">Get 2peer</span>
+          <h2>Download and share your screen.</h2>
+          <p>
+            <span id="download-version">Version 1.0.19</span> ·
+            <a href="https://github.com/vercim/2peer/releases" target="_blank" rel="noopener" class="inline-link">all releases &amp; changelog →</a>
+          </p>
+        </div>
+
+        <div class="dl-cards">
+          <!-- macOS -->
+          <article class="dl-card" id="dl-mac">
+            <div class="dl-card__os">
+              <svg viewBox="0 0 24 24" class="dl-card__logo" aria-hidden="true">
+                <path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9s-1.8-.8-3-.8c-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.7 2.3 1.1 0 1.5-.7 2.8-.7s1.6.7 2.8.7 1.9-1.1 2.6-2.1c.8-1.2 1.2-2.3 1.2-2.4-.1 0-2.3-.9-2.4-3.6zM14.2 5.6c.6-.7 1-1.7.9-2.7-.9 0-1.9.6-2.5 1.3-.6.6-1.1 1.6-.9 2.6 1 .1 2-.5 2.5-1.2z"/>
+              </svg>
+              <h3>macOS</h3>
+            </div>
+            <p class="dl-card__note">Apple silicon &amp; Intel · .dmg installer</p>
+            <a class="btn btn--primary btn--block" data-os="mac" href="https://github.com/vercim/2peer/releases" target="_blank" rel="noopener">
+              <span class="btn__label">Download for macOS</span>
+            </a>
+            <a class="dl-card__alt" data-os="mac-zip" href="https://github.com/vercim/2peer/releases" target="_blank" rel="noopener">or download the .zip</a>
+          </article>
+
+          <!-- Windows -->
+          <article class="dl-card" id="dl-win">
+            <div class="dl-card__os">
+              <svg viewBox="0 0 24 24" class="dl-card__logo" aria-hidden="true">
+                <path d="M3 5.7 10.4 4.7v7H3V5.7zM3 12.5h7.4v7L3 18.4v-5.9zM11.3 4.5 21 3.2v8.3h-9.7V4.5zM11.3 12.5H21v8.3l-9.7-1.3v-7z"/>
+              </svg>
+              <h3>Windows</h3>
+            </div>
+            <p class="dl-card__note">Windows 10/11 · 64-bit · NSIS installer</p>
+            <a class="btn btn--primary btn--block" data-os="win" href="https://github.com/vercim/2peer/releases" target="_blank" rel="noopener">
+              <span class="btn__label">Download for Windows</span>
+            </a>
+            <a class="dl-card__alt" href="https://github.com/vercim/2peer/releases" target="_blank" rel="noopener">browse all assets</a>
+          </article>
+        </div>
+
+        <p class="dl-foot" id="dl-status">
+          Prefer to choose manually?
+          <a href="https://github.com/vercim/2peer/releases" target="_blank" rel="noopener" class="inline-link">Open the releases page on GitHub →</a>
+        </p>
+      </section>
+    </main>
+
+    <!-- ─────────────────────── FOOTER ──────────────────────── -->
+    <footer class="footer">
+      <div class="footer__brand">
+        <img src="./assets/icon.png" alt="" class="nav__logo" />
+        <span>2peer</span>
+      </div>
+      <div class="footer__links">
+        <a href="https://github.com/vercim/2peer" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/vercim/2peer/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="#top">Back to top</a>
+      </div>
+      <p class="footer__note">P2P over WebRTC · no media servers · no accounts</p>
+    </footer>
+
+    <script src="./main.js"></script>
+  </body>
+</html>
