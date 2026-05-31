@@ -1,38 +1,31 @@
-# 2peer site
+# 2peer
 
-Static one-page site for 2peer. No build step — plain HTML/CSS/vanilla JS.
+A peer-to-peer screen streaming application that connects two computers directly. No servers, no accounts — just share your ID with another user and start sharing.
 
-## Local preview
+## Features
 
-```bash
-python3 -m http.server 4321 --directory site
-# → http://localhost:4321
-```
+- **Direct connection** — P2P between two participants with no intermediaries
+- **Screen sharing** — broadcast your entire screen or individual windows
+- **Fullscreen mode** — view peer's screen on your entire monitor
+- **Picture-in-Picture** — keep peer's screen in the corner
 
-## Deploy on Vercel
+## How to use
 
-Config lives in [`../vercel.json`](../vercel.json) at the repo root.
+1. Launch the app
+2. Copy your ID (click "Copy") and send it to your peer
+3. Enter peer's ID in the "Peer ID" field and click "Call"
+4. The peer will see an incoming call — have them click "Accept"
+5. Click "Broadcast" to start sharing your screen
 
-- **Root Directory**: leave at the repo root (do **not** set it to `site/`).
-  `outputDirectory: "site"` serves the static files, and `ignoreCommand`
-  needs the root git context to diff the `site/` path.
-- **Build Command**: none (`buildCommand: null`).
-- **Ignored Build Step**: `git diff --quiet HEAD^ HEAD -- site/` — a push that
-  doesn't touch `site/` is skipped, so app-only commits don't redeploy the site.
+### Controls
 
-## Dynamic version & downloads
+- **Broadcast** — start sharing your screen
+- **Change** — switch source (screen or window)
+- **PiP** — enable picture-in-picture
+- **Fullscreen** — expand peer's screen to full monitor
 
-[`main.js`](main.js) fetches `https://api.github.com/repos/vercim/2peer/releases/latest`
-at runtime and fills in:
+## Requirements
 
-- the version label (hero pill + download section),
-- the macOS `.dmg` / `.zip` and Windows `.exe` download links,
-- highlights the visitor's detected OS card.
-
-If there are no releases yet (current state), it falls back to
-`data-fallback-version` on `<body>` and points every download button at the
-GitHub releases page. Once you publish a release with `.dmg`/`.zip`/`.exe`
-assets, the buttons wire up automatically — no code change needed.
-
-Update `data-fallback-version` in [`index.html`](index.html) if you want the
-pre-release placeholder to match a newer `package.json` version.
+- Windows, macOS
+- Internet access
+- Screen capture permission
