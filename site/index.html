@@ -8,7 +8,7 @@
       name="description"
       content="2peer is a peer-to-peer screen sharing app for two. Video and audio flow directly between you and one other person over WebRTC — no accounts, no media servers."
     />
-    <link rel="icon" type="image/png" href="./assets/icon.png" />
+    <link rel="icon" type="image/svg" href="./assets/icon.svg" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
@@ -17,7 +17,7 @@
       property="og:description"
       content="Share your ID, place a call, broadcast your screen. Media travels peer-to-peer over WebRTC. macOS and Windows."
     />
-    <meta property="og:image" content="./assets/icon.png" />
+    <meta property="og:image" content="./assets/icon.svg" />
 
     <link rel="preconnect" href="https://api.github.com" />
     <link rel="stylesheet" href="./styles.css" />
@@ -26,7 +26,7 @@
     <!-- ───────────────────────── NAV ───────────────────────── -->
     <header class="nav" id="nav">
       <a class="nav__brand" href="#top" aria-label="2peer home">
-        <img src="./assets/icon.png" alt="" class="nav__logo" />
+        <img src="./assets/icon.svg" alt="" class="nav__logo" />
         <span>2peer</span>
       </a>
       <nav class="nav__links">
@@ -148,7 +148,7 @@
             <span class="stat__label">stream quality<sup class="stat__ref">*</sup></span>
           </div>
           <div class="stat">
-            <span class="stat__num" id="stat-size">~200 MB</span>
+            <span class="stat__num" id="stat-size">~280 MB</span>
             <span class="stat__label">app weight</span>
           </div>
           <div class="stat">
@@ -181,7 +181,7 @@
           <!-- Quality presets -->
           <article class="card card--wide">
             <header class="card__head">
-              <h3>Quality presets</h3>
+              <h3>Recommended quality presets</h3>
               <span class="card__tag">SDP&nbsp;b=AS&nbsp;+&nbsp;sender encodings</span>
             </header>
             <table class="qtable">
@@ -189,9 +189,10 @@
                 <tr><th>Resolution</th><th>Frame rate</th><th>Target bitrate</th></tr>
               </thead>
               <tbody>
-                <tr><td>720p&nbsp;HD</td><td>30 / 60 fps</td><td><span class="bar" style="--w:25%"></span>6 Mbps</td></tr>
-                <tr><td>1080p&nbsp;FHD</td><td>30 / 60 fps</td><td><span class="bar" style="--w:50%"></span>12 Mbps</td></tr>
-                <tr><td>1440p&nbsp;QHD</td><td>30 / 60 fps</td><td><span class="bar" style="--w:100%"></span>24 Mbps</td></tr>
+                <tr><td>720p&nbsp;HD</td><td>60 fps</td><td><span class="bar" style="--w:25%"></span>6 Mbps</td></tr>
+                <tr><td>1080p&nbsp;FHD</td><td>60 fps</td><td><span class="bar" style="--w:50%"></span>12 Mbps</td></tr>
+                <tr><td>1440p&nbsp;QHD</td><td>30 / 60 fps</td><td><span class="bar" style="--w:80%"></span>24 Mbps</td></tr>
+                <tr><td>2160p&nbsp;UHD</td><td>30 fps</td><td><span class="bar" style="--w:100%"></span>35 Mbps</td></tr>
               </tbody>
             </table>
           </article>
@@ -262,7 +263,7 @@
     <!-- ─────────────────────── FOOTER ──────────────────────── -->
     <footer class="footer">
       <div class="footer__brand">
-        <img src="./assets/icon.png" alt="" class="nav__logo" />
+        <img src="./assets/icon.svg" alt="" class="nav__logo" />
         <span>2peer</span>
       </div>
       <div class="footer__links">

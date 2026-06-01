@@ -70,10 +70,6 @@
     if (exe) setLink(winBtn, exe.browser_download_url, `Download for Windows · v${tag}`);
     else markUnavailable("dl-win");
 
-    // installer size stat — prefer the Windows .exe, fall back to the .dmg
-    const sizer = exe || dmg;
-    if (sizer && sizer.size) setSize(sizer.size);
-
     // hero button → detected platform's direct asset, else releases page
     const hero = document.getElementById("hero-download");
     if (hero) {
@@ -91,11 +87,6 @@
   function markUnavailable(cardId) {
     const card = document.getElementById(cardId);
     if (card) card.classList.add("is-unavailable");
-  }
-
-  function setSize(bytes) {
-    const el = document.getElementById("stat-size");
-    if (el) el.textContent = `${Math.round(bytes / 1048576)} MB`;
   }
 
   function setVersion(v) {
