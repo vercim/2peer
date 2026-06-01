@@ -32,12 +32,19 @@
   body {
     height: 100vh;
     overflow: hidden;
-    background: #0a0a0a;
+    background: transparent;
     color: #e0e0e0;
     font-family: Inter, ui-sans-serif, system-ui, sans-serif;
     font-size: 13px;
     -webkit-font-smoothing: antialiased;
     user-select: none;
+  }
+
+  /* Custom rounded window corners (window itself is transparent) */
+  #root {
+    height: 100vh;
+    border-radius: 14px;
+    overflow: hidden;
   }
 
   input::placeholder {

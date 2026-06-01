@@ -35,7 +35,7 @@ export function Sidebar({
   callerId = "",
   hasActiveCall = false,
   connectionStatus = "idle",
-  supabaseStatus = "disconnected",
+  signalingStatus = "disconnected",
   statusMessages = [],
   version = "",
   remoteId = "",
@@ -95,35 +95,39 @@ export function Sidebar({
         <span className="text-[10px] tracking-[0.09em] uppercase text-faint">
           Call
         </span>
-        <div className="relative">
-          <div
-            className={`absolute inset-0 rounded-[5px] p-[9px_10px] text-[13px] font-mono pointer-events-none flex items-center transition-colors duration-140 z-[1] ${
-              remoteId || isInputFocused
-                ? "bg-panel-3 border border-[rgba(255,255,255,0.12)] text-[#888]"
-                : "bg-panel-2 border border-border text-[#444]"
-            }`}
-          >
-            {remoteId ? "" : "Peer ID"}
+        {/* The Peer ID field only makes sense when idle. While a call is active
+            or being placed there's nothing to type, so we hide it entirely and
+            leave just the Hang up / Cancel button below. */}
+        {!hasActiveCall && !isCalling && (
+          <div className="relative">
+            <div
+              className={`absolute inset-0 rounded-[5px] p-[9px_10px] text-[13px] font-mono pointer-events-none flex items-center transition-colors duration-140 z-[1] ${
+                remoteId || isInputFocused
+                  ? "bg-panel-3 border border-[rgba(255,255,255,0.12)] text-[#888]"
+                  : "bg-panel-2 border border-border text-[#444]"
+              }`}
+            >
+              {remoteId ? "" : "Peer ID"}
+            </div>
+            <input
+              className={`w-full bg-transparent border border-transparent rounded-[5px] p-[9px_10px] outline-none text-[13px] font-mono text-text placeholder:text-transparent transition-colors duration-140 z-[2] relative ${
+                remoteId || isInputFocused ? "bg-panel-3" : ""
+              }`}
+              value={remoteId}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\./g, "").toUpperCase();
+                onRemoteIdChange ? onRemoteIdChange(val) : null;
+              }}
+              onKeyDown={handleKeyDown}
+              maxLength={12}
+              placeholder=""
+              autoComplete="off"
+              spellCheck={false}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
           </div>
-          <input
-            className={`w-full bg-transparent border border-transparent rounded-[5px] p-[9px_10px] outline-none text-[13px] font-mono text-text placeholder:text-transparent transition-colors duration-140 z-[2] relative ${
-              remoteId || isInputFocused ? "bg-panel-3" : ""
-            }`}
-            value={remoteId}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\./g, "").toUpperCase();
-              onRemoteIdChange ? onRemoteIdChange(val) : null;
-            }}
-            onKeyDown={handleKeyDown}
-            maxLength={12}
-            placeholder=""
-            disabled={hasActiveCall}
-            autoComplete="off"
-            spellCheck={false}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => setIsInputFocused(false)}
-          />
-        </div>
+        )}
         <div className="flex gap-[6px]">
           {hasActiveCall ? (
             <button
@@ -189,7 +193,7 @@ export function Sidebar({
       <div className="mt-auto flex flex-col gap-[10px]">
         <div className="bg-panel border border-border rounded-[8px] p-[10px_14px]">
           <div className="text-[11px] text-[#555] font-mono overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-[6px]">
-            {supabaseStatus === "connected" ? (
+            {signalingStatus === "connected" ? (
               <svg
                 width="14"
                 height="14"
@@ -221,11 +225,13 @@ export function Sidebar({
               </svg>
             )}
             <TextMorph>
-              {supabaseStatus === "connected"
-                ? "Supabase Realtime"
-                : supabaseStatus === "error"
-                  ? "Supabase Error"
-                  : "Supabase Disconnected"}
+              {signalingStatus === "connected"
+                ? "P2P Ready"
+                : signalingStatus === "error"
+                  ? "P2P Error"
+                  : signalingStatus === "connecting"
+                    ? "Connecting…"
+                    : "P2P Offline"}
             </TextMorph>
           </div>
         </div>

@@ -1,20 +1,20 @@
 {
   "name": "2peer",
-  "version": "1.0.19",
+  "version": "1.0.21",
   "description": "2peer",
   "type": "module",
   "main": "src/electron.cjs",
   "scripts": {
-    "prebuild:win": "node -e \"const p=require('./package.json');p.version=p.version.replace(/(\\d+\\.\\d+\\.)(\\d+)/,(m,m1,m2)=>m1+(+m2+1));require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))\"",
-    "prebuild:mac": "node -e \"const p=require('./package.json');p.version=p.version.replace(/(\\d+\\.\\d+\\.)(\\d+)/,(m,m1,m2)=>m1+(+m2+1));require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))\"",
+    "bump": "node -e \"const p=require('./package.json');p.version=p.version.replace(/(\\d+\\.\\d+\\.)(\\d+)/,(m,m1,m2)=>m1+(+m2+1));require('fs').writeFileSync('package.json',JSON.stringify(p,null,2));console.log('Version bumped to',JSON.parse(require('fs').readFileSync('package.json')).version)\"",
     "start": "vite build && electron .",
+    "test": "vite build && electron . & electron . --clone",
     "dev": "vite",
     "build": "vite build",
     "build:win": "vite build && electron-builder --win --x64",
     "build:mac": "vite build && electron-builder --mac"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.7",
+    "@trystero-p2p/torrent": "^0.25.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "torph": "^0.0.9"

@@ -3,27 +3,22 @@ import { TitleBar } from "./components/TitleBar.jsx";
 import { Sidebar } from "./components/Sidebar.jsx";
 import { VideoPanel } from "./components/VideoPanel.jsx";
 import { SourcePicker } from "./components/SourcePicker.jsx";
-import { MicPicker } from "./components/MicPicker.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
 import { StatusGlow } from "./components/StatusGlow.jsx";
 import { soundManager } from "./utils/soundManager.js";
-import { qualityOptions, getResolutionByValue } from "./utils/rtcConfig.js";
-import {
-  applyMaxQualityEncoding,
-  getDefaultBitrateForResolution,
-  setUserManualBitrate,
-} from "./utils/bitrateManager.js";
 import { setMaxBandwidthInSDP } from "./utils/sdpUtils.js";
 import { streamHasVideo, stopStreamTracks } from "./utils/streamUtils.js";
 import { useStatusLog } from "./hooks/useStatusLog.js";
 import { useSignaling } from "./hooks/useSignaling.js";
 import { usePeerConnection } from "./hooks/usePeerConnection.js";
 import { useBroadcast } from "./hooks/useBroadcast.js";
-import { useMicrophone } from "./hooks/useMicrophone.js";
+
+// Stream quality is fixed for now (Full HD @ 60fps). A settings UI will replace
+// this later; the bitrate ceiling lives in DEFAULT_BITRATES["1080p"].
+const STREAM_QUALITY = { resolution: "1080p", fps: 60 };
 
 export default function App({ version = "" }) {
   const [selfId, setSelfId] = useState("");
-  const [supabaseStatus, setSupabaseStatus] = useState("disconnected");
   const [statusDotState, setStatusDotState] = useState("idle");
   const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
@@ -44,11 +39,6 @@ export default function App({ version = "" }) {
     message: "",
   });
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
-  const [micPickerOpen, setMicPickerOpen] = useState(false);
-  const [micDeviceId, setMicDeviceId] = useState(null);
-  const [isMicMuted, setIsMicMuted] = useState(true);
-  const [hasMicTrack, setHasMicTrack] = useState(false);
-  const [micStream, setMicStream] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
   const [localMeta, setLocalMeta] = useState("");
   const [remoteMeta, setRemoteMeta] = useState("");
@@ -58,9 +48,7 @@ export default function App({ version = "" }) {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [isRemoteMuted, setIsRemoteMuted] = useState(false);
-  const [micVolume, setMicVolume] = useState(1);
   const [remoteMicVolume, setRemoteMicVolume] = useState(1);
-  const [config, setConfig] = useState(null);
   const [remoteVideoWrapClass, setRemoteVideoWrapClass] = useState(
     "flex-1 min-h-0 relative bg-[#050505] placeholder",
   );
@@ -68,23 +56,20 @@ export default function App({ version = "" }) {
     "flex-1 min-h-0 relative bg-[#050505] placeholder",
   );
   const [isElectronReady, setIsElectronReady] = useState(false);
-  const [streamQuality, setStreamQuality] = useState({
-    resolution: "1080p",
-    fps: 60,
-  });
+  const streamQuality = STREAM_QUALITY;
 
   const [remoteId, setRemoteId] = useState("");
+  const [updateInfo, setUpdateInfo] = useState({
+    updateAvailable: false,
+    url: "",
+  });
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localContainerRef = useRef(null);
   const remoteContainerRef = useRef(null);
   const pcRef = useRef(null);
-  const outChannelRef = useRef(null);
   const pendingIceRef = useRef([]);
-  const supabaseClientRef = useRef(null);
-  const myChannelRef = useRef(null);
-  const reconnectTimerRef = useRef(null);
   const isPoliteRef = useRef(false);
   const bitrateIntervalRef = useRef(null);
   const answerProcessedRef = useRef(false);
@@ -121,14 +106,19 @@ export default function App({ version = "" }) {
     }
   }, [localStream, localVideoWrapClass]);
 
-  const { sendSignal, handleSignal, resetSignalingRefs } = useSignaling({
+  const {
+    sendSignal,
+    handleSignal,
+    resetSignalingRefs,
+    initMyRoom,
+    openCallChannel,
+    closeCallChannel,
+    signalingStatus,
+  } = useSignaling({
     pcRef,
     selfId,
-    currentPeerId,
     streamQuality,
     pendingIceRef,
-    outChannelRef,
-    supabaseClientRef,
     addStatus,
     remoteVideoRef,
     setRemoteVideoWrapClass,
@@ -164,7 +154,7 @@ export default function App({ version = "" }) {
       sendSignal,
     });
 
-  const { handleSourceSelected, stopBroadcast, changeMic } = useBroadcast({
+  const { handleSourceSelected, stopBroadcast } = useBroadcast({
     pcRef,
     currentPeerId,
     streamQuality,
@@ -178,106 +168,23 @@ export default function App({ version = "" }) {
     attachLocalTracks,
   });
 
-  const {
-    startMicrophone,
-    stopMicrophone,
-    toggleMicrophone,
-    changeMicrophone,
-  } = useMicrophone({
-    pcRef,
-    currentPeerId,
-    streamQuality,
-    localStreamRef,
-    addStatus,
-    sendSignal,
-    isMicMuted,
-    setIsMicMuted,
-    setHasMicTrack,
-  });
-
-  const [micStreamTrack, setMicStreamTrack] = useState(null);
-
-  useEffect(() => {
-    if (!micStream) {
-      setMicVolume(0);
-      return;
-    }
-    const audioTrack = micStream.getAudioTracks()[0];
-    if (!audioTrack) return;
-
-    let animationId;
-    try {
-      const audioContext = new AudioContext();
-      const analyser = audioContext.createAnalyser();
-      const source = audioContext.createMediaStreamSource(micStream);
-      source.connect(analyser);
-      analyser.fftSize = 256;
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const updateVolume = () => {
-        analyser.getByteFrequencyData(dataArray);
-        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        const volume = Math.min(average / 128, 1);
-        setMicVolume(volume);
-        animationId = requestAnimationFrame(updateVolume);
-      };
-      updateVolume();
-
-      return () => {
-        cancelAnimationFrame(animationId);
-        audioContext.close();
-      };
-    } catch (e) {
-      console.warn("[MicVolume] AudioContext failed:", e);
-    }
-  }, [micStream]);
-
   useEffect(() => {
     const videoEl = remoteVideoRef.current;
     if (!videoEl) return;
     videoEl.volume = remoteMicVolume;
   }, [remoteMicVolume]);
 
+  // Check GitHub for a newer release; show the Update badge only if one exists.
   useEffect(() => {
-    const pc = pcRef.current;
-    if (!pc || pc.connectionState !== "connected") return;
-
-    setUserManualBitrate(true);
-    clearTimeout(window._manualBitrateTimeout);
-    window._manualBitrateTimeout = setTimeout(() => {
-      setUserManualBitrate(false);
-    }, 15000);
-
-    const res = getResolutionByValue(streamQuality.resolution);
-
-    const currentStream = localStreamRef.current;
-    if (currentStream) {
-      const videoTrack = currentStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack
-          .applyConstraints({
-            width: { ideal: res.width },
-            height: { ideal: res.height },
-            frameRate: { ideal: streamQuality.fps },
-          })
-          .catch((e) => console.warn("[Quality] applyConstraints failed:", e));
-      }
-    }
-
-    const manualBitrate = getDefaultBitrateForResolution(
-      streamQuality.resolution,
-    );
-
-    pc.getSenders().forEach((s) =>
-      applyMaxQualityEncoding(s, streamQuality, manualBitrate),
-    );
-
-    setLocalMeta(`${res.width}×${res.height} @${streamQuality.fps}fps`);
-  }, [streamQuality]);
-
-  useEffect(() => {
-    console.log("[App] window.electronAPI:", window.electronAPI);
-    console.log("[App] window.supabase:", window.supabase);
+    if (!window.electronAPI?.checkForUpdate) return;
+    window.electronAPI
+      .checkForUpdate()
+      .then((info) => {
+        if (info?.updateAvailable) {
+          setUpdateInfo({ updateAvailable: true, url: info.url || "" });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -294,111 +201,20 @@ export default function App({ version = "" }) {
     }
   }, []);
 
-  const connectSupabase = useCallback(
-    async (url, key, id) => {
-      if (!window.supabase) {
-        addStatus("Error: Supabase library not loaded.", true);
-        return;
-      }
-      let client = supabaseClientRef.current;
-      if (!client) {
-        try {
-          client = window.supabase.createClient(url, key, {
-            auth: { persistSession: false, autoRefreshToken: false },
-          });
-          supabaseClientRef.current = client;
-          console.log("[Supabase] Client created, URL:", url);
-        } catch (e) {
-          console.error("[Supabase] Init error:", e);
-          setSupabaseStatus("error");
-          addStatus("Supabase init error: " + e.message, true);
-          return;
-        }
-      }
-      if (myChannelRef.current) {
-        try {
-          await client.removeChannel(myChannelRef.current);
-        } catch (_) {}
-        myChannelRef.current = null;
-        await new Promise((r) => setTimeout(r, 500));
-      }
-
-      const ch = client.channel(`peer:${id}`, {
-        config: { broadcast: { self: false } },
-      });
-      ch.on("broadcast", { event: "signal" }, ({ payload }) => {
-        console.log("[Supabase] Received signal:", payload?.type);
-        handleSignalRef.current?.(payload);
-      });
-      ch.on("error", (err) => {
-        console.error("[Supabase] Channel error:", err);
-        addStatus("Channel error: " + (err?.message || "Unknown"), true);
-      });
-
-      ch.subscribe((status) => {
-        console.log("[Supabase] Subscribe status:", status);
-        if (status === "SUBSCRIBED") {
-          setSupabaseStatus("connected");
-          if (reconnectTimerRef.current) {
-            clearTimeout(reconnectTimerRef.current);
-            reconnectTimerRef.current = null;
-          }
-          addStatus('Ready. Share your ID and click "Call".');
-        }
-        if (status === "CHANNEL_ERROR") {
-          setSupabaseStatus("error");
-          addStatus("Channel error.", true);
-        }
-        if (status === "TIMED_OUT") {
-          setSupabaseStatus("error");
-          addStatus("Connection timeout.", true);
-        }
-        if (status === "CLOSED") {
-          console.log("[Supabase] Channel closed");
-          setSupabaseStatus("error");
-          addStatus("Connection closed.", true);
-        }
-      });
-
-      myChannelRef.current = ch;
-
-      return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          if (ch.state !== "joined") {
-            console.log("[Supabase] Timeout, channel state:", ch.state);
-            setSupabaseStatus("error");
-            reject(new Error("Connection timeout"));
-          }
-        }, 10000);
-
-        const checkInterval = setInterval(() => {
-          if (ch.state === "joined" || ch.state === "subscribed") {
-            clearTimeout(timeout);
-            clearInterval(checkInterval);
-            resolve(ch);
-          }
-        }, 100);
-      });
-    },
-    [handleSignalRef],
-  );
-
   useEffect(() => {
     if (isElectronReady) {
       (async () => {
         try {
           const profile = await window.electronAPI.getProfile();
-          const cfg = await window.electronAPI.getConfig();
           setSelfId(profile.id);
-          setConfig(cfg);
           window.__SELF_ID__ = profile.id;
-          await connectSupabase(cfg.supabaseUrl, cfg.supabaseKey, profile.id);
+          await initMyRoom(profile.id);
         } catch (e) {
           addStatus(e.message || "Init error", true);
         }
       })();
     }
-  }, [isElectronReady, connectSupabase]);
+  }, [isElectronReady, initMyRoom]);
 
   useEffect(() => {
     if (window.electronAPI?.onCallLast) {
@@ -428,12 +244,7 @@ export default function App({ version = "" }) {
       if (notify && currentPeerId)
         sendSignal({ type: "hangup", to: currentPeerId });
       soundManager.playDisconnect();
-      if (outChannelRef.current) {
-        supabaseClientRef.current
-          ?.removeChannel(outChannelRef.current)
-          .catch(() => {});
-        outChannelRef.current = null;
-      }
+      closeCallChannel();
       if (pcRef.current) {
         pcRef.current.getSenders().forEach((s) => s.track?.stop());
         pcRef.current.close();
@@ -447,9 +258,16 @@ export default function App({ version = "" }) {
       setHasActiveCall(false);
       pendingIceRef.current = [];
       setIncomingCall(null);
+      // Reset both the status dot and the call status so the Sidebar returns to
+      // its idle layout (input + "Call") for *both* peers — otherwise a peer
+      // torn down mid-"connecting" stays stuck showing "Cancel".
+      setCallStatus("idle");
       setStatusDotState("idle");
       setGlowState("failed");
       setGlowTrigger((prev) => prev + 1);
+      // Clear the idempotency guards so a fresh call can be placed/received
+      // after teardown (otherwise a declined/ended peer can't ring again).
+      resetSignalingRefs();
       if (localStreamRef.current) {
         stopStreamTracks(localStreamRef.current);
         setLocalStream(null);
@@ -463,22 +281,16 @@ export default function App({ version = "" }) {
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
       setRemoteStream(null);
       setIsRemoteMuted(false);
-      setIsMicMuted(true);
-      setMicDeviceId(null);
-      setHasMicTrack(false);
       setRemoteMeta("");
       setRemoteVideoWrapClass(
         "flex-1 min-h-0 relative bg-[#050505] placeholder",
       );
-      if (pcRef.current) {
-        pcRef.current.getSenders().forEach((s) => {
-          if (s.track) s.track.stop();
-        });
-      }
     },
     [
       currentPeerId,
       sendSignal,
+      closeCallChannel,
+      resetSignalingRefs,
       setRemoteBitrate,
       setLocalStream,
       setLocalMeta,
@@ -490,11 +302,10 @@ export default function App({ version = "" }) {
       setIncomingCall,
       setCurrentPeerId,
       setHasActiveCall,
+      setCallStatus,
       setStatusDotState,
       setGlowState,
       setGlowTrigger,
-      setIsMicMuted,
-      setMicDeviceId,
     ],
   );
 
@@ -515,36 +326,6 @@ export default function App({ version = "" }) {
       answerProcessedRef.current = false;
       resetSignalingRefs();
 
-      await createPeerConnection(peerId, false);
-      if (localStreamRef.current) {
-        await attachLocalTracks(localStreamRef.current);
-      }
-
-      if (!micStream && pcRef.current?.connectionState === "connected") {
-        console.log("[App] Starting microphone, deviceId:", micDeviceId);
-        const micResult = await startMicrophone(micDeviceId);
-        if (micResult) {
-          setMicStream(micResult.stream);
-          setMicStreamTrack(micResult.track);
-        }
-      }
-
-      const offer = await pcRef.current.createOffer({
-        offerToReceiveVideo: true,
-        offerToReceiveAudio: true,
-      });
-      const modifiedOffer = {
-        ...offer,
-        sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.resolution),
-      };
-      await pcRef.current.setLocalDescription(modifiedOffer);
-
-      sendSignal({
-        type: "call",
-        to: peerId,
-        offer: pcRef.current.localDescription,
-      });
-
       setCurrentPeerId(peerId);
       addStatus(
         `Calling <strong style="font-family:monospace">${peerId}</strong>...`,
@@ -552,13 +333,48 @@ export default function App({ version = "" }) {
       soundManager.playCall();
       setStatusDotState("connecting");
       setCallStatus("connecting");
-      if (window.electronAPI?.setLastCalledId) {
-        window.electronAPI.setLastCalledId(peerId);
+
+      try {
+        await openCallChannel(peerId);
+
+        await createPeerConnection(peerId, false);
+        if (localStreamRef.current) {
+          await attachLocalTracks(localStreamRef.current);
+        }
+
+        const offer = await pcRef.current.createOffer({
+          offerToReceiveVideo: true,
+          offerToReceiveAudio: true,
+        });
+        const modifiedOffer = {
+          ...offer,
+          sdp: setMaxBandwidthInSDP(offer.sdp, streamQuality.resolution),
+        };
+        await pcRef.current.setLocalDescription(modifiedOffer);
+
+        sendSignal({
+          type: "call",
+          to: peerId,
+          offer: pcRef.current.localDescription,
+        });
+
+        if (window.electronAPI?.setLastCalledId) {
+          window.electronAPI.setLastCalledId(peerId);
+        }
+      } catch (e) {
+        addStatus(e.message || "Peer not reachable", true);
+        closeCallChannel();
+        setCallStatus("idle");
+        setStatusDotState("idle");
+        setCurrentPeerId("");
+        soundManager.playCancel();
       }
     },
     [
       selfId,
       hangup,
+      openCallChannel,
+      closeCallChannel,
       createPeerConnection,
       attachLocalTracks,
       sendSignal,
@@ -567,11 +383,6 @@ export default function App({ version = "" }) {
       resetSignalingRefs,
       setCallStatus,
       setStatusDotState,
-      startMicrophone,
-      micDeviceId,
-      micStream,
-      setMicStream,
-      setMicStreamTrack,
     ],
   );
 
@@ -598,15 +409,6 @@ export default function App({ version = "" }) {
     await createPeerConnection(from, true);
     if (localStreamRef.current) {
       await attachLocalTracks(localStreamRef.current);
-    }
-
-    if (!micStream && pcRef.current?.connectionState === "connected") {
-      console.log("[App] Starting microphone (accept), deviceId:", micDeviceId);
-      const micResult = await startMicrophone(micDeviceId);
-      if (micResult) {
-        setMicStream(micResult.stream);
-        setMicStreamTrack(micResult.track);
-      }
     }
 
     setCurrentPeerId(from);
@@ -649,23 +451,21 @@ export default function App({ version = "" }) {
     setStatusDotState,
     setIncomingCall,
     setRemoteBitrate,
-    startMicrophone,
-    micDeviceId,
-    micStream,
-    setMicStream,
-    setMicStreamTrack,
   ]);
 
   const handleDeclineCall = useCallback(() => {
     if (!incomingCall) return;
     soundManager.stopIncomingLoop();
     const { from } = incomingCall;
-    setIncomingCall(null);
     sendSignal({ type: "decline", to: from });
+    setIncomingCall(null);
+    // Clear the "incoming processed" guard so this peer can be rung again;
+    // without this a single decline would silently block all future calls.
+    resetSignalingRefs();
     addStatus(
       `Call from <strong style="font-family:monospace">${from}</strong> declined.`,
     );
-  }, [incomingCall, sendSignal, addStatus, setIncomingCall]);
+  }, [incomingCall, sendSignal, resetSignalingRefs, addStatus, setIncomingCall]);
 
   const handleBroadcast = useCallback(
     async () => setSourcePickerOpen(true),
@@ -675,42 +475,6 @@ export default function App({ version = "" }) {
   const handleChangeSource = useCallback(
     async () => setSourcePickerOpen(true),
     [],
-  );
-
-  const handleStartMic = useCallback(async () => {
-    const result = await startMicrophone(micDeviceId);
-    if (result) {
-      setMicStream(result.stream);
-    }
-  }, [startMicrophone, micDeviceId]);
-
-  const handleStopMic = useCallback(async () => {
-    if (micStream) {
-      await stopMicrophone(micStream, micStream.getAudioTracks()[0]);
-      setMicStream(null);
-    }
-  }, [stopMicrophone, micStream]);
-
-  const handleToggleMic = useCallback(() => {
-    if (micStream) {
-      const track = micStream.getAudioTracks()[0];
-      if (track) {
-        toggleMicrophone(track);
-      }
-    }
-  }, [toggleMicrophone, micStream]);
-
-  const handleMicSelect = useCallback(
-    async (deviceId) => {
-      setMicDeviceId(deviceId);
-      if (micStream && pcRef.current?.connectionState === "connected") {
-        const result = await changeMicrophone(deviceId, micStream);
-        if (result) {
-          setMicStream(result.stream);
-        }
-      }
-    },
-    [micStream, changeMicrophone],
   );
 
   const handlePiP = useCallback(async () => {
@@ -737,10 +501,7 @@ export default function App({ version = "" }) {
         await videoElement.msRequestFullscreen();
       }
     } catch (e) {
-      console.error(
-        "[Fullscreen] Ошибка при переходе в полноэкранный режим:",
-        e,
-      );
+      console.error("[Fullscreen] error:", e);
     }
   }, []);
 
@@ -762,22 +523,15 @@ export default function App({ version = "" }) {
     addStatus("Regenerating ID...");
     soundManager.playIdChange();
     try {
-      if (myChannelRef.current) {
-        await supabaseClientRef.current
-          .removeChannel(myChannelRef.current)
-          .catch(() => {});
-        myChannelRef.current = null;
-      }
-      await new Promise((r) => setTimeout(r, 500));
       const profile = await window.electronAPI.regenerateProfile();
       setSelfId(profile.id);
       window.__SELF_ID__ = profile.id;
-      await connectSupabase(config.supabaseUrl, config.supabaseKey, profile.id);
+      await initMyRoom(profile.id);
       addStatus("New ID created.");
     } catch (e) {
       addStatus("Failed to change ID: " + (e.message || "Unknown error"), true);
     }
-  }, [config, connectSupabase, addStatus]);
+  }, [initMyRoom, addStatus]);
 
   const handleHangup = useCallback(async () => {
     if (!currentPeerId && !pcRef.current) {
@@ -798,47 +552,23 @@ export default function App({ version = "" }) {
   }, [currentPeerId, hangup, addStatus]);
 
   const handleCancelCall = useCallback(() => {
-    if (incomingCall) {
-      sendSignal({ type: "cancel", to: incomingCall.from });
-    } else if (currentPeerId) {
-      sendSignal({ type: "cancel", to: currentPeerId });
-    }
-    if (outChannelRef.current) {
-      supabaseClientRef.current
-        ?.removeChannel(outChannelRef.current)
-        .catch(() => {});
-      outChannelRef.current = null;
-    }
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
-    }
-    pendingIceRef.current = [];
-    setCurrentPeerId("");
-    setHasActiveCall(false);
-    setCallStatus("idle");
-    setStatusDotState("idle");
-    soundManager.playCancel();
+    // Tell the other side first (uses the still-open signaling channel), then
+    // run the same full teardown as hangup so no partial state is left behind.
+    const target = incomingCall?.from || currentPeerId;
+    if (target) sendSignal({ type: "cancel", to: target });
+    hangup(false);
     addStatus("Call cancelled.");
-  }, [
-    incomingCall,
-    currentPeerId,
-    sendSignal,
-    addStatus,
-    setCallStatus,
-    setStatusDotState,
-    setCurrentPeerId,
-    setHasActiveCall,
-  ]);
+  }, [incomingCall, currentPeerId, sendSignal, hangup, addStatus]);
 
   return (
     <div className="h-screen flex flex-col bg-bg text-text font-sans text-[13px] antialiased overflow-hidden">
       <StatusGlow state={glowState} trigger={glowTrigger} />
       <TitleBar
-        status={statusDotState}
         connectionStatus={callStatus}
         hasActiveCall={hasActiveCall}
         version={version}
+        updateAvailable={updateInfo.updateAvailable}
+        updateUrl={updateInfo.url}
       />
       <div className="h-[calc(100vh-38px)] grid grid-cols-[272px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden">
         <Sidebar
@@ -854,7 +584,7 @@ export default function App({ version = "" }) {
           callerId={incomingCall?.from || ""}
           hasActiveCall={hasActiveCall}
           connectionStatus={callStatus}
-          supabaseStatus={supabaseStatus}
+          signalingStatus={signalingStatus}
           statusMessages={statusLog}
           version={version}
           remoteId={remoteId}
@@ -870,20 +600,10 @@ export default function App({ version = "" }) {
               isBroadcasting={!!localStream}
               onBroadcast={localStream ? stopBroadcast : handleBroadcast}
               onChangeSource={handleChangeSource}
-              onStartMic={handleStartMic}
-              onStopMic={handleStopMic}
-              onToggleMic={handleToggleMic}
               showPlaceholder={!streamHasVideo(localStream)}
               videoRef={localVideoRef}
               containerRef={localContainerRef}
               canBroadcast={pcRef.current?.connectionState === "connected"}
-              streamQuality={streamQuality}
-              onQualityChange={setStreamQuality}
-              qualityOptions={qualityOptions}
-              isMicMuted={isMicMuted}
-              onToggleMicMute={() => setIsMicMuted(!isMicMuted)}
-              hasMic={hasMicTrack}
-              micVolume={micVolume}
             />
             <VideoPanel
               ref={remoteVideoRef}

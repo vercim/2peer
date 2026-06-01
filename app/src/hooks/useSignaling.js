@@ -1,17 +1,32 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
+import { joinRoom, getRelaySockets } from "@trystero-p2p/torrent";
 import { soundManager } from "../utils/soundManager.js";
 import { setMaxBandwidthInSDP } from "../utils/sdpUtils.js";
 import { applyMaxQualityEncoding } from "../utils/bitrateManager.js";
 import { stopStreamTracks } from "../utils/streamUtils.js";
 
+// room name namespace — keeps our rooms separate from other apps using Trystero.
+// We pass an explicit tracker list so Trystero connects to ALL of them (its
+// default only uses the first 3), which improves the odds that at least one
+// WebSocket signaling relay is reachable on a given network.
+const TRYSTERO_CONFIG = {
+  appId: "2peer",
+  relayConfig: {
+    urls: [
+      "wss://tracker.webtorrent.dev",
+      "wss://tracker.openwebtorrent.com",
+      "wss://tracker.btorrent.xyz",
+      "wss://tracker.files.fm:7073/announce",
+    ],
+  },
+};
+const CALL_TIMEOUT_MS = 30_000;
+
 export function useSignaling({
   pcRef,
   selfId,
-  currentPeerId,
   streamQuality,
   pendingIceRef,
-  outChannelRef,
-  supabaseClientRef,
   addStatus,
   remoteVideoRef,
   setRemoteVideoWrapClass,
@@ -27,69 +42,91 @@ export function useSignaling({
   const hangupProcessedRef = useRef(false);
   const incomingProcessedRef = useRef({ value: false });
 
-  const ensureOutChannel = useCallback(
-    async (peerId) => {
-      if (
-        outChannelRef.current &&
-        outChannelRef.current._topic === `realtime:peer:${peerId}`
-      )
-        return;
-      if (outChannelRef.current) {
-        try {
-          await supabaseClientRef.current.removeChannel(outChannelRef.current);
-        } catch (_) {}
-        outChannelRef.current = null;
-      }
-      const ch = supabaseClientRef.current.channel(`peer:${peerId}`, {
-        config: { broadcast: { self: false } },
-      });
-      await new Promise((resolve, reject) => {
-        const timer = setTimeout(
-          () =>
-            outChannelRef.current ? resolve() : reject(new Error("timeout")),
-          8000,
-        );
-        ch.subscribe((status) => {
-          clearTimeout(timer);
-          if (status === "SUBSCRIBED") {
-            outChannelRef.current = ch;
-            resolve();
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
-            reject(new Error(status));
-          else {
-            outChannelRef.current = ch;
-            resolve();
-          }
-        });
-      });
-    },
-    [outChannelRef, supabaseClientRef],
-  );
+  const myRoomRef = useRef(null);   // room we join on startup (room = selfId)
+  const callRoomRef = useRef(null); // room joined when making a call (room = calleeId)
 
-  const sendSignal = useCallback(
-    async (payload) => {
-      if (!supabaseClientRef.current) {
-        addStatus("No connection to Supabase.", true);
+  // action objects returned by room.makeAction("signal") for each room
+  const myRoomActionRef = useRef(null);
+  const callRoomActionRef = useRef(null);
+
+  const peerTrysteroIdRef = useRef(null); // Trystero peer ID of the current call partner
+
+  const [signalingStatus, setSignalingStatus] = useState("disconnected");
+
+  // Watches the actual relay (BitTorrent tracker) WebSocket connections so the
+  // status reflects reality instead of flipping to "connected" the moment we
+  // join a room. Without an open relay socket, peer discovery can't happen and
+  // calls never arrive.
+  const relayMonitorRef = useRef({
+    timer: null,
+    everConnected: false,
+    warned: false,
+    elapsed: 0,
+  });
+
+  const startRelayMonitor = useCallback(() => {
+    const m = relayMonitorRef.current;
+    clearInterval(m.timer);
+    m.everConnected = false;
+    m.warned = false;
+    m.elapsed = 0;
+    m.timer = setInterval(() => {
+      const sockets = Object.values(getRelaySockets() || {});
+      const open = sockets.filter((s) => s && s.readyState === 1).length;
+
+      if (open > 0) {
+        setSignalingStatus("connected");
+        if (!m.everConnected) {
+          m.everConnected = true;
+          addStatus(`Signaling online (${open} server${open > 1 ? "s" : ""}).`);
+        }
         return;
       }
-      try {
-        await ensureOutChannel(payload.to);
-        if (!outChannelRef.current) return;
-        const signalPayload = { ...payload, from: selfId };
-        await outChannelRef.current.send({
-          type: "broadcast",
-          event: "signal",
-          payload: signalPayload,
-        });
-      } catch (e) {
-        if (outChannelRef.current) {
-          addStatus("Send error: " + e.message, true);
+
+      // open === 0. Relay sockets briefly dropping to 0 during normal
+      // reconnection is expected once we've connected — only treat a *never*
+      // connected state as an error worth warning about.
+      setSignalingStatus(m.everConnected ? "connected" : "connecting");
+      if (!m.everConnected && !m.warned) {
+        m.elapsed += 1500;
+        if (m.elapsed >= 9000) {
+          m.warned = true;
+          addStatus(
+            "Can't reach any signaling server — check your network, VPN, or firewall (WebSocket trackers may be blocked).",
+            true,
+          );
         }
       }
+    }, 1500);
+  }, [addStatus]);
+
+  useEffect(() => {
+    return () => clearInterval(relayMonitorRef.current.timer);
+  }, []);
+
+  const selfIdRef = useRef(selfId);
+  useEffect(() => {
+    selfIdRef.current = selfId;
+  }, [selfId]);
+
+  // Stable ref so room event handlers don't capture stale handleSignal
+  const handleSignalRef = useRef(null);
+
+  // --- sendSignal ----------------------------------------------------------
+  // Priority: use callRoom action if we're the caller, else myRoom action.
+  const sendSignal = useCallback(
+    (payload) => {
+      const action = callRoomActionRef.current ?? myRoomActionRef.current;
+      const peerId = peerTrysteroIdRef.current;
+      if (!action || !peerId) return;
+      action
+        .send({ ...payload, from: selfIdRef.current }, { target: peerId })
+        .catch((e) => console.warn("[Trystero] sendSignal error:", e.message));
     },
-    [supabaseClientRef, ensureOutChannel, outChannelRef, selfId, addStatus],
+    [],
   );
 
+  // --- handleSignal --------------------------------------------------------
   const handleSignal = useCallback(
     async (msg) => {
       if (msg.type === "call") {
@@ -100,10 +137,7 @@ export function useSignaling({
         setIncomingCall({ from: msg.from, offer: msg.offer });
         soundManager.playIncomingLoop();
         if (window.electronAPI?.showNotification) {
-          window.electronAPI.showNotification(
-            "Incoming call",
-            `From: ${msg.from}`,
-          );
+          window.electronAPI.showNotification("Incoming call", `From: ${msg.from}`);
         }
         addStatus(
           `Incoming call from <strong style="font-family:monospace">${msg.from}</strong>.`,
@@ -114,7 +148,6 @@ export function useSignaling({
         if (!pcRef.current) return;
         if (answerProcessedRef.current) return;
         if (pcRef.current.signalingState !== "have-local-offer") return;
-
         answerProcessedRef.current = true;
         const modifiedAnswer = {
           ...msg.answer,
@@ -124,12 +157,10 @@ export function useSignaling({
         pcRef.current
           .getSenders()
           .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
-
         for (const c of pendingIceRef.current) {
           await pcRef.current.addIceCandidate(c).catch(console.error);
         }
         pendingIceRef.current = [];
-
         addStatus(
           `<strong style="font-family:monospace">${msg.from}</strong> accepted the call.`,
         );
@@ -223,6 +254,9 @@ export function useSignaling({
         addStatus(
           `<strong style="font-family:monospace">${msg.from}</strong> cancelled the call.`,
         );
+        // If we'd already accepted (PC + local tracks live) when the cancel
+        // raced in, tear it all down — otherwise we'd be stuck "connecting".
+        onHangupRequested(false);
       }
 
       if (msg.type === "hangup") {
@@ -253,11 +287,119 @@ export function useSignaling({
     ],
   );
 
+  useEffect(() => {
+    handleSignalRef.current = handleSignal;
+  }, [handleSignal]);
+
+  // --- initMyRoom ----------------------------------------------------------
+  // Join the room named after our own ID so others can reach us.
+  const initMyRoom = useCallback(
+    async (id) => {
+      if (myRoomRef.current) {
+        try {
+          myRoomRef.current.leave();
+        } catch (_) {}
+        myRoomRef.current = null;
+        myRoomActionRef.current = null;
+      }
+
+      setSignalingStatus("connecting");
+
+      const room = joinRoom(TRYSTERO_CONFIG, id);
+      myRoomRef.current = room;
+
+      const action = room.makeAction("signal");
+      myRoomActionRef.current = action;
+
+      action.onMessage = (payload, { peerId }) => {
+        console.log("[Trystero] Received via myRoom:", payload?.type);
+        peerTrysteroIdRef.current = peerId;
+        handleSignalRef.current?.(payload);
+      };
+
+      room.onPeerJoin = (peerId) => {
+        console.log("[Trystero] Peer joined my room:", peerId);
+        peerTrysteroIdRef.current = peerId;
+      };
+
+      room.onPeerLeave = (peerId) => {
+        console.log("[Trystero] Peer left my room:", peerId);
+        if (peerTrysteroIdRef.current === peerId && !callRoomRef.current) {
+          peerTrysteroIdRef.current = null;
+        }
+      };
+
+      addStatus('Ready. Share your ID and click "Call".');
+      startRelayMonitor();
+    },
+    [addStatus, startRelayMonitor],
+  );
+
+  // --- openCallChannel -----------------------------------------------------
+  // Join the callee's room; resolves when Trystero connects to the callee.
+  const openCallChannel = useCallback((calleeId) => {
+    return new Promise((resolve, reject) => {
+      if (callRoomRef.current) {
+        try {
+          callRoomRef.current.leave();
+        } catch (_) {}
+        callRoomRef.current = null;
+        callRoomActionRef.current = null;
+      }
+      peerTrysteroIdRef.current = null;
+
+      const room = joinRoom(TRYSTERO_CONFIG, calleeId);
+      callRoomRef.current = room;
+
+      const action = room.makeAction("signal");
+      callRoomActionRef.current = action;
+
+      action.onMessage = (payload, { peerId }) => {
+        console.log("[Trystero] Received via callRoom:", payload?.type);
+        peerTrysteroIdRef.current = peerId;
+        handleSignalRef.current?.(payload);
+      };
+
+      const timer = setTimeout(() => {
+        reject(new Error("Peer not reachable (timeout)"));
+      }, CALL_TIMEOUT_MS);
+
+      // Trystero fires onPeerJoin immediately for already-connected peers too
+      room.onPeerJoin = (peerId) => {
+        console.log("[Trystero] Callee found:", peerId);
+        peerTrysteroIdRef.current = peerId;
+        clearTimeout(timer);
+        resolve();
+      };
+    });
+  }, []);
+
+  // --- closeCallChannel ----------------------------------------------------
+  const closeCallChannel = useCallback(() => {
+    if (callRoomRef.current) {
+      try {
+        callRoomRef.current.leave();
+      } catch (_) {}
+      callRoomRef.current = null;
+    }
+    callRoomActionRef.current = null;
+    peerTrysteroIdRef.current = null;
+  }, []);
+
+  // --- resetSignalingRefs --------------------------------------------------
   const resetSignalingRefs = useCallback(() => {
     answerProcessedRef.current = false;
     hangupProcessedRef.current = false;
     incomingProcessedRef.current.value = false;
   }, []);
 
-  return { sendSignal, handleSignal, resetSignalingRefs };
+  return {
+    sendSignal,
+    handleSignal,
+    resetSignalingRefs,
+    initMyRoom,
+    openCallChannel,
+    closeCallChannel,
+    signalingStatus,
+  };
 }

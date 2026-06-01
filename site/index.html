@@ -101,7 +101,7 @@
           <h2>Built to do one thing, completely.</h2>
           <p>
             Not a meeting room. 2peer links two people and gets out of the way:
-            share your ID, they accept, you broadcast — up to 1440p.
+            share your ID, they accept, you broadcast.
           </p>
         </div>
 
@@ -110,8 +110,9 @@
             <span class="feature__num">01</span>
             <h3>Direct, by design</h3>
             <p>
-              WebRTC streams straight between the two machines. The relay only
-              introduces the peers — it never sees your video or audio.
+              WebRTC streams straight between the two machines. Trystero over
+              BitTorrent DHT handles peer discovery — no signaling server, no
+              relay, nothing in the middle.
             </p>
           </article>
           <article class="feature">
@@ -197,10 +198,10 @@
 
           <article class="card card--wide">
             <header class="card__head"><h3>Connectivity</h3></header>
-            <p class="card__lead">8 STUN servers, IP-pinned fallback.</p>
+            <p class="card__lead">Trystero over BitTorrent DHT — zero signaling server.</p>
             <ul class="ticks">
-              <li>Google, Twilio, Metered &amp; more</li>
-              <li>Hardcoded IPs if DNS fails</li>
+              <li>Peer discovery via public BitTorrent trackers</li>
+              <li>8 STUN servers, IP-pinned fallback</li>
               <li>Auto <code>restartIce()</code> on drop</li>
               <li class="ticks__warn">No TURN — symmetric NAT may fail</li>
             </ul>

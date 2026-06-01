@@ -8,6 +8,7 @@ const {
   Menu,
   Notification,
   nativeImage,
+  shell,
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -17,10 +18,60 @@ if (process.platform === "win32") {
   app.setAppUserModelId("2peer");
 }
 
+// Dev convenience: `electron . --clone` (or any --clone=<name>) runs an isolated
+// second instance with its own userData dir → its own profile.json / ID. Because
+// the single-instance lock is keyed to userData, both instances run at once, so
+// you can call yourself between them while testing.
+const cloneArg = process.argv.find((a) => a.startsWith("--clone"));
+if (cloneArg) {
+  const suffix = cloneArg.includes("=") ? cloneArg.split("=")[1] : "clone";
+  app.setPath("userData", `${app.getPath("userData")}-${suffix}`);
+}
+
 const packageJson = JSON.parse(
   fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
 );
 const APP_VERSION = packageJson.version;
+const GITHUB_RELEASES_PAGE = "https://github.com/vercim/2peer/releases/latest";
+const GITHUB_LATEST_API =
+  "https://api.github.com/repos/vercim/2peer/releases/latest";
+
+// Compare two semver-ish strings ("1.2.3"). Returns true if `latest` > `current`.
+function isNewerVersion(latest, current) {
+  const parse = (v) =>
+    String(v)
+      .replace(/^v/i, "")
+      .split(".")
+      .map((n) => parseInt(n, 10) || 0);
+  const a = parse(latest);
+  const b = parse(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0;
+    const y = b[i] || 0;
+    if (x > y) return true;
+    if (x < y) return false;
+  }
+  return false;
+}
+
+async function checkForUpdate() {
+  try {
+    const res = await fetch(GITHUB_LATEST_API, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return { updateAvailable: false };
+    const data = await res.json();
+    const latestVersion = (data.tag_name || data.name || "").replace(/^v/i, "");
+    if (!latestVersion) return { updateAvailable: false };
+    return {
+      updateAvailable: isNewerVersion(latestVersion, APP_VERSION),
+      latestVersion,
+      url: data.html_url || GITHUB_RELEASES_PAGE,
+    };
+  } catch (_) {
+    return { updateAvailable: false };
+  }
+}
 
 function getSettingsFile() {
   return path.join(app.getPath("userData"), "profile.json");
@@ -247,13 +298,18 @@ function createWindow() {
   }
 
   const isLaunchedAsHidden = args.includes("--hidden");
+  const isMac = process.platform === "darwin";
   mainWindow = new BrowserWindow({
     width: 1050,
     height: 780,
     minWidth: 800,
     minHeight: 700,
-    frame: false,
-    backgroundColor: "#0a0a0a",
+    ...(isMac
+      ? { titleBarStyle: "hidden", trafficLightPosition: { x: 13, y: 13 } }
+      : { frame: false }),
+    transparent: true,
+    backgroundColor: "#00000000",
+    roundedCorners: true,
     autoHideMenuBar: true,
     show: !isLaunchedAsHidden,
     webPreferences: {
@@ -306,13 +362,6 @@ function registerIpcHandlers() {
     setLastCalledId(lastCalledId);
     updateTrayMenu();
   });
-  const configHandler = () => ({
-    supabaseUrl: "https://nsoavwoouwjkqktlxjyr.supabase.co",
-    supabaseKey:
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zb2F2d29vdXdqa3FrdGx4anlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MTAwMjgsImV4cCI6MjA5MTA4NjAyOH0.GIzWLsvtzdqsODDjDNB_ZVRvST6KMroOSIaz3p9IUCo",
-  });
-  ipcMain.handle("get-config", configHandler);
-  ipcMain.handle("app:get-config", configHandler);
   ipcMain.handle("sources:get", async () => {
     const sources = await desktopCapturer.getSources({
       types: ["screen", "window"],
@@ -337,6 +386,10 @@ function registerIpcHandlers() {
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
   ipcMain.handle("app:version", () => APP_VERSION);
+  ipcMain.handle("app:check-update", () => checkForUpdate());
+  ipcMain.handle("app:open-external", (_, url) => {
+    shell.openExternal(url || GITHUB_RELEASES_PAGE);
+  });
   ipcMain.handle("app:show-notification", (_, { title, body }) => {
     if (!Notification.isSupported()) return;
     if (mainWindow && mainWindow.isVisible()) return;

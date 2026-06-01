@@ -1,4 +1,4 @@
-import { forwardRef, useState } from "react";
+import { forwardRef } from "react";
 import { formatBitrate } from "../utils/streamUtils.js";
 
 export const VideoPanel = forwardRef(function VideoPanel(
@@ -9,9 +9,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
     isLocal = false,
     onBroadcast,
     onChangeSource,
-    onStartMic,
-    onStopMic,
-    onToggleMic,
     onPiP,
     onFullscreen,
     isBroadcasting = false,
@@ -20,31 +17,14 @@ export const VideoPanel = forwardRef(function VideoPanel(
     className = "",
     videoRef,
     containerRef,
-    streamQuality,
-    onQualityChange,
-    qualityOptions,
     isMuted = false,
     onToggleMute,
     isDisabled = false,
-    isMicMuted = true,
-    hasMic = false,
-    micVolume = 1,
-    onMicVolumeChange,
     remoteMicVolume = 1,
     onRemoteMicVolumeChange,
   },
   ref,
 ) {
-  const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
-
-  const handleMicClick = () => {
-    if (hasMic && onToggleMic) {
-      onToggleMic();
-    } else if (onStartMic) {
-      onStartMic();
-    }
-  };
-
   const handleFullscreen = (e) => {
     e.stopPropagation();
     if (onFullscreen) onFullscreen();
@@ -57,30 +37,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
       <div className="flex items-center justify-between p-[8px_12px] border-b border-border shrink-0">
         <div className="flex items-center gap-[8px]">
           <span className="text-[11px] text-muted">{title}</span>
-          {isLocal && canBroadcast && hasMic && !isMicMuted && (
-            <div className="flex items-center gap-[2px] h-[16px]">
-              <div
-                className="w-[3px] h-full bg-[#555] rounded-sm"
-                style={{ opacity: micVolume > 0.1 ? 1 : 0.3 }}
-              />
-              <div
-                className="w-[3px] h-full bg-[#555] rounded-sm"
-                style={{ opacity: micVolume > 0.3 ? 1 : 0.3 }}
-              />
-              <div
-                className="w-[3px] h-full bg-[#555] rounded-sm"
-                style={{ opacity: micVolume > 0.5 ? 1 : 0.3 }}
-              />
-              <div
-                className="w-[3px] h-full bg-[#555] rounded-sm"
-                style={{ opacity: micVolume > 0.7 ? 1 : 0.3 }}
-              />
-              <div
-                className="w-[3px] h-full bg-[#555] rounded-sm"
-                style={{ opacity: micVolume > 0.9 ? 1 : 0.3 }}
-              />
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-[5px]">
           <span className="text-[10px] text-[#2e2e2e] font-mono">{meta}</span>
@@ -88,27 +44,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
             <span className="text-[10px] text-[#888] font-mono">
               {formatBitrate(bitrate)}
             </span>
-          )}
-          {isLocal && canBroadcast && (
-            <button
-              className={`bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] transition-colors duration-120 ${hasMic && !isMicMuted ? "text-white hover:text-text" : "text-[#555] hover:text-text hover:bg-[rgba(255,255,255,0.09)]"} cursor-pointer`}
-              onClick={handleMicClick}
-            >
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-                <line x1="8" y1="23" x2="16" y2="23" />
-              </svg>
-              {hasMic ? (isMicMuted ? "Unmute" : "Mute") : "Mic"}
-            </button>
           )}
           {isLocal && canBroadcast && (
             <>
@@ -148,66 +83,6 @@ export const VideoPanel = forwardRef(function VideoPanel(
                   </svg>
                   Change
                 </button>
-              )}
-              {canBroadcast && streamQuality && qualityOptions && (
-                <div className="relative">
-                  <button
-                    className="bg-[rgba(255,255,255,0.05)] border border-border rounded-[5px] p-[4px_8px] text-[11px] flex items-center gap-[4px] text-[#555] cursor-pointer transition-colors duration-120 hover:text-text hover:bg-[rgba(255,255,255,0.09)]"
-                    onClick={() => setQualityMenuOpen(!qualityMenuOpen)}
-                  >
-                    <svg
-                      width="11"
-                      height="11"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    Quality
-                  </button>
-                  {qualityMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-border rounded-[6px] p-2 z-50 min-w-[160px]">
-                      <div className="text-[10px] text-muted mb-1">
-                        Resolution
-                      </div>
-                      <select
-                        className="w-full bg-[#0a0a0a] border border-border rounded-[4px] p-1 text-[11px] text-text mb-2"
-                        value={streamQuality.resolution}
-                        onChange={(e) =>
-                          onQualityChange({
-                            ...streamQuality,
-                            resolution: e.target.value,
-                          })
-                        }
-                      >
-                        {qualityOptions.resolution.map((r) => (
-                          <option key={r.value} value={r.value}>
-                            {r.label}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="text-[10px] text-muted mb-1">FPS</div>
-                      <select
-                        className="w-full bg-[#0a0a0a] border border-border rounded-[4px] p-1 text-[11px] text-text mb-2"
-                        value={streamQuality.fps}
-                        onChange={(e) =>
-                          onQualityChange({
-                            ...streamQuality,
-                            fps: parseInt(e.target.value),
-                          })
-                        }
-                      >
-                        {qualityOptions.fps.map((f) => (
-                          <option key={f} value={f}>
-                            {f} FPS
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
               )}
             </>
           )}

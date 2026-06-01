@@ -1,14 +1,16 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  platform: process.platform,
   getProfile: () => ipcRenderer.invoke("profile:get"),
   regenerateProfile: () => ipcRenderer.invoke("profile:regen"),
-  getConfig: () => ipcRenderer.invoke("app:get-config"),
-  getSources: () => ipcRenderer.invoke("sources:get"),
+getSources: () => ipcRenderer.invoke("sources:get"),
   setPendingSource: (id) => ipcRenderer.invoke("sources:set-pending", id),
   minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
   closeWindow: () => ipcRenderer.invoke("window:close"),
   getVersion: () => ipcRenderer.invoke("app:version"),
+  checkForUpdate: () => ipcRenderer.invoke("app:check-update"),
+  openExternal: (url) => ipcRenderer.invoke("app:open-external", url),
   showNotification: (title, body) =>
     ipcRenderer.invoke("app:show-notification", { title, body }),
   quitApp: () => ipcRenderer.invoke("app:quit"),
