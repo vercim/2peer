@@ -23,7 +23,7 @@ export function ConfirmDialog({ isOpen, message, onConfirm, onCancel }) {
         />
         <div className="flex gap-[6px]">
           <button
-            className="bg-[#d8d8d8] text-[#0a0a0a] border-none rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]"
+            className="bg-accent text-[#0a0a0a] border-none rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]"
             onClick={onConfirm}
           >
             Confirm

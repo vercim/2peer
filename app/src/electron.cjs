@@ -110,6 +110,7 @@ function setLastCalledId(lastCalledId) {
 let pendingSourceId = null;
 let tray = null;
 let isQuitting = false;
+let isCallActive = false;
 const args = process.argv.slice(1);
 
 function buildTrayMenu() {
@@ -123,7 +124,9 @@ function buildTrayMenu() {
     { type: "separator" },
     {
       label: "Update ID",
+      enabled: !isCallActive,
       click: () => {
+        if (isCallActive) return;
         const current = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
         const profile = {
           id: generateId(),
@@ -300,10 +303,10 @@ function createWindow() {
   const isLaunchedAsHidden = args.includes("--hidden");
   const isMac = process.platform === "darwin";
   mainWindow = new BrowserWindow({
-    width: 1050,
-    height: 780,
-    minWidth: 800,
-    minHeight: 700,
+    width: 900,
+    height: 650,
+    minWidth: 720,
+    minHeight: 540,
     ...(isMac
       ? { titleBarStyle: "hidden", trafficLightPosition: { x: 13, y: 13 } }
       : { frame: false }),
@@ -349,17 +352,23 @@ function createWindow() {
 function registerIpcHandlers() {
   ipcMain.handle("profile:get", () => ensureProfile());
   ipcMain.handle("profile:regen", () => {
+    if (isCallActive) return null;
     const current = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
     const profile = {
       id: generateId(),
       lastCalledId: current?.lastCalledId || "",
     };
     setProfile(profile);
+    updateTrayMenu();
     return profile;
   });
   ipcMain.handle("profile:get-last-called", () => getLastCalledId());
   ipcMain.handle("profile:set-last-called", (_, lastCalledId) => {
     setLastCalledId(lastCalledId);
+    updateTrayMenu();
+  });
+  ipcMain.handle("app:set-call-active", (_, active) => {
+    isCallActive = !!active;
     updateTrayMenu();
   });
   ipcMain.handle("sources:get", async () => {

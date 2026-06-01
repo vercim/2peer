@@ -37,7 +37,7 @@ export function useBroadcast({
             height: { ideal: res.height },
             frameRate: { ideal: streamQuality.fps },
           },
-          audio: true,
+          audio: false,
         });
       } catch (e) {
         console.log("[Broadcast] getDisplayMedia failed:", e.message);
@@ -51,12 +51,7 @@ export function useBroadcast({
               maxFrameRate: streamQuality.fps,
             },
           },
-          audio: {
-            mandatory: {
-              chromeMediaSource: "desktop",
-              chromeMediaSourceId: sourceId,
-            },
-          },
+          audio: false,
         });
       }
 

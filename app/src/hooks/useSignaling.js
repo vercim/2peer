@@ -233,6 +233,11 @@ export function useSignaling({
       }
 
       if (msg.type === "decline") {
+        // Only meaningful if we have an active PC (offer was sent and peer
+        // received it). A decline arriving when pcRef is null is a stale
+        // duplicate from a previous call — ignore it to avoid tearing down
+        // a new call that may be in the process of connecting.
+        if (!pcRef.current) return;
         incomingProcessedRef.current.value = false;
         setIncomingCall(null);
         setCallStatus("idle");
@@ -244,6 +249,9 @@ export function useSignaling({
       }
 
       if (msg.type === "cancel") {
+        // Only meaningful if we have a pending incoming call notification.
+        // A cancel with no pending call is stale — ignore it.
+        if (!incomingProcessedRef.current.value) return;
         soundManager.stopIncomingLoop();
         incomingProcessedRef.current.value = false;
         setIncomingCall(null);
@@ -254,13 +262,16 @@ export function useSignaling({
         addStatus(
           `<strong style="font-family:monospace">${msg.from}</strong> cancelled the call.`,
         );
-        // If we'd already accepted (PC + local tracks live) when the cancel
-        // raced in, tear it all down — otherwise we'd be stuck "connecting".
+        // Tear down PC+tracks if we had already accepted before the cancel raced in.
         onHangupRequested(false);
       }
 
       if (msg.type === "hangup") {
         if (hangupProcessedRef.current) return;
+        // Without an active PC there is nothing to tear down; a hangup here
+        // is a duplicate/stale signal from the previous call — ignore it so
+        // it can't disrupt a new call that is being set up.
+        if (!pcRef.current) return;
         hangupProcessedRef.current = true;
         incomingProcessedRef.current.value = false;
         addStatus(

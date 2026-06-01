@@ -5,6 +5,8 @@ import { VideoPanel } from "./components/VideoPanel.jsx";
 import { SourcePicker } from "./components/SourcePicker.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
 import { StatusGlow } from "./components/StatusGlow.jsx";
+import { CallingOverlay } from "./components/CallingOverlay.jsx";
+import { IncomingCallDialog } from "./components/IncomingCallDialog.jsx";
 import { soundManager } from "./utils/soundManager.js";
 import { setMaxBandwidthInSDP } from "./utils/sdpUtils.js";
 import { streamHasVideo, stopStreamTracks } from "./utils/streamUtils.js";
@@ -40,6 +42,7 @@ export default function App({ version = "" }) {
   });
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
+  const [isOutgoingCall, setIsOutgoingCall] = useState(false);
   const [localMeta, setLocalMeta] = useState("");
   const [remoteMeta, setRemoteMeta] = useState("");
   const [remoteBitrate, setRemoteBitrate] = useState(0);
@@ -48,7 +51,6 @@ export default function App({ version = "" }) {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [isRemoteMuted, setIsRemoteMuted] = useState(false);
-  const [remoteMicVolume, setRemoteMicVolume] = useState(1);
   const [remoteVideoWrapClass, setRemoteVideoWrapClass] = useState(
     "flex-1 min-h-0 relative bg-[#050505] placeholder",
   );
@@ -77,6 +79,8 @@ export default function App({ version = "" }) {
   const hangupCallbackRef = useRef(null);
   const handleSignalRef = useRef(null);
   const localStreamRef = useRef(null);
+  const handleCallRef = useRef(null);
+  const addStatusRef = useRef(null);
 
   const onHangupRequested = useCallback((notify) => {
     hangupCallbackRef.current?.(notify);
@@ -168,11 +172,11 @@ export default function App({ version = "" }) {
     attachLocalTracks,
   });
 
+  // Keep the main process informed of call state so the tray menu can disable
+  // "Update ID" during a call.
   useEffect(() => {
-    const videoEl = remoteVideoRef.current;
-    if (!videoEl) return;
-    videoEl.volume = remoteMicVolume;
-  }, [remoteMicVolume]);
+    window.electronAPI?.setCallActive?.(hasActiveCall || callStatus === "connecting");
+  }, [hasActiveCall, callStatus]);
 
   // Check GitHub for a newer release; show the Update badge only if one exists.
   useEffect(() => {
@@ -219,25 +223,25 @@ export default function App({ version = "" }) {
   useEffect(() => {
     if (window.electronAPI?.onCallLast) {
       window.electronAPI.onCallLast((lastCalledId) => {
-        if (lastCalledId && selfId) {
-          handleCall(lastCalledId);
+        if (lastCalledId && window.__SELF_ID__) {
+          handleCallRef.current?.(lastCalledId);
         }
       });
     }
     if (window.electronAPI?.onSetRemoteId) {
       window.electronAPI.onSetRemoteId((id) => {
         setRemoteId(id);
-        setTimeout(() => handleCall(id), 100);
+        setTimeout(() => handleCallRef.current?.(id), 100);
       });
     }
     if (window.electronAPI?.onProfileUpdated) {
       window.electronAPI.onProfileUpdated((profile) => {
         setSelfId(profile.id);
         window.__SELF_ID__ = profile.id;
-        addStatus("ID updated: " + profile.id);
+        addStatusRef.current?.("ID updated: " + profile.id);
       });
     }
-  }, [selfId, addStatus]);
+  }, []);
 
   const hangup = useCallback(
     (notify = true) => {
@@ -256,6 +260,7 @@ export default function App({ version = "" }) {
       pcRef.current = null;
       setCurrentPeerId("");
       setHasActiveCall(false);
+      setIsOutgoingCall(false);
       pendingIceRef.current = [];
       setIncomingCall(null);
       // Reset both the status dot and the call status so the Sidebar returns to
@@ -331,6 +336,7 @@ export default function App({ version = "" }) {
         `Calling <strong style="font-family:monospace">${peerId}</strong>...`,
       );
       soundManager.playCall();
+      setIsOutgoingCall(true);
       setStatusDotState("connecting");
       setCallStatus("connecting");
 
@@ -344,7 +350,7 @@ export default function App({ version = "" }) {
 
         const offer = await pcRef.current.createOffer({
           offerToReceiveVideo: true,
-          offerToReceiveAudio: true,
+          offerToReceiveAudio: false,
         });
         const modifiedOffer = {
           ...offer,
@@ -363,7 +369,18 @@ export default function App({ version = "" }) {
         }
       } catch (e) {
         addStatus(e.message || "Peer not reachable", true);
+        // Close PC if it was already created before the error (e.g. createOffer
+        // failed after createPeerConnection). Without this the PC can still
+        // connect in the background and flip UI to "connected" with no peer ID.
+        if (pcRef.current) {
+          pcRef.current.getSenders().forEach((s) => s.track?.stop());
+          pcRef.current.close();
+          pcRef.current = null;
+        }
         closeCallChannel();
+        resetSignalingRefs();
+        setIsOutgoingCall(false);
+        setHasActiveCall(false);
         setCallStatus("idle");
         setStatusDotState("idle");
         setCurrentPeerId("");
@@ -385,6 +402,9 @@ export default function App({ version = "" }) {
       setStatusDotState,
     ],
   );
+
+  useEffect(() => { handleCallRef.current = handleCall; }, [handleCall]);
+  useEffect(() => { addStatusRef.current = addStatus; }, [addStatus]);
 
   const handleAcceptCall = useCallback(async () => {
     if (!incomingCall) return;
@@ -524,6 +544,10 @@ export default function App({ version = "" }) {
     soundManager.playIdChange();
     try {
       const profile = await window.electronAPI.regenerateProfile();
+      if (!profile) {
+        addStatus("Cannot change ID during a call.", true);
+        return;
+      }
       setSelfId(profile.id);
       window.__SELF_ID__ = profile.id;
       await initMyRoom(profile.id);
@@ -570,7 +594,7 @@ export default function App({ version = "" }) {
         updateAvailable={updateInfo.updateAvailable}
         updateUrl={updateInfo.url}
       />
-      <div className="h-[calc(100vh-38px)] grid grid-cols-[272px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden">
+      <div className="h-[calc(100vh-38px)] grid grid-cols-[248px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden">
         <Sidebar
           selfId={selfId}
           onCopyId={handleCopyId}
@@ -578,53 +602,53 @@ export default function App({ version = "" }) {
           onCall={handleCall}
           onHangup={handleHangup}
           onCancelCall={handleCancelCall}
-          onAccept={handleAcceptCall}
-          onDecline={handleDeclineCall}
-          hasIncomingCall={!!incomingCall}
-          callerId={incomingCall?.from || ""}
           hasActiveCall={hasActiveCall}
           connectionStatus={callStatus}
+          isInCall={hasActiveCall || callStatus === "connecting"}
           signalingStatus={signalingStatus}
           statusMessages={statusLog}
           version={version}
           remoteId={remoteId}
           onRemoteIdChange={setRemoteId}
+          localStream={localStream}
+          onBroadcast={handleBroadcast}
+          onStopBroadcast={stopBroadcast}
+          onChangeSource={handleChangeSource}
+          onPiP={handlePiP}
+          onFullscreen={handleFullscreen}
         />
-        <main className="flex flex-col gap-[8px] min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 flex flex-col gap-[8px]">
-            <VideoPanel
-              ref={localVideoRef}
-              title="Your Screen"
-              meta={localMeta}
-              isLocal
-              isBroadcasting={!!localStream}
-              onBroadcast={localStream ? stopBroadcast : handleBroadcast}
-              onChangeSource={handleChangeSource}
-              showPlaceholder={!streamHasVideo(localStream)}
-              videoRef={localVideoRef}
-              containerRef={localContainerRef}
-              canBroadcast={pcRef.current?.connectionState === "connected"}
-            />
-            <VideoPanel
-              ref={remoteVideoRef}
-              title="Peer Screen"
-              meta={remoteMeta}
-              bitrate={remoteBitrate}
-              onPiP={handlePiP}
-              onFullscreen={handleFullscreen}
-              showPlaceholder={!streamHasVideo(remoteStream)}
-              className={remoteVideoWrapClass}
-              videoRef={remoteVideoRef}
-              containerRef={remoteContainerRef}
-              isMuted={isRemoteMuted}
-              onToggleMute={() => setIsRemoteMuted(!isRemoteMuted)}
-              isDisabled={!hasActiveCall}
-              remoteMicVolume={remoteMicVolume}
-              onRemoteMicVolumeChange={setRemoteMicVolume}
-            />
-          </div>
+        <main className="flex flex-col min-h-0 overflow-hidden">
+          <VideoPanel
+            ref={remoteVideoRef}
+            title="Peer Screen"
+            meta={remoteMeta}
+            bitrate={remoteBitrate}
+            showPlaceholder={!streamHasVideo(remoteStream)}
+            className={remoteVideoWrapClass}
+            videoRef={remoteVideoRef}
+            containerRef={remoteContainerRef}
+            isDisabled={!hasActiveCall}
+          />
         </main>
       </div>
+      {/* Outgoing-call / post-accept connecting overlay */}
+      {callStatus === "connecting" && (
+        <CallingOverlay
+          peerId={currentPeerId}
+          onCancel={handleCancelCall}
+          isOutgoing={isOutgoingCall}
+        />
+      )}
+
+      {/* Incoming call modal (takes precedence over connecting overlay) */}
+      {!!incomingCall && (
+        <IncomingCallDialog
+          callerId={incomingCall.from}
+          onAccept={handleAcceptCall}
+          onDecline={handleDeclineCall}
+        />
+      )}
+
       <SourcePicker
         isOpen={sourcePickerOpen}
         onClose={() => setSourcePickerOpen(false)}

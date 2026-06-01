@@ -1,11 +1,11 @@
 {
   "name": "2peer",
-  "version": "1.0.21",
+  "version": "2.0.0",
   "description": "2peer",
   "type": "module",
   "main": "src/electron.cjs",
   "scripts": {
-    "bump": "node -e \"const p=require('./package.json');p.version=p.version.replace(/(\\d+\\.\\d+\\.)(\\d+)/,(m,m1,m2)=>m1+(+m2+1));require('fs').writeFileSync('package.json',JSON.stringify(p,null,2));console.log('Version bumped to',JSON.parse(require('fs').readFileSync('package.json')).version)\"",
+    "bump": "node -e \"const v=process.argv[1];if(!v||!/^\\d+\\.\\d+\\.\\d+$/.test(v)){console.error('Usage: npm run bump -- <version>  (e.g. 1.2.3)');process.exit(1);}const p=require('./package.json');p.version=v;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\\n');console.log('Version set to',v);\" --",
     "start": "vite build && electron .",
     "test": "vite build && electron . & electron . --clone",
     "dev": "vite",

@@ -15,6 +15,7 @@ getSources: () => ipcRenderer.invoke("sources:get"),
     ipcRenderer.invoke("app:show-notification", { title, body }),
   quitApp: () => ipcRenderer.invoke("app:quit"),
   setLastCalledId: (id) => ipcRenderer.invoke("profile:set-last-called", id),
+  setCallActive: (active) => ipcRenderer.invoke("app:set-call-active", active),
   onCallLast: (callback) => {
     ipcRenderer.on("call-last", (_, lastCalledId) => callback(lastCalledId));
   },
