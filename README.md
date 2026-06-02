@@ -8,6 +8,7 @@ A peer-to-peer screen streaming application that connects two computers directly
 - **Screen sharing** — broadcast your entire screen or individual windows
 - **Fullscreen mode** — view peer's screen on your entire monitor
 - **Picture-in-Picture** — keep peer's screen in the corner
+- **Call history** — review past incoming and outgoing calls, copy peer IDs
 
 ## How to use
 

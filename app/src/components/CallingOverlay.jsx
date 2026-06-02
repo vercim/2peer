@@ -8,19 +8,24 @@ function formatId(id) {
 export function CallingOverlay({ peerId, onCancel, isOutgoing = true }) {
   return (
     <div
-      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-[32px] select-none"
+      className="relative flex flex-col items-center justify-center gap-[32px] select-none w-full h-full"
       style={{
-        background:
-          "radial-gradient(ellipse at 50% 44%, rgba(80,130,220,0.05) 0%, transparent 58%), var(--color-overlay-dark)",
-        backdropFilter: "blur(22px) saturate(0.7)",
-        WebkitBackdropFilter: "blur(22px) saturate(0.7)",
+        background: "var(--color-bg)",
         animation: "callOverlayIn 0.4s ease-out",
       }}
     >
-      <MorphicLoader size={140} bg="#060606" />
+      {/* bottom gradient vignette — z-0 stays behind all content */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-[55%] pointer-events-none z-0"
+        style={{
+          background: "linear-gradient(to bottom, transparent 0%, var(--color-bg) 70%)",
+        }}
+      />
+
+      <MorphicLoader size={140} bg="var(--color-bg)" />
 
       {/* ── Labels ────────────────────────────────────────────── */}
-      <div className="flex flex-col items-center gap-[7px] text-center">
+      <div className="relative z-10 flex flex-col items-center gap-[7px] text-center">
         <span
           className="text-[10px] tracking-[0.15em] uppercase"
           style={{ color: "var(--color-overlay-label)" }}
@@ -45,7 +50,7 @@ export function CallingOverlay({ peerId, onCancel, isOutgoing = true }) {
 
       {/* ── Cancel button ─────────────────────────────────────── */}
       <button
-        className="bg-danger text-[#e8b4b4] rounded-[8px] py-[10px] px-[32px] text-[12px] font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h active:opacity-70 tracking-[0.04em]"
+        className="relative z-10 bg-danger text-[#e8b4b4] rounded-[8px] py-[10px] px-[32px] text-[12px] font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h active:opacity-70 tracking-[0.04em]"
         onClick={onCancel}
       >
         Cancel

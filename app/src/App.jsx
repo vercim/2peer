@@ -8,6 +8,7 @@ import { StatusGlow } from "./components/StatusGlow.jsx";
 import { IncomingCallDialog } from "./components/IncomingCallDialog.jsx";
 import { CallingOverlay } from "./components/CallingOverlay.jsx";
 import { SettingsDialog } from "./components/SettingsDialog.jsx";
+import { CallHistoryDialog } from "./components/CallHistoryDialog.jsx";
 import { soundManager } from "./utils/soundManager.js";
 import { setMaxBandwidthInSDP } from "./utils/sdpUtils.js";
 import { streamHasVideo, stopStreamTracks } from "./utils/streamUtils.js";
@@ -18,6 +19,18 @@ import { useSignaling } from "./hooks/useSignaling.js";
 import { usePeerConnection } from "./hooks/usePeerConnection.js";
 import { useBroadcast } from "./hooks/useBroadcast.js";
 
+function adjustAccentForTheme(hex, isDark) {
+  if (!hex || hex.length < 7) return hex;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const clamp = (n) => Math.max(0, Math.min(255, Math.round(n)));
+  if (!isDark) {
+    return `rgba(${clamp(r * 0.78)}, ${clamp(g * 0.78)}, ${clamp(b * 0.78)}, 1)`;
+  }
+  return `rgba(${clamp(r + 25)}, ${clamp(g + 25)}, ${clamp(b + 25)}, 1)`;
+}
+
 const DEFAULT_SETTINGS = {
   accentColor: "#B9D9CC",
   theme: "dark",
@@ -27,22 +40,52 @@ const DEFAULT_SETTINGS = {
   resolution: "1080p",
   fps: 60,
   streamAudio: true,
-  trafficLimits: { enabled: false, uploadGB: 50, downloadGB: 50 },
-  notificationsEnabled: true,
+  trafficLimits: { enabled: false, uploadGB: 100, downloadGB: 100 },
+  callNotifications: true,
+  updateNotifications: true,
   startAtLogin: true,
   trayEnabled: true,
   minimizeToTray: true,
 };
 
+const SIDEBAR_MIN = 190;
+const SIDEBAR_MAX = 360;
+const SIDEBAR_DEFAULT = 190;
+
 export default function App({ version = "" }) {
   const [selfId, setSelfId] = useState("");
   const [statusDotState, setStatusDotState] = useState("idle");
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
+  const isResizing = useRef(false);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
   const [callStatus, setCallStatus] = useState("idle");
   const [statusLog, setStatusLog] = useState([]);
   const [glowTrigger, setGlowTrigger] = useState(0);
   const [glowState, setGlowState] = useState("idle");
 
   const { addStatus } = useStatusLog(statusLog, setStatusLog);
+
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (!isResizing.current) return;
+      const delta = e.clientX - resizeStartX.current;
+      setSidebarWidth(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, resizeStartWidth.current + delta)));
+    };
+    const onMouseUp = () => { isResizing.current = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => { window.removeEventListener("mousemove", onMouseMove); window.removeEventListener("mouseup", onMouseUp); };
+  }, []);
+
+  const handleResizeStart = (e) => {
+    isResizing.current = true;
+    resizeStartX.current = e.clientX;
+    resizeStartWidth.current = sidebarWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  };
 
   useEffect(() => {
     if (statusDotState !== "idle" && statusDotState !== "disconnected") {
@@ -57,6 +100,10 @@ export default function App({ version = "" }) {
   });
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [callHistory, setCallHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("callHistory") || "[]"); } catch { return []; }
+  });
   const [appSettings, setAppSettings] = useState(DEFAULT_SETTINGS);
   const [incomingCall, setIncomingCall] = useState(null);
   const [isOutgoingCall, setIsOutgoingCall] = useState(false);
@@ -149,6 +196,7 @@ export default function App({ version = "" }) {
     setGlowState,
     setGlowTrigger,
     onHangupRequested,
+    callNotifications: appSettings.callNotifications !== false,
   });
 
   useEffect(() => {
@@ -203,6 +251,12 @@ export default function App({ version = "" }) {
       .then((info) => {
         if (info?.updateAvailable) {
           setUpdateInfo({ updateAvailable: true, url: info.url || "" });
+          if (appSettings.updateNotifications !== false) {
+            window.electronAPI?.showNotification?.(
+              "Update available",
+              `A new version of 2peer is available.`,
+            );
+          }
         }
       })
       .catch(() => {});
@@ -343,6 +397,15 @@ export default function App({ version = "" }) {
     hangupCallbackRef.current = hangup;
   }, [hangup]);
 
+  const addCallHistory = useCallback((peerId, direction, outcome) => {
+    const entry = { id: Date.now(), timestamp: new Date().toISOString(), peerId, direction, outcome };
+    setCallHistory((prev) => {
+      const next = [...prev, entry].slice(-200);
+      try { localStorage.setItem("callHistory", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
   const handleCall = useCallback(
     async (peerId) => {
       if (peerId === selfId) {
@@ -357,6 +420,7 @@ export default function App({ version = "" }) {
       resetSignalingRefs();
 
       setCurrentPeerId(peerId);
+      addCallHistory(peerId, "outgoing", "called");
       addStatus(
         `Calling <strong style="font-family:monospace">${peerId}</strong>...`,
       );
@@ -368,11 +432,13 @@ export default function App({ version = "" }) {
       try {
         await openCallChannel(peerId);
 
+        addStatus("Creating WebRTC peer connection...");
         await createPeerConnection(peerId, false);
         if (localStreamRef.current) {
           await attachLocalTracks(localStreamRef.current);
         }
 
+        addStatus("Creating offer...");
         const offer = await pcRef.current.createOffer({
           offerToReceiveVideo: true,
           offerToReceiveAudio: false,
@@ -388,6 +454,7 @@ export default function App({ version = "" }) {
           to: peerId,
           offer: pcRef.current.localDescription,
         });
+        addStatus("Offer sent via signaling. Waiting for peer to accept...");
 
         if (window.electronAPI?.setLastCalledId) {
           window.electronAPI.setLastCalledId(peerId);
@@ -422,6 +489,7 @@ export default function App({ version = "" }) {
       sendSignal,
       streamQuality,
       addStatus,
+      addCallHistory,
       resetSignalingRefs,
       setCallStatus,
       setStatusDotState,
@@ -451,6 +519,7 @@ export default function App({ version = "" }) {
     answerProcessedRef.current = false;
     resetSignalingRefs();
 
+    addStatus(`Accepting call — creating peer connection...`);
     await createPeerConnection(from, true);
     if (localStreamRef.current) {
       await attachLocalTracks(localStreamRef.current);
@@ -458,13 +527,17 @@ export default function App({ version = "" }) {
 
     setCurrentPeerId(from);
 
+    addStatus("Setting remote description (offer)...");
     await pcRef.current.setRemoteDescription(offer);
 
+    const buffered = pendingIceRef.current.length;
+    if (buffered > 0) addStatus(`Flushing ${buffered} buffered ICE candidate${buffered > 1 ? "s" : ""}...`);
     for (const c of pendingIceRef.current) {
       await pcRef.current.addIceCandidate(c);
     }
     pendingIceRef.current = [];
 
+    addStatus("Creating answer...");
     const answer = await pcRef.current.createAnswer();
     const modifiedAnswer = {
       ...answer,
@@ -477,7 +550,9 @@ export default function App({ version = "" }) {
       to: from,
       answer: pcRef.current.localDescription,
     });
+    addStatus(`Answer sent. Waiting for ICE to establish a path...`);
 
+    addCallHistory(from, "incoming", "connected");
     addStatus(
       `Call accepted. Connecting to <strong style="font-family:monospace">${from}</strong>...`,
     );
@@ -491,6 +566,7 @@ export default function App({ version = "" }) {
     sendSignal,
     streamQuality,
     addStatus,
+    addCallHistory,
     resetSignalingRefs,
     setCallStatus,
     setStatusDotState,
@@ -507,10 +583,11 @@ export default function App({ version = "" }) {
     // Clear the "incoming processed" guard so this peer can be rung again;
     // without this a single decline would silently block all future calls.
     resetSignalingRefs();
+    addCallHistory(from, "incoming", "declined");
     addStatus(
       `Call from <strong style="font-family:monospace">${from}</strong> declined.`,
     );
-  }, [incomingCall, sendSignal, resetSignalingRefs, addStatus, setIncomingCall]);
+  }, [incomingCall, sendSignal, resetSignalingRefs, addCallHistory, addStatus, setIncomingCall]);
 
   const handleBroadcast = useCallback(
     async () => setSourcePickerOpen(true),
@@ -601,7 +678,9 @@ export default function App({ version = "" }) {
   // Apply visual settings to document
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--color-accent", appSettings.accentColor || "#B9D9CC");
+    const base = appSettings.accentColor || "#B9D9CC";
+    const isDark = (appSettings.theme || "dark") === "dark";
+    root.style.setProperty("--color-accent", adjustAccentForTheme(base, isDark));
     root.setAttribute("data-theme", appSettings.theme || "dark");
     root.classList.toggle("reduce-motion", !!appSettings.reduceMotion);
     root.classList.toggle("monochromatic", !!appSettings.monochromatic);
@@ -662,7 +741,8 @@ export default function App({ version = "" }) {
         updateAvailable={updateInfo.updateAvailable}
         updateUrl={updateInfo.url}
       />
-      <div className="h-[calc(100vh-38px)] grid grid-cols-[248px_minmax(0,1fr)] gap-[10px] p-[10px] overflow-hidden">
+      <div className="h-[calc(100vh-38px)] flex p-[10px] gap-0 overflow-hidden">
+        <div style={{ width: sidebarWidth, minWidth: sidebarWidth }} className="flex flex-col overflow-hidden shrink-0">
         <Sidebar
           selfId={selfId}
           onCopyId={handleCopyId}
@@ -685,8 +765,18 @@ export default function App({ version = "" }) {
           onPiP={handlePiP}
           onFullscreen={handleFullscreen}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenHistory={() => setHistoryOpen(true)}
+          callHistory={callHistory}
         />
-        <main className="flex flex-col min-h-0 overflow-hidden">
+        </div>
+        {/* resize handle */}
+        <div
+          className="w-[10px] shrink-0 flex items-center justify-center cursor-col-resize group"
+          onMouseDown={handleResizeStart}
+        >
+          <div className="w-[2px] h-[32px] rounded-full bg-border opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
+        </div>
+        <main className="flex flex-col min-h-0 overflow-hidden flex-1">
           <VideoPanel
             ref={remoteVideoRef}
             title="Peer Screen"
@@ -697,17 +787,18 @@ export default function App({ version = "" }) {
             videoRef={remoteVideoRef}
             containerRef={remoteContainerRef}
             isDisabled={!hasActiveCall}
+            overlay={
+              callStatus === "connecting" && !incomingCall ? (
+                <CallingOverlay
+                  peerId={currentPeerId}
+                  onCancel={handleCancelCall}
+                  isOutgoing={isOutgoingCall}
+                />
+              ) : null
+            }
           />
         </main>
       </div>
-      {/* Calling overlay — outgoing or post-accept connecting */}
-      {callStatus === "connecting" && !incomingCall && (
-        <CallingOverlay
-          peerId={currentPeerId}
-          onCancel={handleCancelCall}
-          isOutgoing={isOutgoingCall}
-        />
-      )}
       {/* Incoming call modal (takes precedence over connecting overlay) */}
       {!!incomingCall && (
         <IncomingCallDialog
@@ -716,6 +807,16 @@ export default function App({ version = "" }) {
           onDecline={handleDeclineCall}
         />
       )}
+
+      <CallHistoryDialog
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        history={callHistory}
+        onClear={() => {
+          setCallHistory([]);
+          try { localStorage.removeItem("callHistory"); } catch {}
+        }}
+      />
 
       <SettingsDialog
         isOpen={settingsOpen}

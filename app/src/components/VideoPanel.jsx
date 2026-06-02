@@ -12,6 +12,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
     videoRef,
     containerRef,
     isDisabled = false,
+    overlay = null,
   },
   ref,
 ) {
@@ -37,6 +38,9 @@ export const VideoPanel = forwardRef(function VideoPanel(
         ref={containerRef}
         className={`flex-1 min-h-0 relative ${showPlaceholder ? "bg-transparent" : "bg-[#050505]"}`}
       >
+        {overlay && (
+          <div className="absolute inset-0 z-10">{overlay}</div>
+        )}
         {showPlaceholder && (
           <div className="absolute inset-0 flex items-center justify-center">
             <MonitorX size={48} className="text-[#555]" strokeWidth={1.5} />

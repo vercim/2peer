@@ -1,8 +1,24 @@
 import { useState, useEffect } from "react";
-import { Airplay, Pipette, GlobeLock, GlobeOff, Settings, SquareArrowOutUpRight, Expand } from "lucide-react";
+import { Airplay, Pipette, GlobeLock, GlobeOff, Settings, SquareArrowOutUpRight, Expand, History } from "lucide-react";
 import { TextMorph } from "torph/react";
 import { useSettings } from "../contexts/SettingsContext.js";
 import StatusLog from "./StatusLog";
+
+function IconBtn({ onClick, disabled, children }) {
+  return (
+    <button
+      className={`flex items-center justify-center transition-colors duration-120 ${
+        disabled
+          ? "text-[#333] cursor-not-allowed"
+          : "text-[#555] hover:text-accent cursor-pointer"
+      }`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+}
 
 function formatDuration(seconds) {
   const h = Math.floor(seconds / 3600);
@@ -50,6 +66,8 @@ export function Sidebar({
   onPiP = null,
   onFullscreen = null,
   onOpenSettings = null,
+  onOpenHistory = null,
+  callHistory = [],
 }) {
   const { reduceMotion } = useSettings();
   const [copied, setCopied] = useState(false);
@@ -89,7 +107,7 @@ export function Sidebar({
   };
 
   return (
-    <aside className="flex flex-col gap-[8px] overflow-hidden min-h-0">
+    <aside className="flex flex-col gap-[8px] overflow-hidden min-h-0 h-full w-full">
       <div className="bg-panel border border-border rounded-[8px] p-[12px_14px] flex flex-col gap-[8px] shrink-0">
         <span className="text-[10px] tracking-[0.09em] uppercase text-faint">
           Your ID
@@ -263,38 +281,34 @@ export function Sidebar({
 
         <div className="bg-panel border border-border rounded-[8px] p-[10px_14px]">
           <div className="flex items-center justify-between">
-            <button
-              className="flex items-center gap-[6px] text-[11px] text-[#555] font-mono hover:text-accent transition-colors duration-120 cursor-pointer"
-              onClick={onOpenSettings}
-            >
-              <Settings size={13} />
-              Settings
-            </button>
             <div className="flex items-center gap-[12px]">
+              <IconBtn onClick={onOpenHistory}>
+                <History size={15} />
+              </IconBtn>
               <button
-                className={`transition-colors duration-120 ${
-                  hasActiveCall
-                    ? "text-[#555] hover:text-accent cursor-pointer"
-                    : "text-[#333] cursor-not-allowed"
-                }`}
+                className="flex items-center gap-[5px] text-[#555] hover:text-accent cursor-pointer transition-colors duration-120"
+                onClick={onOpenSettings}
+              >
+                <Settings size={15} />
+                <span className="text-[10px] font-medium">Settings</span>
+              </button>
+            </div>
+
+            <div className="self-stretch w-px bg-border mx-[4px]" />
+
+            <div className="flex items-center gap-[12px]">
+              <IconBtn
                 onClick={hasActiveCall ? onPiP : undefined}
                 disabled={!hasActiveCall}
-                title="Picture in Picture"
               >
                 <SquareArrowOutUpRight size={15} />
-              </button>
-              <button
-                className={`transition-colors duration-120 ${
-                  hasActiveCall
-                    ? "text-[#555] hover:text-accent cursor-pointer"
-                    : "text-[#333] cursor-not-allowed"
-                }`}
+              </IconBtn>
+              <IconBtn
                 onClick={hasActiveCall ? onFullscreen : undefined}
                 disabled={!hasActiveCall}
-                title="Fullscreen"
               >
                 <Expand size={15} />
-              </button>
+              </IconBtn>
             </div>
           </div>
         </div>

@@ -25,7 +25,8 @@ const DEFAULT_SETTINGS = {
   fps: 60,
   streamAudio: true,
   trafficLimits: { enabled: false, uploadGB: 50, downloadGB: 50 },
-  notificationsEnabled: true,
+  callNotifications: true,
+  updateNotifications: true,
   startAtLogin: true,
   trayEnabled: true,
   minimizeToTray: true,
@@ -37,14 +38,15 @@ function Toggle({ checked, onChange, disabled }) {
   return (
     <button
       onClick={() => !disabled && onChange(!checked)}
-      className={`relative w-[34px] h-[19px] rounded-full transition-colors duration-200 shrink-0 ${
+      className={`relative w-[40px] h-[22px] rounded-full transition-colors duration-200 shrink-0 ${
         disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-      } ${checked ? "bg-accent" : "bg-[var(--color-surface-md)]"}`}
+      } ${checked ? "bg-accent" : "bg-[var(--color-faint)]"}`}
     >
       <div
-        className={`absolute top-[2.5px] w-[14px] h-[14px] rounded-full bg-white transition-all duration-200 ${
-          checked ? "left-[18px]" : "left-[2.5px] opacity-30"
+        className={`absolute top-[3px] w-[16px] h-[16px] rounded-full bg-white transition-all duration-200 ${
+          checked ? "left-[21px]" : "left-[3px]"
         }`}
+        style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
       />
     </button>
   );
@@ -236,11 +238,9 @@ function NetworkTab({ settings, onChange }) {
         onChange={(v) => onChange("streamAudio", v)}
       />
 
-      <Divider />
-
       {/* Traffic limits */}
       <div>
-        <div className="flex items-center justify-between py-[11px] border-b border-border">
+        <div className="flex items-center justify-between py-[11px]">
           <div className="flex flex-col gap-[2px]">
             <span className="text-[12px] text-text">Traffic limits</span>
             <span className="text-[10px] text-faint">
@@ -254,7 +254,7 @@ function NetworkTab({ settings, onChange }) {
         </div>
 
         {limits.enabled && (
-          <div className="flex gap-[10px] pt-[10px]">
+          <div className="flex gap-[10px] pt-[10px] border-t border-border">
             <div className="flex-1 flex flex-col gap-[4px]">
               <span className="text-[10px] text-faint">Upload limit (GB)</span>
               <div className="flex items-center bg-panel-2 border border-border rounded-[5px] px-[8px] py-[6px]">
@@ -300,13 +300,19 @@ function SystemTab({ settings, onChange }) {
   return (
     <div className="flex flex-col">
       <SettingRow
-        label="Notifications"
-        description="Show system notifications for incoming calls"
-        checked={settings.notificationsEnabled}
-        onChange={(v) => onChange("notificationsEnabled", v)}
+        label="Call notifications"
+        description="Show system notification for incoming calls"
+        checked={settings.callNotifications}
+        onChange={(v) => onChange("callNotifications", v)}
       />
       <SettingRow
-        label="Launch at login"
+        label="Update notifications"
+        description="Notify when a new version of 2peer is available"
+        checked={settings.updateNotifications}
+        onChange={(v) => onChange("updateNotifications", v)}
+      />
+      <SettingRow
+        label="Auto run on startup"
         description="Start 2peer automatically when you log in"
         checked={settings.startAtLogin}
         onChange={(v) => onChange("startAtLogin", v)}
@@ -318,10 +324,8 @@ function SystemTab({ settings, onChange }) {
         onChange={(v) => onChange("trayEnabled", v)}
       />
 
-      <Divider />
-
       {/* On window close */}
-      <div className={!settings.trayEnabled ? "opacity-40 pointer-events-none" : ""}>
+      <div className={`mt-[14px] ${!settings.trayEnabled ? "opacity-40 pointer-events-none" : ""}`}>
         <SectionLabel>When closing the window</SectionLabel>
         <PillGroup
           cols={2}
@@ -346,6 +350,7 @@ function SystemTab({ settings, onChange }) {
 
 export function SettingsDialog({ isOpen, onClose, settings, onSave }) {
   const [activeTab, setActiveTab] = useState("app");
+  const [resetDone, setResetDone] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -357,7 +362,11 @@ export function SettingsDialog({ isOpen, onClose, settings, onSave }) {
   if (!isOpen || !settings) return null;
 
   const update = (key, value) => onSave({ ...settings, [key]: value });
-  const reset = () => onSave({ ...DEFAULT_SETTINGS });
+  const reset = () => {
+    onSave({ ...DEFAULT_SETTINGS });
+    setResetDone(true);
+    setTimeout(() => setResetDone(false), 2000);
+  };
 
   return (
     <div
@@ -424,10 +433,12 @@ export function SettingsDialog({ isOpen, onClose, settings, onSave }) {
         <div className="px-[18px] py-[12px] border-t border-border shrink-0">
           <button
             onClick={reset}
-            className="flex items-center gap-[6px] text-[11px] text-[#444] hover:text-[#888] transition-colors duration-120 cursor-pointer"
+            className={`flex items-center gap-[6px] text-[11px] transition-colors duration-200 cursor-pointer ${
+              resetDone ? "text-accent" : "text-[#444] hover:text-[#888]"
+            }`}
           >
-            <RotateCcw size={11} />
-            Reset all settings
+            <RotateCcw size={11} className={resetDone ? "opacity-0 w-0 overflow-hidden" : ""} />
+            {resetDone ? "✓ All settings reset" : "Reset all settings"}
           </button>
         </div>
       </div>

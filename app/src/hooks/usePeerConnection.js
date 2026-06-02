@@ -175,6 +175,13 @@ export function usePeerConnection({
 
       pc.oniceconnectionstatechange = () => {
         const iceState = pc?.iceConnectionState;
+        console.log("[PC] ICE connection state:", iceState);
+        if (iceState === "checking") {
+          addStatus("ICE checking — trying to establish a direct connection...");
+        }
+        if (iceState === "connected" || iceState === "completed") {
+          addStatus("ICE connected — direct path established.");
+        }
         if (iceState === "failed") {
           addStatus("ICE failed. Attempting to reconnect...", true);
           pc.restartIce();
@@ -182,6 +189,13 @@ export function usePeerConnection({
         if (iceState === "disconnected") {
           addStatus("ICE disconnected.");
         }
+      };
+
+      pc.onicegatheringstatechange = () => {
+        const gs = pc?.iceGatheringState;
+        console.log("[PC] ICE gathering state:", gs);
+        if (gs === "gathering") addStatus("ICE gathering — collecting network candidates...");
+        if (gs === "complete") addStatus("ICE gathering complete.");
       };
 
       pcRef.current = pc;

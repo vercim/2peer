@@ -94,7 +94,8 @@ const DEFAULT_APP_SETTINGS = {
   streamAudio: true,
   trafficLimits: { enabled: false, uploadGB: 50, downloadGB: 50 },
   // System
-  notificationsEnabled: true,
+  callNotifications: true,
+  updateNotifications: true,
   startAtLogin: true,
   trayEnabled: true,
   minimizeToTray: true,
@@ -336,8 +337,8 @@ function createWindow() {
   const isLaunchedAsHidden = args.includes("--hidden");
   const isMac = process.platform === "darwin";
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 650,
+    width: 850,
+    height: 700,
     minWidth: 720,
     minHeight: 540,
     ...(isMac

@@ -43,7 +43,7 @@ All other `src/` code is ESM consumed by Vite. Don't convert the `.cjs` files to
 
 **Process boundary.** The renderer never touches Node/Electron APIs directly. [src/preload.cjs](app/src/preload.cjs) exposes a fixed `window.electronAPI` surface over IPC; [src/electron.cjs](app/src/electron.cjs) registers the matching `ipcMain` handlers. To add a renderer→main capability you must edit **both** files. No credentials are stored in the main process — Trystero requires no keys or server config.
 
-**Renderer state lives in [src/App.jsx](app/src/App.jsx).** `App` is the single stateful component; it owns every `useState`/`useRef` (the `RTCPeerConnection` in `pcRef`, streams, call status, etc.) and threads them into a set of hooks that each encapsulate one concern. The hooks receive refs/setters as arguments — they hold almost no state of their own:
+**Renderer state lives in [src/App.jsx](app/src/App.jsx).** `App` is the single stateful component; it owns every `useState`/`useRef` (the `RTCPeerConnection` in `pcRef`, streams, call status, call history, etc.) and threads them into a set of hooks that each encapsulate one concern. The hooks receive refs/setters as arguments — they hold almost no state of their own:
 
 - [useSignaling.js](app/src/hooks/useSignaling.js) — Trystero room management (`initMyRoom`, `openCallChannel`, `closeCallChannel`, `sendSignal`) + the `handleSignal` dispatcher that processes every inbound message type.
 - [usePeerConnection.js](app/src/hooks/usePeerConnection.js) — creates the `RTCPeerConnection`, wires `ontrack`/ICE/connection-state handlers, attaches local tracks, monitors bitrate.
@@ -56,6 +56,14 @@ All other `src/` code is ESM consumed by Vite. Don't convert the `.cjs` files to
 **Polite/impolite peer.** The caller is impolite (`isPoliteRef = false`), the accepter polite. This is the WebRTC perfect-negotiation role used to resolve glare during renegotiation.
 
 **Connection lifecycle.** `handleCall` builds the offer; `handleAcceptCall` builds the answer; both then start the mic and attach local tracks. Connection recovery is automatic: `failed`/`disconnected` connection or ICE states trigger `pc.restartIce()`. `hangup()` in App.jsx is the central teardown — it closes the PC, stops tracks, clears all call state, and (optionally) notifies the peer.
+
+**Call history.** `addCallHistory(peerId, direction, outcome)` in App.jsx appends entries to `callHistory` state and persists them to `localStorage` under the key `"callHistory"` (capped at 200 entries). Direction is `"incoming"` or `"outgoing"`; outcome is one of `called`, `connected`, `declined`, `cancelled`, `missed`. The history is shown in [src/components/CallHistoryDialog.jsx](app/src/components/CallHistoryDialog.jsx), accessible via the History button in the sidebar.
+
+**Notification settings.** The former `notificationsEnabled` flag has been split into two independent booleans: `callNotifications` (OS notification on incoming call, gated in `useSignaling`) and `updateNotifications` (OS notification when a newer app version is detected, gated in App.jsx). Both are stored in `settings.json` and `DEFAULT_APP_SETTINGS` in `electron.cjs`.
+
+**CallingOverlay placement.** The overlay is no longer a `fixed`-positioned layer over the whole window. It is rendered as the `overlay` prop passed to [VideoPanel](app/src/components/VideoPanel.jsx), which places it as an `absolute inset-0` layer inside the video container. This keeps the overlay scoped to the video area.
+
+**Accent color adaptation.** `adjustAccentForTheme(hex, isDark)` in App.jsx modifies the stored accent color before applying it to `--color-accent`: darkens by 38% in light theme, brightens by ~10 in dark theme. This ensures the accent reads well against both backgrounds without requiring users to pick separate colors per theme.
 
 **Quality / bitrate.** Resolution+fps presets and default bitrates live in [src/utils/rtcConfig.js](app/src/utils/rtcConfig.js). Quality is enforced two ways that work together: SDP munging (`setMaxBandwidthInSDP` in [sdpUtils.js](app/src/utils/sdpUtils.js)) sets `b=AS` bandwidth lines on every offer/answer, and sender `encodings` are set via `applyMaxQualityEncoding` in [bitrateManager.js](app/src/utils/bitrateManager.js). Changing `streamQuality` re-applies constraints, encodings, and SDP. `rtcConfig.js` also hardcodes STUN server IPs (in addition to hostnames) as a DNS-resolution fallback — there are **no TURN servers**, so peers behind symmetric NATs may fail to connect.
 

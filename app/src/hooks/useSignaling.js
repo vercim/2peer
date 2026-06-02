@@ -37,6 +37,7 @@ export function useSignaling({
   setGlowState,
   setGlowTrigger,
   onHangupRequested,
+  callNotifications = true,
 }) {
   const answerProcessedRef = useRef(false);
   const hangupProcessedRef = useRef(false);
@@ -130,13 +131,23 @@ export function useSignaling({
   const handleSignal = useCallback(
     async (msg) => {
       if (msg.type === "call") {
-        if (incomingProcessedRef.current.value) return;
-        if (pcRef.current?.connectionState === "connected") return;
-        if (pcRef.current?.signalingState === "have-local-offer") return;
+        if (incomingProcessedRef.current.value) {
+          addStatus("Duplicate incoming call signal received (ignored).");
+          return;
+        }
+        if (pcRef.current?.connectionState === "connected") {
+          addStatus("Incoming call ignored — already in a connected call.");
+          return;
+        }
+        if (pcRef.current?.signalingState === "have-local-offer") {
+          addStatus("Incoming call ignored — outgoing call already in progress.");
+          return;
+        }
         incomingProcessedRef.current.value = true;
+        addStatus(`Signal received: incoming call offer from <strong style="font-family:monospace">${msg.from}</strong>.`);
         setIncomingCall({ from: msg.from, offer: msg.offer });
         soundManager.playIncomingLoop();
-        if (window.electronAPI?.showNotification) {
+        if (callNotifications && window.electronAPI?.showNotification) {
           window.electronAPI.showNotification("Incoming call", `From: ${msg.from}`);
         }
         addStatus(
@@ -145,10 +156,14 @@ export function useSignaling({
       }
 
       if (msg.type === "answer") {
-        if (!pcRef.current) return;
-        if (answerProcessedRef.current) return;
-        if (pcRef.current.signalingState !== "have-local-offer") return;
+        if (!pcRef.current) { addStatus("Answer received but no peer connection exists (ignored)."); return; }
+        if (answerProcessedRef.current) { addStatus("Duplicate answer signal received (ignored)."); return; }
+        if (pcRef.current.signalingState !== "have-local-offer") {
+          addStatus(`Answer received in unexpected signaling state: ${pcRef.current.signalingState} (ignored).`);
+          return;
+        }
         answerProcessedRef.current = true;
+        addStatus(`Answer received from <strong style="font-family:monospace">${msg.from}</strong>. Setting remote description...`);
         const modifiedAnswer = {
           ...msg.answer,
           sdp: setMaxBandwidthInSDP(msg.answer.sdp, streamQuality.resolution),
@@ -157,6 +172,8 @@ export function useSignaling({
         pcRef.current
           .getSenders()
           .forEach((s) => applyMaxQualityEncoding(s, streamQuality));
+        const buffered = pendingIceRef.current.length;
+        if (buffered > 0) addStatus(`Flushing ${buffered} buffered ICE candidate${buffered > 1 ? "s" : ""}...`);
         for (const c of pendingIceRef.current) {
           await pcRef.current.addIceCandidate(c).catch(console.error);
         }
@@ -359,6 +376,8 @@ export function useSignaling({
       }
       peerTrysteroIdRef.current = null;
 
+      addStatus(`Joining peer's signaling room, waiting for peer to appear...`);
+
       const room = joinRoom(TRYSTERO_CONFIG, calleeId);
       callRoomRef.current = room;
 
@@ -372,7 +391,7 @@ export function useSignaling({
       };
 
       const timer = setTimeout(() => {
-        reject(new Error("Peer not reachable (timeout)"));
+        reject(new Error("Peer not reachable (timeout after 30s) — peer may be offline or behind a restrictive firewall"));
       }, CALL_TIMEOUT_MS);
 
       // Trystero fires onPeerJoin immediately for already-connected peers too
@@ -380,10 +399,11 @@ export function useSignaling({
         console.log("[Trystero] Callee found:", peerId);
         peerTrysteroIdRef.current = peerId;
         clearTimeout(timer);
+        addStatus(`Peer found via signaling (Trystero peer: ${peerId.slice(0, 8)}…). Sending offer...`);
         resolve();
       };
     });
-  }, []);
+  }, [addStatus]);
 
   // --- closeCallChannel ----------------------------------------------------
   const closeCallChannel = useCallback(() => {
