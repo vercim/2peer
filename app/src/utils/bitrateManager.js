@@ -9,6 +9,11 @@ let userManualBitrate = false;
 const BITRATE_HISTORY = [];
 const RTT_HISTORY = [];
 
+// Network-warning hysteresis (broadcaster side, based on qualityLimitationReason)
+let bandwidthLimitedStreak = 0;
+let healthyStreak = 0;
+let networkWarningActive = false;
+
 // Session traffic accumulators (reset on each call)
 let cumulativeReceived = 0;
 let cumulativeSent = 0;
@@ -32,6 +37,9 @@ export function resetBitrateState() {
   userManualBitrate = false;
   BITRATE_HISTORY.length = 0;
   RTT_HISTORY.length = 0;
+  bandwidthLimitedStreak = 0;
+  healthyStreak = 0;
+  networkWarningActive = false;
 }
 
 export function applyMaxQualityEncoding(
@@ -58,6 +66,10 @@ export function applyMaxQualityEncoding(
     enc.networkPriority = "high";
     enc.scaleResolutionDownBy = 1;
   });
+
+  // Keep the user-selected resolution fixed: under bandwidth pressure the
+  // encoder drops framerate/quality instead of downscaling resolution.
+  params.degradationPreference = "maintain-resolution";
 
   if (sender.track) {
     sender.track.contentHint = "motion";
@@ -107,6 +119,7 @@ export function monitorBitrate(
   setRemoteMeta,
   streamQuality,
   applyEncoding,
+  setNetworkWarning = null,
 ) {
   if (!pcRef.current || pcRef.current.connectionState !== "connected") {
     setRemoteBitrate(0);
@@ -123,6 +136,8 @@ export function monitorBitrate(
     let rtt = 0;
     let packetsLost = 0;
     let packetsReceived = 0;
+    let hasOutboundVideo = false;
+    let qualityLimitationReason = "none";
 
     report.forEach((item) => {
       if (item.type === "inbound-rtp" && item.kind === "video") {
@@ -135,11 +150,34 @@ export function monitorBitrate(
       }
       if (item.type === "outbound-rtp" && item.kind === "video") {
         bytesSent += item.bytesSent || 0;
+        hasOutboundVideo = true;
+        if (item.qualityLimitationReason) {
+          qualityLimitationReason = item.qualityLimitationReason;
+        }
       }
       if (item.type === "candidate-pair" && item.state === "succeeded") {
         rtt = item.currentRoundTripTime ? item.currentRoundTripTime * 1000 : 0;
       }
     });
+
+    // Broadcaster-only network warning: WebRTC reports "bandwidth" when the
+    // network cannot carry the selected quality. Use hysteresis to avoid flicker.
+    if (setNetworkWarning) {
+      if (hasOutboundVideo && qualityLimitationReason === "bandwidth") {
+        bandwidthLimitedStreak += 1;
+        healthyStreak = 0;
+      } else {
+        healthyStreak += 1;
+        bandwidthLimitedStreak = 0;
+      }
+      if (!networkWarningActive && bandwidthLimitedStreak >= 2) {
+        networkWarningActive = true;
+        setNetworkWarning(true);
+      } else if (networkWarningActive && healthyStreak >= 3) {
+        networkWarningActive = false;
+        setNetworkWarning(false);
+      }
+    }
 
     // Accumulate session traffic totals
     if (lastPollReceived > 0 && bytesReceived >= lastPollReceived) {

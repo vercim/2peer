@@ -14,14 +14,6 @@ export function CallingOverlay({ peerId, onCancel, isOutgoing = true }) {
         animation: "callOverlayIn 0.4s ease-out",
       }}
     >
-      {/* bottom gradient vignette — z-0 stays behind all content */}
-      <div
-        className="absolute inset-x-0 bottom-0 h-[55%] pointer-events-none z-0"
-        style={{
-          background: "linear-gradient(to bottom, transparent 0%, var(--color-bg) 70%)",
-        }}
-      />
-
       <MorphicLoader size={140} bg="var(--color-bg)" />
 
       {/* ── Labels ────────────────────────────────────────────── */}
@@ -34,7 +26,7 @@ export function CallingOverlay({ peerId, onCancel, isOutgoing = true }) {
         </span>
         <span
           className="font-mono text-[21px] tracking-[0.05em]"
-          style={{ color: "var(--color-overlay-id)" }}
+          style={{ color: "var(--color-overlay-label)" }}
         >
           {formatId(peerId)}
         </span>

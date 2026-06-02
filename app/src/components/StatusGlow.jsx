@@ -15,6 +15,11 @@ export function StatusGlow({ state = "idle", trigger = 0 }) {
 
   if (!active) return null;
 
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  const alpha = isLight ? "40" : "1A";
+  const blur  = isLight ? 90 : 78;
+  const spread = isLight ? 34 : 28;
+
   return (
     <div
       key={keyRef.current}
@@ -26,7 +31,7 @@ export function StatusGlow({ state = "idle", trigger = 0 }) {
         pointerEvents: "none",
         border: `1px solid transparent`,
         outline: `1px solid transparent`,
-        boxShadow: `inset 0 0 78px 28px ${color}1A`,
+        boxShadow: `inset 0 0 ${blur}px ${spread}px ${color}${alpha}`,
         transform: "translate3d(0,0,0)",
         isolation: "isolate",
       }}

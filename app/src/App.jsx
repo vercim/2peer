@@ -110,6 +110,7 @@ export default function App({ version = "" }) {
   const [localMeta, setLocalMeta] = useState("");
   const [remoteMeta, setRemoteMeta] = useState("");
   const [remoteBitrate, setRemoteBitrate] = useState(0);
+  const [networkWarning, setNetworkWarning] = useState(false);
   const [currentPeerId, setCurrentPeerId] = useState("");
   const [hasActiveCall, setHasActiveCall] = useState(false);
   const [localStream, setLocalStream] = useState(null);
@@ -210,6 +211,7 @@ export default function App({ version = "" }) {
       bitrateIntervalRef,
       setRemoteBitrate,
       setRemoteMeta,
+      setNetworkWarning,
       setRemoteStream,
       setRemoteVideoWrapClass,
       setStatusDotState,
@@ -366,6 +368,7 @@ export default function App({ version = "" }) {
       setRemoteStream(null);
       setIsRemoteMuted(false);
       setRemoteMeta("");
+      setNetworkWarning(false);
       setRemoteVideoWrapClass(
         "flex-1 min-h-0 relative bg-[#050505] placeholder",
       );
@@ -782,6 +785,7 @@ export default function App({ version = "" }) {
             title="Peer Screen"
             meta={remoteMeta}
             bitrate={remoteBitrate}
+            warning={networkWarning && !!localStream}
             showPlaceholder={!streamHasVideo(remoteStream)}
             className={remoteVideoWrapClass}
             videoRef={remoteVideoRef}

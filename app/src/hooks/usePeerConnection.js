@@ -12,6 +12,7 @@ export function usePeerConnection({
   bitrateIntervalRef,
   setRemoteBitrate,
   setRemoteMeta,
+  setNetworkWarning,
   setRemoteStream,
   setRemoteVideoWrapClass,
   setStatusDotState,
@@ -143,6 +144,7 @@ export function usePeerConnection({
                   setRemoteMeta,
                   streamQuality,
                   applyMaxQualityEncoding,
+                  setNetworkWarning,
                 );
               }, 2500);
             } catch (e) {
@@ -207,6 +209,7 @@ export function usePeerConnection({
       streamQuality,
       setRemoteBitrate,
       setRemoteMeta,
+      setNetworkWarning,
       setRemoteStream,
       setRemoteVideoWrapClass,
       setStatusDotState,
