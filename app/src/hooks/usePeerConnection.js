@@ -3,7 +3,6 @@ import { getFullRtcConfig } from "../utils/rtcConfig.js";
 import {
   applyMaxQualityEncoding,
   monitorBitrate,
-  resetBitrateState,
 } from "../utils/bitrateManager.js";
 import { soundManager } from "../utils/soundManager.js";
 
@@ -240,15 +239,5 @@ export function usePeerConnection({
     [pcRef, streamQuality],
   );
 
-  const closePeerConnection = useCallback(() => {
-    if (bitrateIntervalRef.current) {
-      clearInterval(bitrateIntervalRef.current);
-      bitrateIntervalRef.current = null;
-    }
-    setRemoteBitrate(0);
-    window._prevBytesReceived = 0;
-    resetBitrateState();
-  }, [bitrateIntervalRef, setRemoteBitrate]);
-
-  return { createPeerConnection, attachLocalTracks, closePeerConnection };
+  return { createPeerConnection, attachLocalTracks };
 }

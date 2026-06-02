@@ -13,8 +13,75 @@
   --color-danger: #7a1f1f;
   --color-danger-h: #9b2828;
 
+  /* Surface overlays for buttons/panels */
+  --color-surface:    rgba(255, 255, 255, 0.06);
+  --color-surface-hi: rgba(255, 255, 255, 0.09);
+  --color-surface-lo: rgba(255, 255, 255, 0.025);
+  --color-surface-md: rgba(255, 255, 255, 0.08);
+
+  /* Dialog / modal */
+  --color-dialog-bg:     rgba(14, 14, 14, 0.98);
+  --color-dialog-border: rgba(255, 255, 255, 0.08);
+  --color-dialog-shadow: rgba(0, 0, 0, 0.65);
+  --color-overlay:       rgba(6, 6, 6, 0.75);
+  --color-overlay-dark:  rgba(6, 6, 6, 0.84);
+
+  /* Calling overlay text */
+  --color-overlay-label: rgba(255, 255, 255, 0.22);
+  --color-overlay-id:    rgba(215, 238, 255, 0.72);
+  --color-overlay-sub:   rgba(255, 255, 255, 0.18);
+
   --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, Menlo, Consolas, monospace;
+}
+
+/* ── Light theme ─────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --color-bg: #ebebeb;
+  --color-panel: #e0e0e0;
+  --color-panel-2: #d4d4d4;
+  --color-panel-3: #c8c8c8;
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-text: #1a1a1a;
+  --color-muted: #555;
+  --color-faint: #999;
+  --color-danger: #a01a1a;
+  --color-danger-h: #b82020;
+
+  --color-surface:    rgba(0, 0, 0, 0.06);
+  --color-surface-hi: rgba(0, 0, 0, 0.1);
+  --color-surface-lo: rgba(0, 0, 0, 0.03);
+  --color-surface-md: rgba(0, 0, 0, 0.08);
+
+  --color-dialog-bg:     rgba(232, 232, 232, 0.98);
+  --color-dialog-border: rgba(0, 0, 0, 0.1);
+  --color-dialog-shadow: rgba(0, 0, 0, 0.18);
+  --color-overlay:       rgba(120, 120, 120, 0.5);
+  --color-overlay-dark:  rgba(100, 100, 100, 0.65);
+
+  --color-overlay-label: rgba(0, 0, 0, 0.45);
+  --color-overlay-id:    rgba(20, 50, 100, 0.8);
+  --color-overlay-sub:   rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="light"] body,
+[data-theme="light"] #root {
+  background: #ebebeb;
+  color: #1a1a1a;
+}
+
+/* ── Reduce motion ───────────────────────────────────────────────────────── */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* ── Monochromatic ───────────────────────────────────────────────────────── */
+.monochromatic {
+  filter: grayscale(1) saturate(0);
 }
 
 @layer base {
@@ -199,39 +266,105 @@
   }
 }
 
-/* ── Liquid blob morphing ─────────────────────────────────────────────────── */
-@keyframes blobMorph1 {
-  0%,100% { border-radius: 62% 38% 34% 66% / 63% 29% 71% 37%; }
-  16%     { border-radius: 44% 56% 64% 36% / 48% 64% 36% 52%; }
-  33%     { border-radius: 38% 62% 48% 52% / 55% 44% 56% 45%; }
-  50%     { border-radius: 56% 44% 28% 72% / 38% 58% 42% 62%; }
-  66%     { border-radius: 72% 28% 56% 44% / 44% 36% 64% 56%; }
-  83%     { border-radius: 50% 50% 42% 58% / 66% 32% 68% 34%; }
+/* ── Morphic shape loader ─────────────────────────────────────────────────── */
+
+/* 12-point shapes for smooth clip-path interpolation:
+   circle  → square → triangle, cycling every 7 s */
+@keyframes morphShape {
+  0%,100% {
+    /* circle */
+    clip-path: polygon(50% 0%, 75% 7%, 93% 25%, 100% 50%, 93% 75%, 75% 93%,
+                       50% 100%, 25% 93%, 7% 75%, 0% 50%, 7% 25%, 25% 7%);
+  }
+  33% {
+    /* square */
+    clip-path: polygon(0% 0%, 33% 0%, 67% 0%, 100% 0%, 100% 33%, 100% 67%,
+                       100% 100%, 67% 100%, 33% 100%, 0% 100%, 0% 67%, 0% 33%);
+  }
+  66% {
+    /* triangle */
+    clip-path: polygon(50% 5%, 62% 26%, 73% 48%, 85% 69%, 96% 90%, 73% 90%,
+                       50% 90%, 27% 90%, 4% 90%, 16% 69%, 27% 48%, 39% 26%);
+  }
 }
-@keyframes blobMorph2 {
-  0%,100% { border-radius: 44% 56% 68% 32% / 47% 69% 31% 53%; }
-  25%     { border-radius: 68% 32% 50% 50% / 61% 39% 61% 39%; }
-  50%     { border-radius: 32% 68% 42% 58% / 52% 32% 68% 48%; }
-  75%     { border-radius: 58% 42% 62% 38% / 68% 52% 48% 32%; }
+
+.morphic-shape {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  will-change: transform, clip-path;
 }
-@keyframes blobMorph3 {
-  0%,100% { border-radius: 57% 43% 52% 48% / 58% 46% 54% 42%; }
-  50%     { border-radius: 43% 57% 46% 54% / 42% 54% 46% 58%; }
+
+.morphic-s1 {
+  animation:
+    morphShape 7s ease-in-out infinite,
+    morphOrbit1 7s ease-in-out infinite;
 }
-@keyframes blobFloat {
-  0%,100% { transform: translateY(0px) rotate(0deg); }
-  35%     { transform: translateY(-7px) rotate(3deg); }
-  68%     { transform: translateY(5px) rotate(-2deg); }
+.morphic-s2 {
+  animation:
+    morphShape 7s ease-in-out infinite -2.33s,
+    morphOrbit2 7s ease-in-out infinite -2.33s;
 }
-@keyframes blobFloatReverse {
-  0%,100% { transform: translateY(0px) rotate(0deg); }
-  35%     { transform: translateY(6px) rotate(-3deg); }
-  68%     { transform: translateY(-5px) rotate(2deg); }
+.morphic-s3 {
+  animation:
+    morphShape 7s ease-in-out infinite -4.67s,
+    morphOrbit3 7s ease-in-out infinite -4.67s;
 }
-@keyframes blobGlow {
-  0%,100% { opacity: 0.45; }
-  50%     { opacity: 0.85; }
+
+@keyframes morphOrbit1 {
+  0%,100% { transform: translate(calc(-50% + 20px), calc(-50% - 16px)); }
+  25%     { transform: translate(calc(-50% - 20px), calc(-50% - 10px)); }
+  50%     { transform: translate(calc(-50% - 10px), calc(-50% + 20px)); }
+  75%     { transform: translate(calc(-50% + 18px), calc(-50% + 14px)); }
 }
+@keyframes morphOrbit2 {
+  0%,100% { transform: translate(calc(-50% - 16px), calc(-50% + 18px)); }
+  25%     { transform: translate(calc(-50% + 16px), calc(-50% + 20px)); }
+  50%     { transform: translate(calc(-50% + 22px), calc(-50% - 10px)); }
+  75%     { transform: translate(calc(-50% - 6px), calc(-50% - 22px)); }
+}
+@keyframes morphOrbit3 {
+  0%,100% { transform: translate(calc(-50% + 2px), calc(-50% + 4px)); }
+  25%     { transform: translate(calc(-50% + 6px), calc(-50% - 22px)); }
+  50%     { transform: translate(calc(-50% - 18px), calc(-50% - 4px)); }
+  75%     { transform: translate(calc(-50% - 8px), calc(-50% + 12px)); }
+}
+
+/* Outgoing signal rings */
+.morphic-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  transform-origin: center;
+  opacity: 0;
+  animation: morphRingExpand 3.6s ease-out infinite;
+  will-change: transform, opacity;
+}
+.mr1 { animation-delay: 0s; }
+.mr2 { animation-delay: 1.2s; }
+.mr3 { animation-delay: 2.4s; }
+
+@keyframes morphRingExpand {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+    border-radius: 58% 42% 54% 46% / 47% 57% 43% 53%;
+  }
+  7%  { opacity: 0.38; }
+  100% {
+    transform: scale(2.85);
+    opacity: 0;
+    border-radius: 44% 56% 49% 51% / 55% 43% 57% 45%;
+  }
+}
+
+@keyframes morphAppear {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 @keyframes callOverlayIn {
   from { opacity: 0; }
   to   { opacity: 1; }

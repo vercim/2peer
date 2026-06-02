@@ -5,19 +5,34 @@ import { VideoPanel } from "./components/VideoPanel.jsx";
 import { SourcePicker } from "./components/SourcePicker.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
 import { StatusGlow } from "./components/StatusGlow.jsx";
-import { CallingOverlay } from "./components/CallingOverlay.jsx";
 import { IncomingCallDialog } from "./components/IncomingCallDialog.jsx";
+import { CallingOverlay } from "./components/CallingOverlay.jsx";
+import { SettingsDialog } from "./components/SettingsDialog.jsx";
 import { soundManager } from "./utils/soundManager.js";
 import { setMaxBandwidthInSDP } from "./utils/sdpUtils.js";
 import { streamHasVideo, stopStreamTracks } from "./utils/streamUtils.js";
+import { getTrafficStats, resetTrafficStats } from "./utils/bitrateManager.js";
+import { SettingsContext } from "./contexts/SettingsContext.js";
 import { useStatusLog } from "./hooks/useStatusLog.js";
 import { useSignaling } from "./hooks/useSignaling.js";
 import { usePeerConnection } from "./hooks/usePeerConnection.js";
 import { useBroadcast } from "./hooks/useBroadcast.js";
 
-// Stream quality is fixed for now (Full HD @ 60fps). A settings UI will replace
-// this later; the bitrate ceiling lives in DEFAULT_BITRATES["1080p"].
-const STREAM_QUALITY = { resolution: "1080p", fps: 60 };
+const DEFAULT_SETTINGS = {
+  accentColor: "#B9D9CC",
+  theme: "dark",
+  soundEnabled: true,
+  reduceMotion: false,
+  monochromatic: false,
+  resolution: "1080p",
+  fps: 60,
+  streamAudio: true,
+  trafficLimits: { enabled: false, uploadGB: 50, downloadGB: 50 },
+  notificationsEnabled: true,
+  startAtLogin: true,
+  trayEnabled: true,
+  minimizeToTray: true,
+};
 
 export default function App({ version = "" }) {
   const [selfId, setSelfId] = useState("");
@@ -41,6 +56,8 @@ export default function App({ version = "" }) {
     message: "",
   });
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [appSettings, setAppSettings] = useState(DEFAULT_SETTINGS);
   const [incomingCall, setIncomingCall] = useState(null);
   const [isOutgoingCall, setIsOutgoingCall] = useState(false);
   const [localMeta, setLocalMeta] = useState("");
@@ -58,7 +75,7 @@ export default function App({ version = "" }) {
     "flex-1 min-h-0 relative bg-[#050505] placeholder",
   );
   const [isElectronReady, setIsElectronReady] = useState(false);
-  const streamQuality = STREAM_QUALITY;
+  const streamQuality = { resolution: appSettings.resolution, fps: appSettings.fps };
 
   const [remoteId, setRemoteId] = useState("");
   const [updateInfo, setUpdateInfo] = useState({
@@ -68,7 +85,6 @@ export default function App({ version = "" }) {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const localContainerRef = useRef(null);
   const remoteContainerRef = useRef(null);
   const pcRef = useRef(null);
   const pendingIceRef = useRef([]);
@@ -139,7 +155,7 @@ export default function App({ version = "" }) {
     handleSignalRef.current = handleSignal;
   }, [handleSignal]);
 
-  const { createPeerConnection, attachLocalTracks, closePeerConnection } =
+  const { createPeerConnection, attachLocalTracks } =
     usePeerConnection({
       pcRef,
       streamQuality,
@@ -162,6 +178,7 @@ export default function App({ version = "" }) {
     pcRef,
     currentPeerId,
     streamQuality,
+    streamAudio: appSettings.streamAudio !== false,
     localStreamRef,
     localVideoRef,
     setLocalStream,
@@ -216,6 +233,13 @@ export default function App({ version = "" }) {
         } catch (e) {
           addStatus(e.message || "Init error", true);
         }
+        if (window.electronAPI?.getSettings) {
+          try {
+            const s = await window.electronAPI.getSettings();
+            setAppSettings(s);
+            soundManager.setEnabled(s.soundEnabled);
+          } catch (_) {}
+        }
       })();
     }
   }, [isElectronReady, initMyRoom]);
@@ -248,6 +272,7 @@ export default function App({ version = "" }) {
       if (notify && currentPeerId)
         sendSignal({ type: "hangup", to: currentPeerId });
       soundManager.playDisconnect();
+      resetTrafficStats();
       closeCallChannel();
       if (pcRef.current) {
         pcRef.current.getSenders().forEach((s) => s.track?.stop());
@@ -517,8 +542,6 @@ export default function App({ version = "" }) {
         await videoElement.requestFullscreen();
       } else if (videoElement.webkitRequestFullscreen) {
         await videoElement.webkitRequestFullscreen();
-      } else if (videoElement.msRequestFullscreen) {
-        await videoElement.msRequestFullscreen();
       }
     } catch (e) {
       console.error("[Fullscreen] error:", e);
@@ -575,6 +598,50 @@ export default function App({ version = "" }) {
     addStatus("Call ended.");
   }, [currentPeerId, hangup, addStatus]);
 
+  // Apply visual settings to document
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--color-accent", appSettings.accentColor || "#B9D9CC");
+    root.setAttribute("data-theme", appSettings.theme || "dark");
+    root.classList.toggle("reduce-motion", !!appSettings.reduceMotion);
+    root.classList.toggle("monochromatic", !!appSettings.monochromatic);
+  }, [appSettings.accentColor, appSettings.theme, appSettings.reduceMotion, appSettings.monochromatic]);
+
+  // Apply sound enabled state
+  useEffect(() => {
+    soundManager.setEnabled(appSettings.soundEnabled !== false);
+  }, [appSettings.soundEnabled]);
+
+  // Traffic limit warnings: check every minute during active call
+  const trafficWarnedRef = useRef(0);
+  useEffect(() => {
+    if (!hasActiveCall || !appSettings.trafficLimits?.enabled) return;
+    const id = setInterval(() => {
+      const { sentBytes, receivedBytes } = getTrafficStats();
+      const sentGB = sentBytes / 1_073_741_824;
+      const rcvdGB = receivedBytes / 1_073_741_824;
+      const now = Date.now();
+      const exceeded =
+        sentGB > (appSettings.trafficLimits.uploadGB || 50) ||
+        rcvdGB > (appSettings.trafficLimits.downloadGB || 50);
+      if (exceeded && now - trafficWarnedRef.current > 300_000) {
+        trafficWarnedRef.current = now;
+        addStatus(
+          `Traffic limit exceeded — sent ${sentGB.toFixed(2)} GB / received ${rcvdGB.toFixed(2)} GB.`,
+          true,
+        );
+      }
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [hasActiveCall, appSettings.trafficLimits, addStatus]);
+
+  const handleSaveSettings = useCallback(async (newSettings) => {
+    setAppSettings(newSettings);
+    if (window.electronAPI?.saveSettings) {
+      window.electronAPI.saveSettings(newSettings).catch(() => {});
+    }
+  }, []);
+
   const handleCancelCall = useCallback(() => {
     // Tell the other side first (uses the still-open signaling channel), then
     // run the same full teardown as hangup so no partial state is left behind.
@@ -585,8 +652,9 @@ export default function App({ version = "" }) {
   }, [incomingCall, currentPeerId, sendSignal, hangup, addStatus]);
 
   return (
+    <SettingsContext.Provider value={appSettings}>
     <div className="h-screen flex flex-col bg-bg text-text font-sans text-[13px] antialiased overflow-hidden">
-      <StatusGlow state={glowState} trigger={glowTrigger} />
+<StatusGlow state={glowState} trigger={glowTrigger} />
       <TitleBar
         connectionStatus={callStatus}
         hasActiveCall={hasActiveCall}
@@ -616,6 +684,7 @@ export default function App({ version = "" }) {
           onChangeSource={handleChangeSource}
           onPiP={handlePiP}
           onFullscreen={handleFullscreen}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
         <main className="flex flex-col min-h-0 overflow-hidden">
           <VideoPanel
@@ -631,15 +700,14 @@ export default function App({ version = "" }) {
           />
         </main>
       </div>
-      {/* Outgoing-call / post-accept connecting overlay */}
-      {callStatus === "connecting" && (
+      {/* Calling overlay — outgoing or post-accept connecting */}
+      {callStatus === "connecting" && !incomingCall && (
         <CallingOverlay
           peerId={currentPeerId}
           onCancel={handleCancelCall}
           isOutgoing={isOutgoingCall}
         />
       )}
-
       {/* Incoming call modal (takes precedence over connecting overlay) */}
       {!!incomingCall && (
         <IncomingCallDialog
@@ -649,6 +717,12 @@ export default function App({ version = "" }) {
         />
       )}
 
+      <SettingsDialog
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={appSettings}
+        onSave={handleSaveSettings}
+      />
       <SourcePicker
         isOpen={sourcePickerOpen}
         onClose={() => setSourcePickerOpen(false)}
@@ -667,5 +741,6 @@ export default function App({ version = "" }) {
         }}
       />
     </div>
+    </SettingsContext.Provider>
   );
 }

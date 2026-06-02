@@ -1,4 +1,5 @@
 import { TextMorph } from "torph/react";
+import { useSettings } from "../contexts/SettingsContext.js";
 
 const noDrag = { WebkitAppRegion: "no-drag" };
 
@@ -31,6 +32,7 @@ export function TitleBar({
   updateAvailable = false,
   updateUrl = "",
 }) {
+  const { reduceMotion } = useSettings();
   const isMac = window.electronAPI?.platform === "darwin";
 
   const handleMinimize = () => {
@@ -55,42 +57,51 @@ export function TitleBar({
     }
   };
 
-  const appName = (
+  const appName = reduceMotion ? (
+    <span>{getStatusText()}</span>
+  ) : (
     <TextMorph ease={{ stiffness: 200, damping: 20 }}>
       {getStatusText()}
     </TextMorph>
   );
 
   if (isMac) {
+    // Native traffic lights are on the left (~68px) — keep that area clear.
+    // App name and version sit on the right.
     return (
       <div
         className="h-[38px] flex items-center justify-between bg-panel border-b border-border shrink-0"
         style={{ WebkitAppRegion: "drag" }}
       >
-        {/* Left side — near the traffic-light controls */}
-        <div className="flex items-center gap-[8px] pl-[80px]">
-          {updateAvailable && <UpdateBadge onClick={handleUpdate} />}
+        {/* Spacer for traffic-light zone */}
+        <div className="w-[80px] shrink-0">
+          {updateAvailable && (
+            <div className="flex items-center h-full pl-[80px]">
+              <UpdateBadge onClick={handleUpdate} />
+            </div>
+          )}
         </div>
-        {/* Right side — version label then app name */}
+        {/* Right side — app name then version */}
         <div className="flex items-center gap-[10px] pr-[14px] text-[13px] font-semibold text-muted">
-          <VersionLabel version={version} />
           {appName}
+          <VersionLabel version={version} />
         </div>
       </div>
     );
   }
 
+  // Windows: custom minimize + close on the right
   return (
     <div
       className="h-[38px] flex items-center justify-between bg-panel border-b border-border shrink-0"
       style={{ WebkitAppRegion: "drag" }}
     >
-      {/* Left side — app name then version label */}
+      {/* Left side — app name then version */}
       <div className="flex items-center gap-[10px] pl-[14px] text-[13px] font-semibold text-muted">
         {appName}
         <VersionLabel version={version} />
       </div>
-      {/* Right side — update badge near the window controls */}
+      {/* Right side — optional update badge then window controls */}
       <div className="flex items-center gap-[10px]">
         {updateAvailable && (
           <span className="flex items-center">

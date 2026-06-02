@@ -25,4 +25,6 @@ getSources: () => ipcRenderer.invoke("sources:get"),
   onProfileUpdated: (callback) => {
     ipcRenderer.on("profile-updated", (_, profile) => callback(profile));
   },
+  getSettings: () => ipcRenderer.invoke("settings:get"),
+  saveSettings: (settings) => ipcRenderer.invoke("settings:set", settings),
 });

@@ -4,6 +4,12 @@ export class SoundManager {
     this.initialized = false;
     this.incomingInterval = null;
     this.volumeMultiplier = 1;
+    this.enabled = true;
+  }
+
+  setEnabled(enabled) {
+    this.enabled = enabled;
+    if (!enabled) this.stopIncomingLoop();
   }
 
   init() {
@@ -22,6 +28,7 @@ export class SoundManager {
   }
 
   playBubble(frequency = 800, duration = 0.08, volume = 0.5) {
+    if (!this.enabled) return;
     this.ensureContext();
     const ctx = this.audioContext;
     const now = ctx.currentTime;
@@ -82,11 +89,6 @@ export class SoundManager {
     this.playBubble(400, 0.05, 0.18);
     this.playBubble(600, 0.08, 0.216);
     this.playBubble(900, 0.12, 0.288);
-  }
-
-  playIncoming() {
-    this.playBubble(587.33, 0.12, 0.288);
-    setTimeout(() => this.playBubble(659.25, 0.12, 0.288), 120);
   }
 
   playIncomingLoop() {

@@ -8,6 +8,7 @@ export function useBroadcast({
   pcRef,
   currentPeerId,
   streamQuality,
+  streamAudio,
   localStreamRef,
   localVideoRef,
   setLocalStream,
@@ -37,7 +38,7 @@ export function useBroadcast({
             height: { ideal: res.height },
             frameRate: { ideal: streamQuality.fps },
           },
-          audio: false,
+          audio: !!streamAudio,
         });
       } catch (e) {
         console.log("[Broadcast] getDisplayMedia failed:", e.message);
@@ -51,7 +52,7 @@ export function useBroadcast({
               maxFrameRate: streamQuality.fps,
             },
           },
-          audio: false,
+          audio: !!streamAudio,
         });
       }
 
@@ -114,6 +115,7 @@ export function useBroadcast({
       pcRef,
       currentPeerId,
       streamQuality,
+      streamAudio,
       localStreamRef,
       localVideoRef,
       setLocalStream,

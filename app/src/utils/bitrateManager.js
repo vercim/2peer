@@ -9,12 +9,21 @@ let userManualBitrate = false;
 const BITRATE_HISTORY = [];
 const RTT_HISTORY = [];
 
-export function getCurrentBitrate() {
-  return currentBitrate;
+// Session traffic accumulators (reset on each call)
+let cumulativeReceived = 0;
+let cumulativeSent = 0;
+let lastPollReceived = 0;
+let lastPollSent = 0;
+
+export function getTrafficStats() {
+  return { receivedBytes: cumulativeReceived, sentBytes: cumulativeSent };
 }
 
-export function setUserManualBitrate(value) {
-  userManualBitrate = value;
+export function resetTrafficStats() {
+  cumulativeReceived = 0;
+  cumulativeSent = 0;
+  lastPollReceived = 0;
+  lastPollSent = 0;
 }
 
 export function resetBitrateState() {
@@ -37,7 +46,7 @@ export function applyMaxQualityEncoding(
   const res =
     qualityOptions.resolution.find(
       (r) => r.value === (quality.resolution || "1080p"),
-    ) || qualityOptions.resolution[2];
+    ) || qualityOptions.resolution[3];
   const fps = quality.fps || 60;
 
   let autoBitrate = forcedBitrate || currentBitrate.value;
@@ -54,9 +63,7 @@ export function applyMaxQualityEncoding(
     sender.track.contentHint = "motion";
     if (typeof sender.track.applyConstraints === "function") {
       sender.track
-        .applyConstraints({
-          latencyHint: "interactive",
-        })
+        .applyConstraints({ latencyHint: "interactive" })
         .catch(() => {});
     }
   }
@@ -107,10 +114,9 @@ export function monitorBitrate(
     return () => {};
   }
 
-  let intervalId;
-
   pcRef.current.getStats().then((report) => {
     let bytesReceived = 0;
+    let bytesSent = 0;
     let frameRate = 0;
     let width = 0;
     let height = 0;
@@ -127,10 +133,24 @@ export function monitorBitrate(
         packetsLost += item.packetsLost || 0;
         packetsReceived += item.packetsReceived || 0;
       }
+      if (item.type === "outbound-rtp" && item.kind === "video") {
+        bytesSent += item.bytesSent || 0;
+      }
       if (item.type === "candidate-pair" && item.state === "succeeded") {
         rtt = item.currentRoundTripTime ? item.currentRoundTripTime * 1000 : 0;
       }
     });
+
+    // Accumulate session traffic totals
+    if (lastPollReceived > 0 && bytesReceived >= lastPollReceived) {
+      cumulativeReceived += bytesReceived - lastPollReceived;
+    }
+    lastPollReceived = bytesReceived;
+
+    if (lastPollSent > 0 && bytesSent >= lastPollSent) {
+      cumulativeSent += bytesSent - lastPollSent;
+    }
+    lastPollSent = bytesSent;
 
     if (width > 0 && height > 0) {
       setRemoteMeta(
@@ -180,15 +200,11 @@ export function monitorBitrate(
       });
     }
   });
-
-  return () => {
-    if (intervalId) clearInterval(intervalId);
-  };
 }
 
 export function getDefaultBitrateForResolution(resolution, fps = 60) {
   const baseBitrate = DEFAULT_BITRATES[resolution] || DEFAULT_BITRATES["1080p"];
-  if (fps === 30) {
+  if (fps <= 30) {
     return Math.floor(baseBitrate * 0.7);
   }
   return baseBitrate;

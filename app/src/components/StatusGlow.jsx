@@ -26,7 +26,7 @@ export function StatusGlow({ state = "idle", trigger = 0 }) {
         pointerEvents: "none",
         border: `1px solid transparent`,
         outline: `1px solid transparent`,
-        boxShadow: `inset 0 0 70px 30px ${color}32`,
+        boxShadow: `inset 0 0 78px 28px ${color}1A`,
         transform: "translate3d(0,0,0)",
         isolation: "isolate",
       }}

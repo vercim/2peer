@@ -76,6 +76,53 @@ async function checkForUpdate() {
 function getSettingsFile() {
   return path.join(app.getPath("userData"), "profile.json");
 }
+
+function getAppSettingsFile() {
+  return path.join(app.getPath("userData"), "settings.json");
+}
+
+const DEFAULT_APP_SETTINGS = {
+  // App
+  accentColor: "#B9D9CC",
+  theme: "dark",
+  soundEnabled: true,
+  reduceMotion: false,
+  monochromatic: false,
+  // Network
+  resolution: "1080p",
+  fps: 60,
+  streamAudio: true,
+  trafficLimits: { enabled: false, uploadGB: 50, downloadGB: 50 },
+  // System
+  notificationsEnabled: true,
+  startAtLogin: true,
+  trayEnabled: true,
+  minimizeToTray: true,
+};
+
+function loadAppSettings() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(getAppSettingsFile(), "utf8"));
+    return { ...DEFAULT_APP_SETTINGS, ...raw };
+  } catch (_) {
+    return { ...DEFAULT_APP_SETTINGS };
+  }
+}
+
+function saveAppSettings(settings) {
+  const merged = { ...DEFAULT_APP_SETTINGS, ...settings };
+  fs.mkdirSync(path.dirname(getAppSettingsFile()), { recursive: true });
+  fs.writeFileSync(getAppSettingsFile(), JSON.stringify(merged, null, 2));
+  return merged;
+}
+
+function applyLoginSetting(startAtLogin) {
+  if (process.platform === "darwin") {
+    app.setLoginItemSettings({ openAtLogin: startAtLogin, openAsHidden: true });
+  } else if (process.platform === "win32") {
+    app.setLoginItemSettings({ openAtLogin: startAtLogin, args: ["--hidden"] });
+  }
+}
 function ensureProfile() {
   try {
     const parsed = JSON.parse(fs.readFileSync(getSettingsFile(), "utf8"));
@@ -107,10 +154,13 @@ function setLastCalledId(lastCalledId) {
   } catch (_) {}
 }
 
+let mainWindow = null;
 let pendingSourceId = null;
 let tray = null;
 let isQuitting = false;
 let isCallActive = false;
+let minimizeToTray = true;
+let trayEnabled = true;
 const args = process.argv.slice(1);
 
 function buildTrayMenu() {
@@ -160,7 +210,9 @@ function buildTrayMenu() {
       ? [
           {
             label: "Call the last",
+            enabled: !isCallActive,
             click: () => {
+              if (isCallActive) return;
               if (mainWindow) {
                 mainWindow.show();
                 mainWindow.focus();
@@ -188,6 +240,43 @@ function updateTrayMenu() {
   }
 }
 
+function createTray() {
+  const iconPath = path.join(__dirname, "..", "assets", "icon.png");
+  let trayIcon;
+  try {
+    if (fs.existsSync(iconPath)) {
+      trayIcon = nativeImage
+        .createFromPath(iconPath)
+        .resize({ width: 16, height: 16 });
+    } else {
+      trayIcon = nativeImage.createEmpty();
+    }
+  } catch (_) {
+    trayIcon = nativeImage.createEmpty();
+  }
+
+  tray = new Tray(
+    trayIcon.isEmpty()
+      ? nativeImage.createFromDataURL(
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA7AAAAOwBeShxvQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAGfSURBVFiF7ZY9TsNAEIW/WRsJKChyAe6RK9A7cQNKJS5AT8ENKJW4ABUoKVBQoEuRC1Aok5CQNiQn2Rkva9bOxoDQsjP72n8e29nEGGP+T1L+HwP7wD5QAhZAA/gE3IBdYBuo/mXADnAKPAFvwAiwDdwGpoCJUwQngXPgEbgH3AL3QOkKsgWcA+fAE7ABbAL3QBkwBM6BV+AR2AQugBJQBM6AN+AZ2ACugCKQBy6AO+AJWAcuARlAClgGroBbIA9cAjJAHjgHboFbIA9cALLALXAe/PwK4E8BEsA5cAvIA+eADDADrADPgAwwDawC5UAmUAqU/9fA/8c4D4BToA4sA+f/+4DL4C+QCRSBJeDs/zlwHvgIXAEy/3dgJSAPnAAvgUugCFwC/gIog2XgGLgKXAJf/wugBBaBI+A0+N0E/gL+FwJnoBTYDhaBY+AqMAv8BSgBJSAHXASPgOPABSCBAngB3AQugZf/RVAESsAOcBY8Bo6AY0ACBfASuAueAVeBc+DzXwBl8Bi4Cp4Cx8AxIIECeAXcB8+Bq+ApcPIPgEvAcfAYOAaOgf8A5ICj4DFwHDwGjgF3AP8BUAMu/10ATwPO/wGQ+wdJ6g9M1Yq/GAAAAABJRU5ErkJggg==",
+        )
+      : trayIcon,
+  );
+
+  tray.setToolTip("2peer");
+  tray.setContextMenu(buildTrayMenu());
+
+  tray.on("double-click", () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+      if (process.platform === "darwin") {
+        app.dock.show();
+      }
+    }
+  });
+}
+
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
@@ -201,58 +290,16 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
-    if (process.platform === "darwin") {
-      app.setLoginItemSettings({
-        openAtLogin: true,
-        openAsHidden: true,
-      });
-    } else if (process.platform === "win32") {
-      app.setLoginItemSettings({
-        openAtLogin: true,
-        args: ["--hidden"],
-      });
-    }
+    const initialSettings = loadAppSettings();
+    applyLoginSetting(initialSettings.startAtLogin);
+    minimizeToTray = initialSettings.minimizeToTray !== false;
+    trayEnabled = initialSettings.trayEnabled !== false;
 
     registerIpcHandlers();
 
-    function createTray() {
-      const iconPath = path.join(__dirname, "..", "assets", "icon.png");
-      let trayIcon;
-      try {
-        if (fs.existsSync(iconPath)) {
-          trayIcon = nativeImage
-            .createFromPath(iconPath)
-            .resize({ width: 16, height: 16 });
-        } else {
-          trayIcon = nativeImage.createEmpty();
-        }
-      } catch (_) {
-        trayIcon = nativeImage.createEmpty();
-      }
-
-      tray = new Tray(
-        trayIcon.isEmpty()
-          ? nativeImage.createFromDataURL(
-              "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA7AAAAOwBeShxvQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAGfSURBVFiF7ZY9TsNAEIW/WRsJKChyAe6RK9A7cQNKJS5AT8ENKJW4ABUoKVBQoEuRC1Aok5CQNiQn2Rkva9bOxoDQsjP72n8e29nEGGP+T1L+HwP7wD5QAhZAA/gE3IBdYBuo/mXADnAKPAFvwAiwDdwGpoCJUwQngXPgEbgH3AL3QOkKsgWcA+fAE7ABbAH3QBkwBM6BV+AR2AQugBJQBM6AN+AZ2ACugCKQBy6AO+AJWAcuARlAClgGroBbIA9cAjJAHjgHboFbIA9cALLALXAe/PwK4E8BEsA5cAvIA+eADDADrADPgAwwDawC5UAmUAqU/9fA/8c4D4BToA4sA+f/+4DL4C+QCRSBJeDs/zlwHvgIXAEy/3dgJSAPnAAvgUugCFwC/gIog2XgGLgKXAJf/wugBBaBI+A0+N0E/gL+FwJnoBTYDhaBY+AqMAv8BSgBJSAHXASPgOPABSCBAngB3AQugZf/RVAESsAOcBY8Bo6AY0ACBfASuAueAVeBc+DzXwBl8Bi4Cp4Cx8AxIIECeAXcB8+Bq+ApcPIPgEvAcfAYOAaOgf8A5ICj4DFwHDwGjgF3AP8BUAMu/10ATwPO/wGQ+wdJ6g9M1Yq/GAAAAABJRU5ErkJggg==",
-            )
-          : trayIcon,
-      );
-
-      tray.setToolTip("2peer");
-      tray.setContextMenu(buildTrayMenu());
-
-      tray.on("double-click", () => {
-        if (mainWindow) {
-          mainWindow.show();
-          mainWindow.focus();
-          if (process.platform === "darwin") {
-            app.dock.show();
-          }
-        }
-      });
+    if (trayEnabled) {
+      createTray();
     }
-
-    createTray();
     session.defaultSession.setDisplayMediaRequestHandler(
       async (_req, callback) => {
         try {
@@ -283,22 +330,8 @@ if (!gotTheLock) {
 }
 
 function createWindow() {
-  // Determine if we're running in development or production
-  const isDev = !app.isPackaged;
-
-  // In development, dist is in the project root
-  // In production, dist is next to the main entry point (src folder)
-  let indexPath;
-  let preloadPath;
-
-  if (isDev) {
-    indexPath = path.join(__dirname, "..", "dist", "index.html");
-    preloadPath = path.join(__dirname, "preload.cjs");
-  } else {
-    // In production (packaged app), files are in app.asar
-    indexPath = path.join(__dirname, "..", "dist", "index.html");
-    preloadPath = path.join(__dirname, "preload.cjs");
-  }
+  const indexPath = path.join(__dirname, "..", "dist", "index.html");
+  const preloadPath = path.join(__dirname, "preload.cjs");
 
   const isLaunchedAsHidden = args.includes("--hidden");
   const isMac = process.platform === "darwin";
@@ -310,9 +343,7 @@ function createWindow() {
     ...(isMac
       ? { titleBarStyle: "hidden", trafficLightPosition: { x: 13, y: 13 } }
       : { frame: false }),
-    transparent: true,
-    backgroundColor: "#00000000",
-    roundedCorners: true,
+    backgroundColor: "#0a0a0a",
     autoHideMenuBar: true,
     show: !isLaunchedAsHidden,
     webPreferences: {
@@ -328,11 +359,14 @@ function createWindow() {
 
   mainWindow.on("close", (event) => {
     if (!isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
-      if (process.platform === "darwin") {
-        app.dock.hide();
+      if (minimizeToTray && tray) {
+        event.preventDefault();
+        mainWindow.hide();
+        if (process.platform === "darwin") {
+          app.dock.hide();
+        }
       }
+      // else: allow window to close naturally
     }
   });
 
@@ -341,10 +375,6 @@ function createWindow() {
       app.dock.show();
     }
   });
-
-  // if (isDev) {
-  //   mainWindow.webContents.openDevTools();
-  // }
 
   return mainWindow;
 }
@@ -424,6 +454,22 @@ function registerIpcHandlers() {
   ipcMain.handle("app:quit", () => {
     isQuitting = true;
     app.quit();
+  });
+  ipcMain.handle("settings:get", () => loadAppSettings());
+  ipcMain.handle("settings:set", (_, settings) => {
+    const saved = saveAppSettings(settings);
+    applyLoginSetting(saved.startAtLogin);
+    minimizeToTray = saved.minimizeToTray !== false;
+    trayEnabled = saved.trayEnabled !== false;
+    if (trayEnabled && !tray) {
+      createTray();
+    } else if (!trayEnabled && tray) {
+      tray.destroy();
+      tray = null;
+    } else if (tray) {
+      updateTrayMenu();
+    }
+    return saved;
   });
 }
 
