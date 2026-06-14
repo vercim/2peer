@@ -1,0 +1,131 @@
+/* ============================================================================
+   colormap.css — single source of truth for EVERY color in 2peer.
+   ----------------------------------------------------------------------------
+   Built on OKLCH (perceptually uniform): lightness reads the same across hues,
+   so neutral ramps step evenly and the brand keeps its character when tinted.
+
+   Color theory in play here:
+   • Neutrals carry a faint cool tint (hue ≈ 245) instead of pure gray — pure
+     #111 reads "dead"; a whisper of blue makes dark surfaces feel intentional.
+   • Brand = teal (hue ≈ 169). For a P2P comms app teal signals calm + connection;
+     it doubles as the "online / connected" positive state, so success never has
+     to fight the brand.
+   • Warning (amber ≈ 78) and danger (red ≈ 23) sit far from the brand hue on the
+     wheel, so status never reads ambiguously.
+   • Token names are stable — components reference --color-* through Tailwind v4
+     utilities (bg-panel, text-text, bg-accent, …). Change values here, not JSX.
+   ========================================================================== */
+
+@theme {
+  /* ── Surfaces (dark, elevation low → high) ─────────────────────────────── */
+  --color-bg:       oklch(0.155 0.007 245); /* app canvas */
+  --color-panel:    oklch(0.198 0.008 245); /* cards */
+  --color-panel-2:  oklch(0.238 0.009 245); /* inset / inputs */
+  --color-panel-3:  oklch(0.288 0.010 245); /* hover / elevated */
+  --color-video:    oklch(0.115 0.006 245); /* video letterbox */
+
+  --color-border:   color-mix(in oklch, white 9%, transparent);
+
+  /* ── Text ramp (cool neutral) ──────────────────────────────────────────── */
+  --color-text:      oklch(0.945 0.004 245); /* primary */
+  --color-text-soft: oklch(0.820 0.005 245); /* secondary emphasis */
+  --color-muted:     oklch(0.660 0.006 245); /* secondary */
+  --color-faint:     oklch(0.500 0.007 245); /* tertiary / idle icons */
+  --color-faint-2:   oklch(0.380 0.007 245); /* hints */
+  --color-dim:       oklch(0.300 0.006 245); /* placeholders / disabled */
+
+  /* ── Brand (teal) ──────────────────────────────────────────────────────────
+     --color-accent-base is the user-customizable seed (settings). The live
+     --color-accent is derived from it per theme so one picked color reads well
+     on both backgrounds — no separate light/dark choice needed. */
+  --color-accent-base:   #22C79C;
+  --color-accent:        color-mix(in oklch, var(--color-accent-base) 92%, white);
+  --color-accent-strong: color-mix(in oklch, var(--color-accent-base) 78%, white);
+  --color-accent-soft:   color-mix(in oklch, var(--color-accent-base) 16%, transparent);
+  --color-on-accent:     oklch(0.27 0.06 169); /* text/icon on a brand fill */
+
+  /* ── Semantic ──────────────────────────────────────────────────────────── */
+  --color-success:   var(--color-accent);          /* connected / online */
+  --color-warning:   oklch(0.810 0.130 78);        /* connecting / caution */
+  --color-info:      oklch(0.700 0.120 240);
+
+  --color-danger:    oklch(0.450 0.150 23);        /* destructive fill (hang up) */
+  --color-danger-h:  oklch(0.510 0.165 23);        /* …hover */
+  --color-danger-fg: oklch(0.720 0.150 23);        /* danger text / icon */
+  --color-on-danger: oklch(0.870 0.060 22);        /* text on danger fill */
+
+  /* ── Button / panel overlay tints ──────────────────────────────────────── */
+  --color-surface:    color-mix(in oklch, white 7%,  transparent);
+  --color-surface-hi: color-mix(in oklch, white 11%, transparent);
+  --color-surface-lo: color-mix(in oklch, white 3%,  transparent);
+  --color-surface-md: color-mix(in oklch, white 9%,  transparent);
+
+  /* ── Dialog / modal / overlay ──────────────────────────────────────────── */
+  --color-dialog-bg:     oklch(0.185 0.008 245);
+  --color-dialog-border: color-mix(in oklch, white 10%, transparent);
+  --color-dialog-shadow: oklch(0 0 0 / 0.6);
+  --color-overlay:       oklch(0.12 0.006 245 / 0.74);
+  --color-overlay-dark:  oklch(0.10 0.006 245 / 0.84);
+
+  /* ── Calling-overlay text ──────────────────────────────────────────────── */
+  --color-overlay-label: color-mix(in oklch, white 22%, transparent);
+  --color-overlay-id:    color-mix(in oklch, var(--color-accent) 78%, white);
+  --color-overlay-sub:   color-mix(in oklch, white 18%, transparent);
+
+  /* ── Status glow (consumed by statusStates.js / StatusGlow.jsx) ────────── */
+  --color-glow-idle:         oklch(0.66 0.006 245);
+  --color-glow-connecting:   var(--color-warning);
+  --color-glow-connected:    var(--color-accent);
+  --color-glow-failed:       var(--color-danger-fg);
+  --color-glow-disconnected: oklch(0.82 0.13 90);
+}
+
+/* ── Light theme ───────────────────────────────────────────────────────────
+   Standard elevation model (unlike the old inverted one): bg = soft gray,
+   panels = white and *lighter* than the canvas. The brand is darkened so teal
+   stays legible on white. */
+[data-theme="light"] {
+  --color-bg:      oklch(0.945 0.003 245);
+  --color-panel:   oklch(0.995 0.001 245);
+  --color-panel-2: oklch(0.965 0.003 245);
+  --color-panel-3: oklch(0.925 0.004 245);
+  --color-video:   oklch(0.115 0.006 245); /* video stays dark in both themes */
+
+  --color-border:  color-mix(in oklch, black 11%, transparent);
+
+  --color-text:      oklch(0.255 0.010 245);
+  --color-text-soft: oklch(0.380 0.010 245);
+  --color-muted:     oklch(0.500 0.010 245);
+  --color-faint:     oklch(0.620 0.009 245);
+  --color-faint-2:   oklch(0.720 0.007 245);
+  --color-dim:       oklch(0.800 0.005 245);
+
+  --color-accent:        color-mix(in oklch, var(--color-accent-base) 82%, black);
+  --color-accent-strong: color-mix(in oklch, var(--color-accent-base) 68%, black);
+  --color-accent-soft:   color-mix(in oklch, var(--color-accent-base) 18%, transparent);
+  --color-on-accent:     oklch(0.99 0.01 169);
+
+  --color-warning:   oklch(0.650 0.150 70);
+  --color-info:      oklch(0.550 0.150 245);
+  --color-danger:    oklch(0.560 0.180 25);
+  --color-danger-h:  oklch(0.500 0.190 25);
+  --color-danger-fg: oklch(0.520 0.190 25);
+  --color-on-danger: oklch(0.985 0.010 25);
+
+  --color-surface:    color-mix(in oklch, black 6%,  transparent);
+  --color-surface-hi: color-mix(in oklch, black 10%, transparent);
+  --color-surface-lo: color-mix(in oklch, black 3%,  transparent);
+  --color-surface-md: color-mix(in oklch, black 8%,  transparent);
+
+  --color-dialog-bg:     oklch(0.985 0.002 245);
+  --color-dialog-border: color-mix(in oklch, black 12%, transparent);
+  --color-dialog-shadow: oklch(0 0 0 / 0.18);
+  --color-overlay:       oklch(0.55 0.01 245 / 0.45);
+  --color-overlay-dark:  oklch(0.45 0.01 245 / 0.6);
+
+  --color-overlay-label: color-mix(in oklch, black 45%, transparent);
+  --color-overlay-id:    color-mix(in oklch, var(--color-accent) 85%, black);
+  --color-overlay-sub:   color-mix(in oklch, black 32%, transparent);
+
+  --color-glow-idle: oklch(0.5 0.01 245);
+}

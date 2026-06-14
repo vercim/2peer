@@ -1,73 +1,33 @@
 @import "tailwindcss";
+@import "./colormap.css";
 
+/* Non-color design tokens: type scale, radius scale, fonts.
+   (All color tokens live in colormap.css.) Tailwind v4 merges @theme blocks. */
 @theme {
-  --color-bg: #0a0a0a;
-  --color-panel: #111;
-  --color-panel-2: #181818;
-  --color-panel-3: #202020;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-text: #e0e0e0;
-  --color-muted: #777;
-  --color-faint: #3a3a3a;
-  --color-accent: #B9D9CC;
-  --color-danger: #7a1f1f;
-  --color-danger-h: #9b2828;
-
-  /* Surface overlays for buttons/panels */
-  --color-surface:    rgba(255, 255, 255, 0.06);
-  --color-surface-hi: rgba(255, 255, 255, 0.09);
-  --color-surface-lo: rgba(255, 255, 255, 0.025);
-  --color-surface-md: rgba(255, 255, 255, 0.08);
-
-  /* Dialog / modal */
-  --color-dialog-bg:     rgba(14, 14, 14, 0.98);
-  --color-dialog-border: rgba(255, 255, 255, 0.08);
-  --color-dialog-shadow: rgba(0, 0, 0, 0.65);
-  --color-overlay:       rgba(6, 6, 6, 0.75);
-  --color-overlay-dark:  rgba(6, 6, 6, 0.84);
-
-  /* Calling overlay text */
-  --color-overlay-label: rgba(255, 255, 255, 0.22);
-  --color-overlay-id:    rgba(215, 238, 255, 0.72);
-  --color-overlay-sub:   rgba(255, 255, 255, 0.18);
-
   --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, Menlo, Consolas, monospace;
-}
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-/* ── Light theme ─────────────────────────────────────────────────────────── */
-[data-theme="light"] {
-  --color-bg: #ebebeb;
-  --color-panel: #e0e0e0;
-  --color-panel-2: #d4d4d4;
-  --color-panel-3: #c8c8c8;
-  --color-border: rgba(0, 0, 0, 0.1);
-  --color-text: #1a1a1a;
-  --color-muted: #555;
-  --color-faint: #999;
-  --color-danger: #a01a1a;
-  --color-danger-h: #b82020;
+  /* Type scale (px) — generates text-2xs … text-2xl */
+  --text-2xs: 10px;  --text-2xs--line-height: 14px;
+  --text-xs:  11px;  --text-xs--line-height:  15px;
+  --text-sm:  12px;  --text-sm--line-height:  16px;
+  --text-base:13px;  --text-base--line-height:18px;
+  --text-md:  14px;  --text-md--line-height:  20px;
+  --text-lg:  16px;  --text-lg--line-height:  22px;
+  --text-xl:  20px;  --text-xl--line-height:  26px;
+  --text-2xl: 26px;  --text-2xl--line-height: 32px;
 
-  --color-surface:    rgba(0, 0, 0, 0.06);
-  --color-surface-hi: rgba(0, 0, 0, 0.1);
-  --color-surface-lo: rgba(0, 0, 0, 0.03);
-  --color-surface-md: rgba(0, 0, 0, 0.08);
-
-  --color-dialog-bg:     rgba(232, 232, 232, 0.98);
-  --color-dialog-border: rgba(0, 0, 0, 0.1);
-  --color-dialog-shadow: rgba(0, 0, 0, 0.18);
-  --color-overlay:       rgba(120, 120, 120, 0.5);
-  --color-overlay-dark:  rgba(100, 100, 100, 0.65);
-
-  --color-overlay-label: rgba(0, 0, 0, 0.45);
-  --color-overlay-id:    rgba(20, 50, 100, 0.8);
-  --color-overlay-sub:   rgba(0, 0, 0, 0.32);
+  /* Radius scale — generates rounded-sm … rounded-xl */
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
 [data-theme="light"] body,
 [data-theme="light"] #root {
-  background: #ebebeb;
-  color: #1a1a1a;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 /* ── Reduce motion ───────────────────────────────────────────────────────── */
@@ -84,9 +44,25 @@
   filter: grayscale(1) saturate(0);
 }
 
+@layer components {
+  /* Semantic type scale — every text size in the app maps to one of these four
+     roles. All are anchored on --t-base (the user-set font size), so changing
+     the size preference scales the whole UI proportionally. Use these classes
+     instead of hardcoded text-[..px] so sizing stays centralized.
+       .t-micro   — uppercase section labels (the only deliberately-small text)
+       .t-body    — the standard size: all body text AND all buttons
+       .t-id      — the user's own ID in the sidebar (needs to be readable)
+       .t-display — the large peer ID shown in call overlays (display heading) */
+  .t-micro   { font-size: calc(var(--t-base, 14px) * 0.72); }
+  .t-body    { font-size: var(--t-base, 14px); }
+  .t-id      { font-size: calc(var(--t-base, 14px) * 1.15); }
+  .t-display { font-size: calc(var(--t-base, 14px) * 1.45); }
+}
+
 @layer base {
   :root {
     --tb: 38px;
+    --t-base: 14px;
   }
 
   * {
@@ -100,10 +76,13 @@
     height: 100vh;
     overflow: hidden;
     background: transparent;
-    color: #e0e0e0;
-    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-    font-size: 13px;
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--t-base, 14px);
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11", "ss01";
     user-select: none;
   }
 
@@ -114,12 +93,18 @@
     overflow: hidden;
   }
 
+  /* Tabular figures for IDs, timers and bitrate — keeps digits from jittering */
+  .tabular-nums,
+  input {
+    font-variant-numeric: tabular-nums;
+  }
+
   input::placeholder {
-    color: #333;
+    color: var(--color-dim);
   }
 
   input {
-    color: #e0e0e0;
+    color: var(--color-text);
   }
 }
 
@@ -133,28 +118,28 @@
   }
 
   .entry {
-    font-size: 12px;
-    color: #777;
-    line-height: 1.4;
+    font-size: var(--t-base, 14px);
+    color: var(--color-muted);
+    line-height: 1.45;
     padding: 2px 0;
     word-break: break-word;
     animation: fadeIn 0.3s ease-out;
   }
 
   .entry:last-child {
-    color: #e0e0e0;
+    color: var(--color-text);
   }
 
   .entry strong {
-    color: #e0e0e0;
+    color: var(--color-text);
   }
 
   .entry.error {
-    color: #b44;
+    color: var(--color-danger-fg);
   }
 
   .entry.error strong {
-    color: #b44;
+    color: var(--color-danger-fg);
   }
 }
 
@@ -199,8 +184,8 @@
   /* Individual window tile styling (optional enhancement) */
   .windows-grid .window-tile {
     position: relative;
-    background: #0a0a0a;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--color-video);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
     overflow: hidden;
   }

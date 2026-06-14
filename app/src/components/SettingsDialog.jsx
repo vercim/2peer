@@ -2,11 +2,15 @@ import { useState, useEffect } from "react";
 import { X, RotateCcw } from "lucide-react";
 import { qualityOptions } from "../utils/rtcConfig.js";
 
+// Accent *seeds* — colormap.css derives the live tint per theme via color-mix,
+// so each reads well on both dark and light. Evenly spread around the wheel.
 const ACCENT_COLORS = [
-  { name: "Sage",  value: "#B9D9CC" },
-  { name: "Blue",  value: "#7AAFD9" },
-  { name: "Amber", value: "#D9C47A" },
-  { name: "Red",   value: "#D97A7A" },
+  { name: "Teal",   value: "#22C79C" },
+  { name: "Azure",  value: "#3B9EFF" },
+  { name: "Indigo", value: "#7C82FF" },
+  { name: "Violet", value: "#B57BFF" },
+  { name: "Amber",  value: "#F2B14C" },
+  { name: "Coral",  value: "#F0726A" },
 ];
 
 const TABS = [
@@ -16,8 +20,9 @@ const TABS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  accentColor: "#B9D9CC",
+  accentColor: "#22C79C",
   theme: "dark",
+  fontSize: 14,
   soundEnabled: true,
   reduceMotion: false,
   monochromatic: false,
@@ -56,8 +61,8 @@ function SettingRow({ label, description, checked, onChange, disabled }) {
   return (
     <div className="flex items-center justify-between gap-[16px] py-[11px] border-b border-border last:border-none">
       <div className="flex flex-col gap-[2px]">
-        <span className={`text-[12px] ${disabled ? "text-[#555]" : "text-text"}`}>{label}</span>
-        {description && <span className="text-[10px] text-faint">{description}</span>}
+        <span className={`t-body ${disabled ? "text-dim" : "text-text"}`}>{label}</span>
+        {description && <span className="t-body text-faint">{description}</span>}
       </div>
       <Toggle checked={!!checked} onChange={onChange} disabled={disabled} />
     </div>
@@ -78,10 +83,10 @@ function PillGroup({ options, value, onChange, cols = 3 }) {
           <button
             key={v}
             onClick={() => onChange(v)}
-            className={`py-[7px] rounded-[5px] text-[11px] font-semibold transition-colors duration-120 cursor-pointer border truncate ${
+            className={`py-[7px] rounded-[5px] t-body font-semibold transition-colors duration-120 cursor-pointer border truncate ${
               active
                 ? "bg-[var(--color-surface-md)] border-[var(--color-dialog-border)] text-text"
-                : "bg-transparent border-border text-[#555] hover:text-[#888] hover:border-[var(--color-dialog-border)]"
+                : "bg-transparent border-border text-faint hover:text-text hover:border-[var(--color-dialog-border)]"
             }`}
           >
             {label}
@@ -157,6 +162,25 @@ function AppTab({ settings, onChange }) {
 
       <Divider />
 
+      {/* Text size */}
+      <div className="mb-[14px]">
+        <SectionLabel>Text size</SectionLabel>
+        <PillGroup
+          cols={5}
+          options={[
+            { value: 11, label: "XS" },
+            { value: 12, label: "S"  },
+            { value: 14, label: "M"  },
+            { value: 16, label: "L"  },
+            { value: 18, label: "XL" },
+          ]}
+          value={settings.fontSize ?? 14}
+          onChange={(v) => onChange("fontSize", Number(v))}
+        />
+      </div>
+
+      <Divider />
+
       {/* Toggles */}
       <SettingRow
         label="Sound effects"
@@ -224,7 +248,7 @@ function NetworkTab({ settings, onChange }) {
       </div>
 
       <div className="p-[7px_10px] rounded-[5px] bg-[var(--color-surface-lo)] border border-border mb-[2px]">
-        <span className="text-[10px] text-faint">
+        <span className="t-body text-faint">
           Bitrate adjusts automatically. Changes apply on the next call.
         </span>
       </div>
@@ -242,8 +266,8 @@ function NetworkTab({ settings, onChange }) {
       <div>
         <div className="flex items-center justify-between py-[11px]">
           <div className="flex flex-col gap-[2px]">
-            <span className="text-[12px] text-text">Traffic limits</span>
-            <span className="text-[10px] text-faint">
+            <span className="t-body text-text">Traffic limits</span>
+            <span className="t-body text-faint">
               Show warnings when session traffic exceeds limits
             </span>
           </div>
@@ -256,7 +280,7 @@ function NetworkTab({ settings, onChange }) {
         {limits.enabled && (
           <div className="flex gap-[10px] pt-[10px] border-t border-border">
             <div className="flex-1 flex flex-col gap-[4px]">
-              <span className="text-[10px] text-faint">Upload limit (GB)</span>
+              <span className="t-body text-faint">Upload limit (GB)</span>
               <div className="flex items-center bg-panel-2 border border-border rounded-[5px] px-[8px] py-[6px]">
                 <input
                   type="number"
@@ -266,13 +290,13 @@ function NetworkTab({ settings, onChange }) {
                   onChange={(e) =>
                     updateLimits("uploadGB", Math.max(1, Number(e.target.value)))
                   }
-                  className="w-full bg-transparent text-[12px] text-text outline-none font-mono"
+                  className="w-full bg-transparent t-body text-text outline-none font-mono"
                 />
-                <span className="text-[10px] text-faint shrink-0">GB</span>
+                <span className="t-body text-faint shrink-0">GB</span>
               </div>
             </div>
             <div className="flex-1 flex flex-col gap-[4px]">
-              <span className="text-[10px] text-faint">Download limit (GB)</span>
+              <span className="t-body text-faint">Download limit (GB)</span>
               <div className="flex items-center bg-panel-2 border border-border rounded-[5px] px-[8px] py-[6px]">
                 <input
                   type="number"
@@ -282,9 +306,9 @@ function NetworkTab({ settings, onChange }) {
                   onChange={(e) =>
                     updateLimits("downloadGB", Math.max(1, Number(e.target.value)))
                   }
-                  className="w-full bg-transparent text-[12px] text-text outline-none font-mono"
+                  className="w-full bg-transparent t-body text-text outline-none font-mono"
                 />
-                <span className="text-[10px] text-faint shrink-0">GB</span>
+                <span className="t-body text-faint shrink-0">GB</span>
               </div>
             </div>
           </div>
@@ -337,7 +361,7 @@ function SystemTab({ settings, onChange }) {
           onChange={(v) => onChange("minimizeToTray", v === "true" || v === true)}
         />
         {!settings.trayEnabled && (
-          <p className="text-[10px] text-faint mt-[6px]">
+          <p className="t-body text-faint mt-[6px]">
             Enable tray icon to use minimize-to-tray.
           </p>
         )}
@@ -394,7 +418,7 @@ export function SettingsDialog({ isOpen, onClose, settings, onSave }) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-[18px] py-[13px] border-b border-border shrink-0">
-          <span className="text-[12px] font-semibold text-text tracking-[0.02em]">
+          <span className="t-body font-semibold text-text tracking-[0.02em]">
             Settings
           </span>
           <button
@@ -411,10 +435,10 @@ export function SettingsDialog({ isOpen, onClose, settings, onSave }) {
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`px-[10px] py-[6px] rounded-[5px] text-[11px] font-semibold transition-colors duration-120 cursor-pointer ${
+              className={`px-[10px] py-[6px] rounded-[5px] t-body font-semibold transition-colors duration-120 cursor-pointer ${
                 activeTab === id
                   ? "bg-[var(--color-surface-md)] text-text"
-                  : "text-[#888] hover:text-text"
+                  : "text-faint hover:text-text"
               }`}
             >
               {label}
@@ -433,8 +457,8 @@ export function SettingsDialog({ isOpen, onClose, settings, onSave }) {
         <div className="px-[18px] py-[12px] border-t border-border shrink-0">
           <button
             onClick={reset}
-            className={`flex items-center gap-[6px] text-[11px] transition-colors duration-200 cursor-pointer ${
-              resetDone ? "text-accent" : "text-[#444] hover:text-[#888]"
+            className={`flex items-center gap-[6px] t-body transition-colors duration-200 cursor-pointer ${
+              resetDone ? "text-accent" : "text-faint-2 hover:text-faint"
             }`}
           >
             <RotateCcw size={11} className={resetDone ? "opacity-0 w-0 overflow-hidden" : ""} />

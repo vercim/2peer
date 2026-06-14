@@ -1,25 +1,120 @@
 import { useRef, useCallback, useEffect, useState } from "react";
-import { joinRoom, getRelaySockets } from "@trystero-p2p/torrent";
+import {
+  joinRoom as joinTorrentRoom,
+  getRelaySockets as getTorrentSockets,
+} from "@trystero-p2p/torrent";
+import {
+  joinRoom as joinNostrRoom,
+  getRelaySockets as getNostrSockets,
+} from "@trystero-p2p/nostr";
 import { soundManager } from "../utils/soundManager.js";
 import { setMaxBandwidthInSDP } from "../utils/sdpUtils.js";
 import { applyMaxQualityEncoding } from "../utils/bitrateManager.js";
 import { stopStreamTracks } from "../utils/streamUtils.js";
+import { rtcConfig } from "../utils/rtcConfig.js";
 
-// room name namespace — keeps our rooms separate from other apps using Trystero.
-// We pass an explicit tracker list so Trystero connects to ALL of them (its
-// default only uses the first 3), which improves the odds that at least one
-// WebSocket signaling relay is reachable on a given network.
-const TRYSTERO_CONFIG = {
+// --- Signaling transports ----------------------------------------------------
+// Peer discovery is the single point of failure for calls: two peers can only
+// ring each other if they share at least one reachable signaling relay. The app
+// previously relied solely on BitTorrent WSS trackers — but there are only ~2
+// working public ones (openwebtorrent, btorrent), and on a network where both
+// are blocked, the callee simply never received the call.
+//
+// We now run TWO independent transports in parallel and join every room on
+// both. A peer is discoverable through whichever transport the other side can
+// reach, so a single blocked network no longer kills the call. Trystero shares
+// one selfId across strategies, so a peer's id is identical on both transports;
+// duplicate inbound signals are absorbed by the idempotency guards below, and
+// sending to a peer not present on a given transport is silently skipped by the
+// library — so fanning out to both transports is safe.
+//
+// `rtcConfig` (clean STUN, no dead hosts) is shared with both so the signaling
+// data channels traverse NAT on as many networks as the media connection.
+const TORRENT_CONFIG = {
   appId: "2peer",
   relayConfig: {
+    // Only true general-purpose WSS trackers. PeerTube/instance trackers were
+    // dropped: they accept the WebSocket but reject unknown infoHashes, which
+    // not only fails to match peers but also slows discovery on the good ones.
+    urls: ["wss://tracker.openwebtorrent.com", "wss://tracker.btorrent.xyz"],
+  },
+  rtcConfig,
+};
+
+const NOSTR_CONFIG = {
+  appId: "2peer",
+  relayConfig: {
+    // Verified-reachable, operator-diverse public Nostr relays. There are dozens
+    // of these, so the odds that a given network blocks every one are far lower
+    // than for the tiny pool of WebTorrent trackers.
+    // Relays that aggressively rate-limit or spam-block Trystero's frequent
+    // ephemeral announce events were dropped (relay.damus.io — "noting too
+    // much"; nostr-pub.wellorder.net — "spam not permitted"). The set below
+    // tolerated sustained signaling traffic in testing.
     urls: [
-      "wss://tracker.webtorrent.dev",
-      "wss://tracker.openwebtorrent.com",
-      "wss://tracker.btorrent.xyz",
-      "wss://tracker.files.fm:7073/announce",
+      "wss://nos.lol",
+      "wss://relay.primal.net",
+      "wss://relay.snort.social",
+      "wss://relay.mostr.pub",
+      "wss://offchain.pub",
+      "wss://nostr.mom",
     ],
   },
+  rtcConfig,
 };
+
+const TRANSPORTS = [
+  { join: joinTorrentRoom, config: TORRENT_CONFIG },
+  { join: joinNostrRoom, config: NOSTR_CONFIG },
+];
+
+// Join `roomId` on every transport and expose one unified handle. Handlers are
+// wired by the caller after creation (setOnMessage / setOnPeerJoin / ...).
+function joinRoomMulti(roomId) {
+  const legs = [];
+  for (const { join, config } of TRANSPORTS) {
+    try {
+      const room = join(config, roomId);
+      legs.push({ room, action: room.makeAction("signal") });
+    } catch (e) {
+      console.warn("[Signal] transport join failed:", e?.message);
+    }
+  }
+  return {
+    legs,
+    setOnMessage(fn) {
+      legs.forEach((l) => (l.action.onMessage = fn));
+    },
+    setOnPeerJoin(fn) {
+      legs.forEach((l) => (l.room.onPeerJoin = fn));
+    },
+    setOnPeerLeave(fn) {
+      legs.forEach((l) => (l.room.onPeerLeave = fn));
+    },
+    send(payload, target) {
+      legs.forEach((l) =>
+        l.action
+          .send(payload, { target })
+          .catch((e) => console.warn("[Signal] send error:", e?.message)),
+      );
+    },
+    leave() {
+      legs.forEach((l) => {
+        try {
+          l.room.leave();
+        } catch (_) {}
+      });
+    },
+  };
+}
+
+function getAllRelaySockets() {
+  return [
+    ...Object.values(getTorrentSockets() || {}),
+    ...Object.values(getNostrSockets() || {}),
+  ];
+}
+
 const CALL_TIMEOUT_MS = 30_000;
 
 export function useSignaling({
@@ -43,12 +138,11 @@ export function useSignaling({
   const hangupProcessedRef = useRef(false);
   const incomingProcessedRef = useRef({ value: false });
 
-  const myRoomRef = useRef(null);   // room we join on startup (room = selfId)
-  const callRoomRef = useRef(null); // room joined when making a call (room = calleeId)
-
-  // action objects returned by room.makeAction("signal") for each room
-  const myRoomActionRef = useRef(null);
-  const callRoomActionRef = useRef(null);
+  // Each "handle" is a multi-transport room (torrent + nostr joined under the
+  // same id). myRoom = the room named after our own id (so others can reach us);
+  // callRoom = the callee's room, joined while placing a call.
+  const myRoomHandleRef = useRef(null);
+  const callRoomHandleRef = useRef(null);
 
   const peerTrysteroIdRef = useRef(null); // Trystero peer ID of the current call partner
 
@@ -72,7 +166,7 @@ export function useSignaling({
     m.warned = false;
     m.elapsed = 0;
     m.timer = setInterval(() => {
-      const sockets = Object.values(getRelaySockets() || {});
+      const sockets = getAllRelaySockets();
       const open = sockets.filter((s) => s && s.readyState === 1).length;
 
       if (open > 0) {
@@ -114,18 +208,15 @@ export function useSignaling({
   const handleSignalRef = useRef(null);
 
   // --- sendSignal ----------------------------------------------------------
-  // Priority: use callRoom action if we're the caller, else myRoom action.
-  const sendSignal = useCallback(
-    (payload) => {
-      const action = callRoomActionRef.current ?? myRoomActionRef.current;
-      const peerId = peerTrysteroIdRef.current;
-      if (!action || !peerId) return;
-      action
-        .send({ ...payload, from: selfIdRef.current }, { target: peerId })
-        .catch((e) => console.warn("[Trystero] sendSignal error:", e.message));
-    },
-    [],
-  );
+  // Priority: use callRoom handle if we're the caller, else myRoom handle. The
+  // handle fans the message out across both transports; only the one where the
+  // peer is actually connected delivers it.
+  const sendSignal = useCallback((payload) => {
+    const handle = callRoomHandleRef.current ?? myRoomHandleRef.current;
+    const peerId = peerTrysteroIdRef.current;
+    if (!handle || !peerId) return;
+    handle.send({ ...payload, from: selfIdRef.current }, peerId);
+  }, []);
 
   // --- handleSignal --------------------------------------------------------
   const handleSignal = useCallback(
@@ -320,42 +411,39 @@ export function useSignaling({
   }, [handleSignal]);
 
   // --- initMyRoom ----------------------------------------------------------
-  // Join the room named after our own ID so others can reach us.
+  // Join the room named after our own ID (on every transport) so others can
+  // reach us.
   const initMyRoom = useCallback(
     async (id) => {
-      if (myRoomRef.current) {
+      if (myRoomHandleRef.current) {
         try {
-          myRoomRef.current.leave();
+          myRoomHandleRef.current.leave();
         } catch (_) {}
-        myRoomRef.current = null;
-        myRoomActionRef.current = null;
+        myRoomHandleRef.current = null;
       }
 
       setSignalingStatus("connecting");
 
-      const room = joinRoom(TRYSTERO_CONFIG, id);
-      myRoomRef.current = room;
+      const handle = joinRoomMulti(id);
+      myRoomHandleRef.current = handle;
 
-      const action = room.makeAction("signal");
-      myRoomActionRef.current = action;
-
-      action.onMessage = (payload, { peerId }) => {
+      handle.setOnMessage((payload, { peerId }) => {
         console.log("[Trystero] Received via myRoom:", payload?.type);
         peerTrysteroIdRef.current = peerId;
         handleSignalRef.current?.(payload);
-      };
+      });
 
-      room.onPeerJoin = (peerId) => {
+      handle.setOnPeerJoin((peerId) => {
         console.log("[Trystero] Peer joined my room:", peerId);
         peerTrysteroIdRef.current = peerId;
-      };
+      });
 
-      room.onPeerLeave = (peerId) => {
+      handle.setOnPeerLeave((peerId) => {
         console.log("[Trystero] Peer left my room:", peerId);
-        if (peerTrysteroIdRef.current === peerId && !callRoomRef.current) {
+        if (peerTrysteroIdRef.current === peerId && !callRoomHandleRef.current) {
           peerTrysteroIdRef.current = null;
         }
-      };
+      });
 
       addStatus('Ready. Share your ID and click "Call".');
       startRelayMonitor();
@@ -364,56 +452,58 @@ export function useSignaling({
   );
 
   // --- openCallChannel -----------------------------------------------------
-  // Join the callee's room; resolves when Trystero connects to the callee.
+  // Join the callee's room on every transport; resolves as soon as ANY
+  // transport connects us to the callee.
   const openCallChannel = useCallback((calleeId) => {
     return new Promise((resolve, reject) => {
-      if (callRoomRef.current) {
+      if (callRoomHandleRef.current) {
         try {
-          callRoomRef.current.leave();
+          callRoomHandleRef.current.leave();
         } catch (_) {}
-        callRoomRef.current = null;
-        callRoomActionRef.current = null;
+        callRoomHandleRef.current = null;
       }
       peerTrysteroIdRef.current = null;
 
       addStatus(`Joining peer's signaling room, waiting for peer to appear...`);
 
-      const room = joinRoom(TRYSTERO_CONFIG, calleeId);
-      callRoomRef.current = room;
+      const handle = joinRoomMulti(calleeId);
+      callRoomHandleRef.current = handle;
 
-      const action = room.makeAction("signal");
-      callRoomActionRef.current = action;
-
-      action.onMessage = (payload, { peerId }) => {
+      handle.setOnMessage((payload, { peerId }) => {
         console.log("[Trystero] Received via callRoom:", payload?.type);
         peerTrysteroIdRef.current = peerId;
         handleSignalRef.current?.(payload);
-      };
+      });
 
+      let settled = false;
       const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
         reject(new Error("Peer not reachable (timeout after 30s) — peer may be offline or behind a restrictive firewall"));
       }, CALL_TIMEOUT_MS);
 
-      // Trystero fires onPeerJoin immediately for already-connected peers too
-      room.onPeerJoin = (peerId) => {
+      // Fires on whichever transport reaches the callee first; later joins on the
+      // other transport just re-affirm the same peer id.
+      handle.setOnPeerJoin((peerId) => {
         console.log("[Trystero] Callee found:", peerId);
         peerTrysteroIdRef.current = peerId;
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         addStatus(`Peer found via signaling (Trystero peer: ${peerId.slice(0, 8)}…). Sending offer...`);
         resolve();
-      };
+      });
     });
   }, [addStatus]);
 
   // --- closeCallChannel ----------------------------------------------------
   const closeCallChannel = useCallback(() => {
-    if (callRoomRef.current) {
+    if (callRoomHandleRef.current) {
       try {
-        callRoomRef.current.leave();
+        callRoomHandleRef.current.leave();
       } catch (_) {}
-      callRoomRef.current = null;
+      callRoomHandleRef.current = null;
     }
-    callRoomActionRef.current = null;
     peerTrysteroIdRef.current = null;
   }, []);
 

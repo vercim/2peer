@@ -83,8 +83,9 @@ function getAppSettingsFile() {
 
 const DEFAULT_APP_SETTINGS = {
   // App
-  accentColor: "#B9D9CC",
+  accentColor: "#22C79C",
   theme: "dark",
+  fontSize: 14,
   soundEnabled: true,
   reduceMotion: false,
   monochromatic: false,

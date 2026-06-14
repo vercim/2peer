@@ -37,7 +37,7 @@ export const VideoPanel = forwardRef(function VideoPanel(
       <div
         id="remoteVideoWrap"
         ref={containerRef}
-        className={`flex-1 min-h-0 relative ${showPlaceholder ? "bg-transparent" : "bg-[#050505]"}`}
+        className={`flex-1 min-h-0 relative ${showPlaceholder ? "bg-transparent" : "bg-video"}`}
       >
         {overlay && (
           <div className="absolute inset-0 z-10">{overlay}</div>

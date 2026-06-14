@@ -9,8 +9,8 @@ function IconBtn({ onClick, disabled, children }) {
     <button
       className={`flex items-center justify-center transition-colors duration-120 ${
         disabled
-          ? "text-[#333] cursor-not-allowed"
-          : "text-[#555] hover:text-accent cursor-pointer"
+          ? "text-dim cursor-not-allowed"
+          : "text-faint hover:text-accent cursor-pointer"
       }`}
       onClick={onClick}
       disabled={disabled}
@@ -30,13 +30,13 @@ function formatDuration(seconds) {
 }
 
 function AnimatedFormattedId({ id, fallback = "-—" }) {
-  if (!id) return <span className="text-[#444]">{fallback}</span>;
+  if (!id) return <span className="text-faint-2">{fallback}</span>;
   const parts = id.match(/.{1,3}/g) || [];
   return (
     <span>
       {parts.map((part, i) => (
         <span key={i}>
-          {i > 0 && <span className="text-[#444]">.</span>}
+          {i > 0 && <span className="text-faint-2">.</span>}
           <TextMorph>{part}</TextMorph>
         </span>
       ))}
@@ -112,18 +112,18 @@ export function Sidebar({
         <span className="text-[10px] tracking-[0.09em] uppercase text-faint">
           Your ID
         </span>
-        <div className="bg-panel-2 border border-border rounded-[5px] p-[8px_10px] font-mono text-[14px] tracking-[0.04em] text-text break-all">
+        <div className="bg-panel-2 border border-border rounded-[5px] p-[8px_10px] font-mono text-[16px] tracking-[0.04em] text-text break-all">
           <AnimatedFormattedId id={selfId} />
         </div>
         <div className="flex gap-[6px]">
           <button
-            className="flex-1 bg-[var(--color-surface)] text-text border border-border rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap"
+            className="flex-1 bg-[var(--color-surface)] text-text border border-border rounded-[5px] py-[9px] px-[12px] t-body font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65] whitespace-nowrap"
             onClick={handleCopyClick}
           >
             {reduceMotion ? (copied ? "Copied" : "Copy") : <TextMorph>{copied ? "Copied" : "Copy"}</TextMorph>}
           </button>
           <button
-            className={`flex-1 bg-[var(--color-surface)] text-text border border-border rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold whitespace-nowrap transition-opacity duration-120 ${regenDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:opacity-[0.82] active:opacity-[0.65]"}`}
+            className={`flex-1 bg-[var(--color-surface)] text-text border border-border rounded-[5px] py-[9px] px-[12px] t-body font-semibold whitespace-nowrap transition-opacity duration-120 ${regenDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:opacity-[0.82] active:opacity-[0.65]"}`}
             onClick={regenDisabled ? undefined : onRegenId}
             disabled={regenDisabled}
             title={regenDisabled ? "Cannot change ID during a call" : undefined}
@@ -139,7 +139,7 @@ export function Sidebar({
             Call
           </span>
           {hasActiveCall && (
-            <span className="font-mono text-[10px] text-[#555] tabular-nums">
+            <span className="font-mono text-[10px] text-faint tabular-nums">
               {formatDuration(callSeconds)}
             </span>
           )}
@@ -147,16 +147,16 @@ export function Sidebar({
         {!hasActiveCall && !isCalling && (
           <div className="relative">
             <div
-              className={`absolute inset-0 rounded-[5px] p-[9px_10px] text-[13px] font-mono pointer-events-none flex items-center transition-colors duration-140 z-[1] ${
+              className={`absolute inset-0 rounded-[5px] p-[9px_10px] t-body font-mono pointer-events-none flex items-center transition-colors duration-140 z-[1] ${
                 remoteId || isInputFocused
-                  ? "bg-panel-3 border border-[rgba(255,255,255,0.12)] text-[#888]"
-                  : "bg-panel-2 border border-border text-[#444]"
+                  ? "bg-panel-3 border border-border text-muted"
+                  : "bg-panel-2 border border-border text-faint-2"
               }`}
             >
               {remoteId ? "" : "Peer ID"}
             </div>
             <input
-              className={`w-full bg-transparent border border-transparent rounded-[5px] p-[9px_10px] outline-none text-[13px] font-mono text-text placeholder:text-transparent transition-colors duration-140 z-[2] relative ${
+              className={`w-full bg-transparent border border-transparent rounded-[5px] p-[9px_10px] outline-none t-body font-mono text-text placeholder:text-transparent transition-colors duration-140 z-[2] relative ${
                 remoteId || isInputFocused ? "bg-panel-3" : ""
               }`}
               value={remoteId}
@@ -178,16 +178,16 @@ export function Sidebar({
           <div className="flex gap-[6px]">
             {hasActiveCall ? (
               <button
-                className="flex-1 bg-danger text-[#e8b4b4] border-border rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h hover:opacity-100 active:opacity-[0.65] whitespace-nowrap"
+                className="flex-1 bg-danger text-on-danger border-border rounded-[5px] py-[9px] px-[12px] t-body font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h hover:opacity-100 active:opacity-[0.65] whitespace-nowrap"
                 onClick={onHangup}
               >
                 {reduceMotion ? "Hang up" : <TextMorph ease={{ stiffness: 200, damping: 20 }}>Hang up</TextMorph>}
               </button>
             ) : (
               <button
-                className={`flex-1 rounded-[5px] py-[9px] px-[12px] text-[12px] font-semibold cursor-pointer transition-all duration-120 whitespace-nowrap ${
+                className={`flex-1 rounded-[5px] py-[9px] px-[12px] t-body font-semibold cursor-pointer transition-all duration-120 whitespace-nowrap ${
                   remoteId.length === 12
-                    ? "bg-accent text-[#0a0a0a] border-none hover:opacity-[0.82] active:opacity-[0.65]"
+                    ? "bg-accent text-on-accent border-none hover:opacity-[0.82] active:opacity-[0.65]"
                     : "bg-[var(--color-surface-md)] text-muted border-none cursor-not-allowed"
                 }`}
                 onClick={handleCall}
@@ -203,8 +203,8 @@ export function Sidebar({
             <button
               className={`flex-1 bg-[var(--color-surface)] border border-border rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-all duration-120 flex items-center justify-center gap-[5px] ${
                 localStream
-                  ? "text-green-400 hover:text-text hover:bg-[var(--color-surface-hi)]"
-                  : "text-[#555] hover:text-text hover:bg-[var(--color-surface-hi)]"
+                  ? "text-accent hover:text-text hover:bg-[var(--color-surface-hi)]"
+                  : "text-faint hover:text-text hover:bg-[var(--color-surface-hi)]"
               }`}
               onClick={localStream ? onStopBroadcast : onBroadcast}
             >
@@ -213,7 +213,7 @@ export function Sidebar({
             </button>
             {localStream && (
               <button
-                className="bg-[var(--color-surface)] border border-border rounded-[5px] py-[7px] px-[10px] text-[11px] text-[#555] hover:text-text hover:bg-[var(--color-surface-hi)] cursor-pointer transition-all duration-120 flex items-center justify-center"
+                className="bg-[var(--color-surface)] border border-border rounded-[5px] py-[7px] px-[10px] text-[11px] text-faint hover:text-text hover:bg-[var(--color-surface-hi)] cursor-pointer transition-all duration-120 flex items-center justify-center"
                 onClick={onChangeSource}
                 title="Change source"
               >
@@ -237,13 +237,18 @@ export function Sidebar({
           style={
             signalingStatus === "error"
               ? {
-                  background: "rgba(160,40,40,0.10)",
-                  borderColor: "rgba(180,60,60,0.28)",
+                  background: "color-mix(in oklch, var(--color-danger-fg) 12%, transparent)",
+                  borderColor: "color-mix(in oklch, var(--color-danger-fg) 32%, transparent)",
                 }
-              : {
-                  background: "var(--color-panel)",
-                  borderColor: "var(--color-border)",
-                }
+              : signalingStatus === "connected"
+                ? {
+                    background: "var(--color-accent-soft)",
+                    borderColor: "color-mix(in oklch, var(--color-accent) 28%, transparent)",
+                  }
+                : {
+                    background: "var(--color-panel)",
+                    borderColor: "var(--color-border)",
+                  }
           }
         >
           <div
@@ -251,8 +256,10 @@ export function Sidebar({
             style={{
               color:
                 signalingStatus === "error"
-                  ? "rgba(210,90,90,0.9)"
-                  : "rgba(100,100,100,1)",
+                  ? "var(--color-danger-fg)"
+                  : signalingStatus === "connected"
+                    ? "var(--color-accent)"
+                    : "var(--color-faint)",
             }}
           >
             {signalingStatus === "connected" ? (
@@ -286,7 +293,7 @@ export function Sidebar({
                 <History size={15} />
               </IconBtn>
               <button
-                className="flex items-center gap-[5px] text-[#555] hover:text-accent cursor-pointer transition-colors duration-120"
+                className="flex items-center gap-[5px] text-faint hover:text-accent cursor-pointer transition-colors duration-120"
                 onClick={onOpenSettings}
               >
                 <Settings size={15} />

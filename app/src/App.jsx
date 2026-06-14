@@ -19,20 +19,20 @@ import { useSignaling } from "./hooks/useSignaling.js";
 import { usePeerConnection } from "./hooks/usePeerConnection.js";
 import { useBroadcast } from "./hooks/useBroadcast.js";
 
-function adjustAccentForTheme(hex, isDark) {
-  if (!hex || hex.length < 7) return hex;
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const clamp = (n) => Math.max(0, Math.min(255, Math.round(n)));
-  if (!isDark) {
-    return `rgba(${clamp(r * 0.78)}, ${clamp(g * 0.78)}, ${clamp(b * 0.78)}, 1)`;
-  }
-  return `rgba(${clamp(r + 25)}, ${clamp(g + 25)}, ${clamp(b + 25)}, 1)`;
+// We store the raw accent *seed* (a #rrggbb hex) and let colormap.css derive the
+// live --color-accent per theme via color-mix (brighten on dark, darken on
+// light). This replaces the old per-theme hex math. The previous brand default
+// (#B9D9CC sage) is migrated to the new teal so users who never customized it
+// pick up the redesign; deliberately-chosen custom colors are preserved.
+const LEGACY_DEFAULT_ACCENT = "#B9D9CC";
+function normalizeAccent(value) {
+  if (value === LEGACY_DEFAULT_ACCENT) return DEFAULT_SETTINGS.accentColor;
+  if (typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value)) return value;
+  return DEFAULT_SETTINGS.accentColor;
 }
 
 const DEFAULT_SETTINGS = {
-  accentColor: "#B9D9CC",
+  accentColor: "#22C79C",
   theme: "dark",
   soundEnabled: true,
   reduceMotion: false,
@@ -117,10 +117,10 @@ export default function App({ version = "" }) {
   const [remoteStream, setRemoteStream] = useState(null);
   const [isRemoteMuted, setIsRemoteMuted] = useState(false);
   const [remoteVideoWrapClass, setRemoteVideoWrapClass] = useState(
-    "flex-1 min-h-0 relative bg-[#050505] placeholder",
+    "flex-1 min-h-0 relative bg-video placeholder",
   );
   const [localVideoWrapClass, setLocalVideoWrapClass] = useState(
-    "flex-1 min-h-0 relative bg-[#050505] placeholder",
+    "flex-1 min-h-0 relative bg-video placeholder",
   );
   const [isElectronReady, setIsElectronReady] = useState(false);
   const streamQuality = { resolution: appSettings.resolution, fps: appSettings.fps };
@@ -360,7 +360,7 @@ export default function App({ version = "" }) {
         localStreamRef.current = null;
         setLocalMeta("");
         setLocalVideoWrapClass(
-          "flex-1 min-h-0 relative bg-[#050505] placeholder",
+          "flex-1 min-h-0 relative bg-video placeholder",
         );
       }
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
@@ -370,7 +370,7 @@ export default function App({ version = "" }) {
       setRemoteMeta("");
       setNetworkWarning(false);
       setRemoteVideoWrapClass(
-        "flex-1 min-h-0 relative bg-[#050505] placeholder",
+        "flex-1 min-h-0 relative bg-video placeholder",
       );
     },
     [
@@ -681,13 +681,12 @@ export default function App({ version = "" }) {
   // Apply visual settings to document
   useEffect(() => {
     const root = document.documentElement;
-    const base = appSettings.accentColor || "#B9D9CC";
-    const isDark = (appSettings.theme || "dark") === "dark";
-    root.style.setProperty("--color-accent", adjustAccentForTheme(base, isDark));
+    root.style.setProperty("--color-accent-base", normalizeAccent(appSettings.accentColor));
+    root.style.setProperty("--t-base", (appSettings.fontSize ?? 14) + "px");
     root.setAttribute("data-theme", appSettings.theme || "dark");
     root.classList.toggle("reduce-motion", !!appSettings.reduceMotion);
     root.classList.toggle("monochromatic", !!appSettings.monochromatic);
-  }, [appSettings.accentColor, appSettings.theme, appSettings.reduceMotion, appSettings.monochromatic]);
+  }, [appSettings.accentColor, appSettings.fontSize, appSettings.theme, appSettings.reduceMotion, appSettings.monochromatic]);
 
   // Apply sound enabled state
   useEffect(() => {

@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://api.github.com" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body data-repo="vercim/2peer" data-fallback-version="1.0.19">
+  <body data-repo="vercim/2peer" data-fallback-version="2.2.2">
     <!-- ───────────────────────── NAV ───────────────────────── -->
     <header class="nav" id="nav">
       <a class="nav__brand" href="#top" aria-label="2peer home">
@@ -31,7 +31,7 @@
       </a>
       <nav class="nav__links">
         <a href="#product">Product</a>
-        <a href="#tech">Technical</a>
+        <a href="#tech">Details</a>
         <a href="https://github.com/vercim/2peer" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </header>
@@ -110,9 +110,9 @@
             <span class="feature__num">01</span>
             <h3>Direct, by design</h3>
             <p>
-              WebRTC streams straight between the two machines. Trystero over
-              BitTorrent DHT handles peer discovery — no signaling server, no
-              relay, nothing in the middle.
+              WebRTC streams straight between the two machines. Peer discovery
+              runs in parallel over BitTorrent trackers and Nostr relays —
+              no server in the middle.
             </p>
           </article>
           <article class="feature">
@@ -167,9 +167,9 @@
       </section>
 
       <!-- ───────────────────────── TECH ──────────────────────── -->
-      <section class="section section--dark" id="tech">
+      <section class="section" id="tech">
         <div class="section__head">
-          <span class="eyebrow eyebrow--light">Under the hood</span>
+          <span class="eyebrow">Under the hood</span>
           <h2>The technical details, not hidden.</h2>
           <p>
             An Electron app with a React renderer. Here's what governs the
@@ -192,17 +192,17 @@
                 <tr><td>720p&nbsp;HD</td><td>60 fps</td><td><span class="bar" style="--w:25%"></span>6 Mbps</td></tr>
                 <tr><td>1080p&nbsp;FHD</td><td>60 fps</td><td><span class="bar" style="--w:50%"></span>12 Mbps</td></tr>
                 <tr><td>1440p&nbsp;QHD</td><td>30 / 60 fps</td><td><span class="bar" style="--w:80%"></span>24 Mbps</td></tr>
-                <tr><td>2160p&nbsp;UHD</td><td>30 fps</td><td><span class="bar" style="--w:100%"></span>35 Mbps</td></tr>
+                <tr><td>2160p&nbsp;UHD</td><td>30 fps</td><td><span class="bar" style="--w:100%"></span>50 Mbps</td></tr>
               </tbody>
             </table>
           </article>
 
           <article class="card card--wide">
             <header class="card__head"><h3>Connectivity</h3></header>
-            <p class="card__lead">Trystero over BitTorrent DHT — zero signaling server.</p>
+            <p class="card__lead">Trystero — BitTorrent trackers + Nostr relays in parallel, zero signaling server.</p>
             <ul class="ticks">
-              <li>Peer discovery via public BitTorrent trackers</li>
-              <li>8 STUN servers, IP-pinned fallback</li>
+              <li>Dual discovery: BitTorrent trackers and Nostr relays</li>
+              <li>5 STUN servers (Google, Cloudflare, Twilio)</li>
               <li>Auto <code>restartIce()</code> on drop</li>
               <li class="ticks__warn">No TURN — symmetric NAT may fail</li>
             </ul>
@@ -211,7 +211,7 @@
       </section>
 
       <!-- ─────────────────────── DOWNLOAD ────────────────────── -->
-      <section class="section section--download" id="download">
+      <section class="section section--alt section--download" id="download">
         <div class="section__head">
           <span class="eyebrow">Get 2peer</span>
           <h2>Download and share your screen.</h2>
