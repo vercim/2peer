@@ -28,7 +28,7 @@ export function SourcePicker({ isOpen, onClose, onSelect }) {
     if (!items.length) return null;
     return (
       <div className="w-full">
-        <div className="text-[11px] text-faint tracking-[0.09em] uppercase mb-[8px]">
+        <div className="t-micro text-faint tracking-[0.09em] uppercase mb-[8px]">
           {label}
         </div>
         <div className="grid grid-cols-3 gap-[10px]">
@@ -45,7 +45,7 @@ export function SourcePicker({ isOpen, onClose, onSelect }) {
                 alt=""
               />
               <div
-                className="text-[10px] text-text p-[5px_7px] truncate"
+                className="t-body text-text p-[5px_7px] truncate"
                 style={{ background: "var(--color-panel-2)" }}
               >
                 {src.name}
@@ -64,9 +64,9 @@ export function SourcePicker({ isOpen, onClose, onSelect }) {
         style={{ background: "var(--color-panel)" }}
       >
         <div className="flex items-center justify-between">
-          <span className="text-[13px] font-semibold text-text">Select Source</span>
+          <span className="t-body font-semibold text-text">Select Source</span>
           <button
-            className="bg-[var(--color-surface)] text-text border border-border rounded-[5px] py-[6px] px-[10px] text-[11px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]"
+            className="bg-[var(--color-surface)] text-text border border-border rounded-[5px] py-[6px] px-[10px] t-body font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.82] active:opacity-[0.65]"
             onClick={onClose}
           >
             Cancel
@@ -74,7 +74,7 @@ export function SourcePicker({ isOpen, onClose, onSelect }) {
         </div>
         <div className="overflow-y-auto flex-1 min-h-0 flex flex-col gap-[14px]">
           {isLoading ? (
-            <div className="text-center text-muted py-[20px] text-[12px]">
+            <div className="text-center text-muted py-[20px] t-body">
               Loading sources…
             </div>
           ) : (

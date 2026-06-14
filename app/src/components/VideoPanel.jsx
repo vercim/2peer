@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { MonitorX, TriangleAlert } from "lucide-react";
 import { formatBitrate } from "../utils/streamUtils.js";
+import { ICON } from "../utils/icons.js";
 
 export const VideoPanel = forwardRef(function VideoPanel(
   {
@@ -23,12 +24,12 @@ export const VideoPanel = forwardRef(function VideoPanel(
     >
       <div className="flex items-center justify-between p-[8px_12px] border-b border-border shrink-0">
         <div className="flex items-center gap-[8px]">
-          <span className="text-[11px] text-muted">{title}</span>
+          <span className="t-body text-muted">{title}</span>
         </div>
         <div className="flex items-center gap-[5px]">
-          <span className="text-[10px] text-[#2e2e2e] font-mono">{meta}</span>
+          <span className="t-micro text-faint-2 font-mono">{meta}</span>
           {bitrate > 0 && (
-            <span className="text-[10px] text-[#888] font-mono">
+            <span className="t-micro text-muted font-mono">
               {formatBitrate(bitrate)}
             </span>
           )}
@@ -44,13 +45,13 @@ export const VideoPanel = forwardRef(function VideoPanel(
         )}
         {showPlaceholder && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <MonitorX size={48} className="text-[#555]" strokeWidth={1.5} />
+            <MonitorX size={48} className="text-faint" strokeWidth={1.5} />
           </div>
         )}
         {warning && (
           <div className="absolute bottom-[10px] right-[10px] z-20 flex items-center gap-[6px] rounded-[6px] bg-black/70 border border-amber-500/40 px-[10px] py-[6px] backdrop-blur-sm pointer-events-none">
-            <TriangleAlert size={13} className="text-amber-400 shrink-0" strokeWidth={2} />
-            <span className="text-[10px] leading-tight text-amber-200 max-w-[220px]">
+            <TriangleAlert size={ICON.sm} className="text-amber-400 shrink-0" strokeWidth={2} />
+            <span className="t-micro leading-tight text-amber-200 max-w-[220px]">
               Network is struggling — lower the resolution or FPS for a stable stream.
             </span>
           </div>

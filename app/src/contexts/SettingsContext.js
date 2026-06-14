@@ -1,9 +1,8 @@
 import { createContext, useContext } from "react";
 
 export const SettingsContext = createContext({
-  accentColor: "#B9D9CC",
   theme: "dark",
-  fontSize: 14,
+  fontSize: 12,
   soundEnabled: true,
   reduceMotion: false,
   monochromatic: false,

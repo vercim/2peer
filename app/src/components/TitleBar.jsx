@@ -6,7 +6,7 @@ const noDrag = { WebkitAppRegion: "no-drag" };
 function VersionLabel({ version }) {
   if (!version) return null;
   return (
-    <span className="text-[10px] font-mono text-muted bg-[rgba(255,255,255,0.06)] px-[6px] py-[2px] rounded-[5px] leading-none">
+    <span className="t-micro font-mono text-muted bg-[rgba(255,255,255,0.06)] px-[6px] py-[2px] rounded-[5px] leading-none">
       v{version}
     </span>
   );
@@ -18,7 +18,7 @@ function UpdateBadge({ onClick }) {
       onClick={onClick}
       style={noDrag}
       title="A new version is available"
-      className="text-[10px] font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] px-[7px] py-[2px] rounded-[5px] leading-none cursor-pointer border-none transition-colors duration-120"
+      className="t-micro font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] px-[7px] py-[2px] rounded-[5px] leading-none cursor-pointer border-none transition-colors duration-120"
     >
       Update
     </button>
@@ -82,7 +82,7 @@ export function TitleBar({
           )}
         </div>
         {/* Right side — app name then version */}
-        <div className="flex items-center gap-[10px] pr-[14px] text-[13px] font-semibold text-muted">
+        <div className="flex items-center gap-[10px] pr-[14px] t-body font-semibold text-muted">
           {appName}
           <VersionLabel version={version} />
         </div>
@@ -97,7 +97,7 @@ export function TitleBar({
       style={{ WebkitAppRegion: "drag" }}
     >
       {/* Left side — app name then version */}
-      <div className="flex items-center gap-[10px] pl-[14px] text-[13px] font-semibold text-muted">
+      <div className="flex items-center gap-[10px] pl-[14px] t-body font-semibold text-muted">
         {appName}
         <VersionLabel version={version} />
       </div>
@@ -110,7 +110,7 @@ export function TitleBar({
         )}
         <div className="flex" style={noDrag}>
           <button
-            className="w-[36px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
+            className="w-[36px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer t-body transition-colors duration-120 hover:bg-[rgba(255,255,255,0.07)] hover:text-text rounded-[0]"
             onClick={handleMinimize}
             title="Minimize"
           >
@@ -119,7 +119,7 @@ export function TitleBar({
             </svg>
           </button>
           <button
-            className="w-[44px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer text-[13px] transition-colors duration-120 hover:bg-[rgba(255,62,62,0.07)] hover:text-text rounded-[0]"
+            className="w-[44px] h-[38px] flex items-center justify-center bg-none border-none text-muted cursor-pointer t-body transition-colors duration-120 hover:bg-[rgba(255,62,62,0.07)] hover:text-text rounded-[0]"
             onClick={handleClose}
             title="Close"
           >

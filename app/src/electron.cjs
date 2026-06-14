@@ -83,9 +83,8 @@ function getAppSettingsFile() {
 
 const DEFAULT_APP_SETTINGS = {
   // App
-  accentColor: "#22C79C",
   theme: "dark",
-  fontSize: 14,
+  fontSize: 12,
   soundEnabled: true,
   reduceMotion: false,
   monochromatic: false,
@@ -361,14 +360,13 @@ function createWindow() {
 
   mainWindow.on("close", (event) => {
     if (!isQuitting) {
-      if (minimizeToTray && tray) {
+      if (minimizeToTray) {
         event.preventDefault();
         mainWindow.hide();
         if (process.platform === "darwin") {
           app.dock.hide();
         }
       }
-      // else: allow window to close naturally
     }
   });
 

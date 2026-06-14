@@ -7,15 +7,8 @@
   --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  /* Type scale (px) — generates text-2xs … text-2xl */
-  --text-2xs: 10px;  --text-2xs--line-height: 14px;
-  --text-xs:  11px;  --text-xs--line-height:  15px;
-  --text-sm:  12px;  --text-sm--line-height:  16px;
-  --text-base:13px;  --text-base--line-height:18px;
-  --text-md:  14px;  --text-md--line-height:  20px;
-  --text-lg:  16px;  --text-lg--line-height:  22px;
-  --text-xl:  20px;  --text-xl--line-height:  26px;
-  --text-2xl: 26px;  --text-2xl--line-height: 32px;
+  /* Typography is centralized in the .t-* component classes below (anchored on
+     --t-base), not on Tailwind's text-* scale. See the @layer components block. */
 
   /* Radius scale — generates rounded-sm … rounded-xl */
   --radius-sm: 5px;
@@ -24,8 +17,12 @@
   --radius-xl: 16px;
 }
 
-[data-theme="light"] body,
-[data-theme="light"] #root {
+/* Light themes need an opaque body so the rounded-window corners don't show
+   the (dark) OS layer through them. */
+[data-theme="blush"] body,
+[data-theme="blush"] #root,
+[data-theme="pure"] body,
+[data-theme="pure"] #root {
   background: var(--color-bg);
   color: var(--color-text);
 }
@@ -53,16 +50,16 @@
        .t-body    — the standard size: all body text AND all buttons
        .t-id      — the user's own ID in the sidebar (needs to be readable)
        .t-display — the large peer ID shown in call overlays (display heading) */
-  .t-micro   { font-size: calc(var(--t-base, 14px) * 0.72); }
-  .t-body    { font-size: var(--t-base, 14px); }
-  .t-id      { font-size: calc(var(--t-base, 14px) * 1.15); }
-  .t-display { font-size: calc(var(--t-base, 14px) * 1.45); }
+  .t-micro   { font-size: calc(var(--t-base, 12px) * 0.72); }
+  .t-body    { font-size: var(--t-base, 12px); }
+  .t-id      { font-size: calc(var(--t-base, 12px) * 1.15); }
+  .t-display { font-size: calc(var(--t-base, 12px) * 1.45); }
 }
 
 @layer base {
   :root {
     --tb: 38px;
-    --t-base: 14px;
+    --t-base: 12px;
   }
 
   * {
@@ -78,7 +75,7 @@
     background: transparent;
     color: var(--color-text);
     font-family: var(--font-sans);
-    font-size: var(--t-base, 14px);
+    font-size: var(--t-base, 12px);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -118,7 +115,7 @@
   }
 
   .entry {
-    font-size: var(--t-base, 14px);
+    font-size: var(--t-base, 12px);
     color: var(--color-muted);
     line-height: 1.45;
     padding: 2px 0;

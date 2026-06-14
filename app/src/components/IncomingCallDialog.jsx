@@ -74,10 +74,10 @@ export function IncomingCallDialog({ callerId, onAccept, onDecline }) {
 
         {/* ── Text ──────────────────────────────────────────── */}
         <div className="flex flex-col items-center gap-[7px] text-center">
-          <span className="text-[10px] tracking-[0.14em] uppercase text-[#3a3a3a]">
+          <span className="t-micro tracking-[0.14em] uppercase text-faint">
             Incoming call
           </span>
-          <span className="font-mono text-[22px] text-[#ccc] tracking-[0.04em]">
+          <span className="font-mono t-display text-text-soft tracking-[0.04em]">
             {formatId(callerId)}
           </span>
         </div>
@@ -85,7 +85,7 @@ export function IncomingCallDialog({ callerId, onAccept, onDecline }) {
         {/* ── Buttons ───────────────────────────────────────── */}
         <div className="flex gap-[12px] w-full">
           <button
-            className="flex-1 rounded-[8px] py-[11px] text-[12px] font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.85] active:opacity-70 tracking-[0.03em]"
+            className="flex-1 rounded-[8px] py-[11px] t-body font-semibold cursor-pointer transition-opacity duration-120 hover:opacity-[0.85] active:opacity-70 tracking-[0.03em]"
             style={{
               background: "rgba(230,230,230,0.92)",
               color: "#0a0a0a",
@@ -95,7 +95,7 @@ export function IncomingCallDialog({ callerId, onAccept, onDecline }) {
             Accept
           </button>
           <button
-            className="flex-1 bg-danger text-[#e8b4b4] rounded-[8px] py-[11px] text-[12px] font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h active:opacity-70 tracking-[0.03em]"
+            className="flex-1 bg-danger text-[#e8b4b4] rounded-[8px] py-[11px] t-body font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h active:opacity-70 tracking-[0.03em]"
             onClick={onDecline}
           >
             Decline

@@ -1,17 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, RotateCcw } from "lucide-react";
 import { qualityOptions } from "../utils/rtcConfig.js";
-
-// Accent *seeds* — colormap.css derives the live tint per theme via color-mix,
-// so each reads well on both dark and light. Evenly spread around the wheel.
-const ACCENT_COLORS = [
-  { name: "Teal",   value: "#22C79C" },
-  { name: "Azure",  value: "#3B9EFF" },
-  { name: "Indigo", value: "#7C82FF" },
-  { name: "Violet", value: "#B57BFF" },
-  { name: "Amber",  value: "#F2B14C" },
-  { name: "Coral",  value: "#F0726A" },
-];
+import { ICON } from "../utils/icons.js";
 
 const TABS = [
   { id: "app",     label: "App"     },
@@ -20,9 +10,8 @@ const TABS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  accentColor: "#22C79C",
   theme: "dark",
-  fontSize: 14,
+  fontSize: 12,
   soundEnabled: true,
   reduceMotion: false,
   monochromatic: false,
@@ -99,7 +88,7 @@ function PillGroup({ options, value, onChange, cols = 3 }) {
 
 function SectionLabel({ children }) {
   return (
-    <span className="text-[10px] tracking-[0.09em] uppercase text-faint block mb-[7px]">
+    <span className="t-micro tracking-[0.09em] uppercase text-faint block mb-[7px]">
       {children}
     </span>
   );
@@ -112,50 +101,25 @@ function Divider() {
 /* ── Tab: App ────────────────────────────────────────────────────────────── */
 
 function AppTab({ settings, onChange }) {
+  // The legacy "light" theme is shown as the new "blush". The accent color is
+  // no longer user-customizable — each theme owns its full palette + accent.
+  const theme = settings.theme === "light" ? "blush" : (settings.theme || "dark");
+  const fontSize = settings.fontSize ?? DEFAULT_SETTINGS.fontSize;
+
   return (
     <div className="flex flex-col">
-      {/* Accent color */}
-      <div className="mb-[14px]">
-        <SectionLabel>Accent color</SectionLabel>
-        <div className="flex gap-[8px] flex-wrap">
-          {ACCENT_COLORS.map(({ name, value }) => (
-            <button
-              key={value}
-              title={name}
-              onClick={() => onChange("accentColor", value)}
-              className="relative cursor-pointer"
-              style={{ width: 22, height: 22 }}
-            >
-              <div
-                className="w-full h-full rounded-full transition-transform duration-120 hover:scale-110"
-                style={{ background: value }}
-              />
-              {settings.accentColor === value && (
-                <div
-                  className="absolute inset-0 rounded-full"
-                  style={{
-                    outline: `2px solid ${value}`,
-                    outlineOffset: 2,
-                  }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Divider />
-
       {/* Theme */}
       <div className="mb-[14px]">
         <SectionLabel>Theme</SectionLabel>
         <PillGroup
           cols={2}
           options={[
-            { value: "dark",  label: "Dark"  },
-            { value: "light", label: "Light" },
+            { value: "dark",     label: "Default"  },
+            { value: "midnight", label: "Midnight" },
+            { value: "blush",    label: "Blush"    },
+            { value: "pure",     label: "Pure"     },
           ]}
-          value={settings.theme}
+          value={theme}
           onChange={(v) => onChange("theme", v)}
         />
       </div>
@@ -163,20 +127,34 @@ function AppTab({ settings, onChange }) {
       <Divider />
 
       {/* Text size */}
-      <div className="mb-[14px]">
-        <SectionLabel>Text size</SectionLabel>
-        <PillGroup
-          cols={5}
-          options={[
-            { value: 11, label: "XS" },
-            { value: 12, label: "S"  },
-            { value: 14, label: "M"  },
-            { value: 16, label: "L"  },
-            { value: 18, label: "XL" },
-          ]}
-          value={settings.fontSize ?? 14}
-          onChange={(v) => onChange("fontSize", Number(v))}
+      <div className="mb-[14px] flex items-center gap-[12px]">
+        <span className="t-micro tracking-[0.09em] uppercase text-faint shrink-0">
+          Text size
+        </span>
+        <input
+          type="range"
+          min={11}
+          max={18}
+          step={1}
+          value={fontSize}
+          onChange={(e) => onChange("fontSize", Number(e.target.value))}
+          className="flex-1 h-[4px] cursor-pointer accent-[var(--color-accent)]"
         />
+        <span className="t-body text-text tabular-nums shrink-0 w-[36px] text-right">
+          {fontSize}px
+        </span>
+        <button
+          onClick={() => onChange("fontSize", DEFAULT_SETTINGS.fontSize)}
+          disabled={fontSize === DEFAULT_SETTINGS.fontSize}
+          title="Reset to default size"
+          className={`shrink-0 transition-colors duration-120 ${
+            fontSize === DEFAULT_SETTINGS.fontSize
+              ? "text-dim cursor-not-allowed"
+              : "text-faint hover:text-accent cursor-pointer"
+          }`}
+        >
+          <RotateCcw size={ICON.sm} />
+        </button>
       </div>
 
       <Divider />
@@ -349,7 +327,7 @@ function SystemTab({ settings, onChange }) {
       />
 
       {/* On window close */}
-      <div className={`mt-[14px] ${!settings.trayEnabled ? "opacity-40 pointer-events-none" : ""}`}>
+      <div className="mt-[14px]">
         <SectionLabel>When closing the window</SectionLabel>
         <PillGroup
           cols={2}
@@ -360,11 +338,6 @@ function SystemTab({ settings, onChange }) {
           value={settings.minimizeToTray}
           onChange={(v) => onChange("minimizeToTray", v === "true" || v === true)}
         />
-        {!settings.trayEnabled && (
-          <p className="t-body text-faint mt-[6px]">
-            Enable tray icon to use minimize-to-tray.
-          </p>
-        )}
       </div>
     </div>
   );
@@ -425,7 +398,7 @@ export function SettingsDialog({ isOpen, onClose, settings, onSave }) {
             onClick={onClose}
             className="text-[#444] hover:text-[#888] transition-colors duration-120 cursor-pointer"
           >
-            <X size={14} />
+            <X size={ICON.md} />
           </button>
         </div>
 
@@ -461,7 +434,7 @@ export function SettingsDialog({ isOpen, onClose, settings, onSave }) {
               resetDone ? "text-accent" : "text-faint-2 hover:text-faint"
             }`}
           >
-            <RotateCcw size={11} className={resetDone ? "opacity-0 w-0 overflow-hidden" : ""} />
+            <RotateCcw size={ICON.sm} className={resetDone ? "opacity-0 w-0 overflow-hidden" : ""} />
             {resetDone ? "✓ All settings reset" : "Reset all settings"}
           </button>
         </div>

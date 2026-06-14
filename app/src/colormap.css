@@ -22,7 +22,8 @@
   --color-panel:    oklch(0.198 0.008 245); /* cards */
   --color-panel-2:  oklch(0.238 0.009 245); /* inset / inputs */
   --color-panel-3:  oklch(0.288 0.010 245); /* hover / elevated */
-  --color-video:    oklch(0.115 0.006 245); /* video letterbox */
+  --color-video:    oklch(0.115 0.006 245); /* video letterbox (stream playing) */
+  --color-video-empty: oklch(0.185 0.008 245); /* empty peer screen — follows theme, not pure black */
 
   --color-border:   color-mix(in oklch, white 9%, transparent);
 
@@ -80,52 +81,149 @@
   --color-glow-disconnected: oklch(0.82 0.13 90);
 }
 
-/* ── Light theme ───────────────────────────────────────────────────────────
-   Standard elevation model (unlike the old inverted one): bg = soft gray,
-   panels = white and *lighter* than the canvas. The brand is darkened so teal
-   stays legible on white. */
-[data-theme="light"] {
-  --color-bg:      oklch(0.945 0.003 245);
-  --color-panel:   oklch(0.995 0.001 245);
-  --color-panel-2: oklch(0.965 0.003 245);
-  --color-panel-3: oklch(0.925 0.004 245);
-  --color-video:   oklch(0.115 0.006 245); /* video stays dark in both themes */
+/* ============================================================================
+   THEMES
+   ----------------------------------------------------------------------------
+   Each theme is selected via [data-theme="…"] on <html>. The default (teal,
+   dark) lives in the @theme block above and is the :root fallback, so a theme
+   only needs to override what differs from it. A theme defines BOTH its surface
+   palette and its accent (--color-accent-base) — the live --color-accent is
+   then derived the same way the default does (brighten on dark / darken on
+   light). App.jsx applies the user's custom accent seed only on the default
+   theme; midnight and blush own their accent here.
+   ========================================================================== */
 
-  --color-border:  color-mix(in oklch, black 11%, transparent);
+/* ── Midnight ────────────────────────────────────────────────────────────────
+   Much darker than the default — a near-black canvas — with a scarlet accent.
+   Inherits the default's cool-neutral text ramp. "Connected" is kept green so
+   it never reads as the (red) danger state now that the brand itself is red. */
+[data-theme="midnight"] {
+  --color-bg:       oklch(0.070 0.004 265); /* near-black canvas */
+  --color-panel:    oklch(0.108 0.005 265);
+  --color-panel-2:  oklch(0.148 0.006 265);
+  --color-panel-3:  oklch(0.198 0.008 265);
+  --color-video:    oklch(0.035 0.003 265);
+  --color-video-empty: oklch(0.105 0.005 265); /* empty peer screen */
 
-  --color-text:      oklch(0.255 0.010 245);
-  --color-text-soft: oklch(0.380 0.010 245);
-  --color-muted:     oklch(0.500 0.010 245);
-  --color-faint:     oklch(0.620 0.009 245);
-  --color-faint-2:   oklch(0.720 0.007 245);
-  --color-dim:       oklch(0.800 0.005 245);
+  --color-border:   color-mix(in oklch, white 8%, transparent);
 
-  --color-accent:        color-mix(in oklch, var(--color-accent-base) 82%, black);
-  --color-accent-strong: color-mix(in oklch, var(--color-accent-base) 68%, black);
+  /* Scarlet brand */
+  --color-accent-base:   #FF2E1F;
+  --color-accent:        color-mix(in oklch, var(--color-accent-base) 90%, white);
+  --color-accent-strong: color-mix(in oklch, var(--color-accent-base) 74%, white);
   --color-accent-soft:   color-mix(in oklch, var(--color-accent-base) 18%, transparent);
-  --color-on-accent:     oklch(0.99 0.01 169);
+  --color-on-accent:     oklch(0.99 0.02 25); /* white text on scarlet fill */
+
+  /* Keep success/connected green so it stays distinct from scarlet + danger. */
+  --color-success:        oklch(0.780 0.155 150);
+  --color-glow-connected: var(--color-success);
+  --color-glow-idle:      oklch(0.560 0.006 265);
+}
+
+/* ── Blush ─────────────────────────────────────────────────────────────────
+   The gentle theme: a soft, warm light palette (backgrounds carry a faint pink
+   tint instead of neutral gray) with a soft pink accent. Standard elevation —
+   panels are lighter than the canvas. The accent is darkened so the light-pink
+   brand stays legible as text/icons on the near-white surfaces. */
+[data-theme="blush"] {
+  --color-bg:      oklch(0.955 0.010 350);
+  --color-panel:   oklch(0.992 0.004 350);
+  --color-panel-2: oklch(0.972 0.007 350);
+  --color-panel-3: oklch(0.935 0.012 350);
+  --color-video:   oklch(0.115 0.006 245); /* video stays dark in every theme */
+  --color-video-empty: oklch(0.945 0.012 350); /* empty peer screen — soft light */
+
+  --color-border:  color-mix(in oklch, oklch(0.40 0.06 350) 14%, transparent);
+
+  --color-text:      oklch(0.300 0.022 350);
+  --color-text-soft: oklch(0.420 0.020 350);
+  --color-muted:     oklch(0.540 0.018 350);
+  --color-faint:     oklch(0.650 0.015 350);
+  --color-faint-2:   oklch(0.755 0.012 350);
+  --color-dim:       oklch(0.845 0.010 350);
+
+  --color-accent-base:   #FF9BC2; /* soft pink */
+  --color-accent:        color-mix(in oklch, var(--color-accent-base) 78%, black);
+  --color-accent-strong: color-mix(in oklch, var(--color-accent-base) 62%, black);
+  --color-accent-soft:   color-mix(in oklch, var(--color-accent-base) 22%, transparent);
+  --color-on-accent:     oklch(0.99 0.01 350);
 
   --color-warning:   oklch(0.650 0.150 70);
-  --color-info:      oklch(0.550 0.150 245);
-  --color-danger:    oklch(0.560 0.180 25);
-  --color-danger-h:  oklch(0.500 0.190 25);
-  --color-danger-fg: oklch(0.520 0.190 25);
-  --color-on-danger: oklch(0.985 0.010 25);
+  --color-info:      oklch(0.560 0.140 300);
+  --color-danger:    oklch(0.580 0.180 18);
+  --color-danger-h:  oklch(0.520 0.190 18);
+  --color-danger-fg: oklch(0.540 0.190 18);
+  --color-on-danger: oklch(0.990 0.010 18);
 
-  --color-surface:    color-mix(in oklch, black 6%,  transparent);
+  --color-surface:    color-mix(in oklch, oklch(0.40 0.06 350) 6%,  transparent);
+  --color-surface-hi: color-mix(in oklch, oklch(0.40 0.06 350) 11%, transparent);
+  --color-surface-lo: color-mix(in oklch, oklch(0.40 0.06 350) 3%,  transparent);
+  --color-surface-md: color-mix(in oklch, oklch(0.40 0.06 350) 9%,  transparent);
+
+  --color-dialog-bg:     oklch(0.985 0.005 350);
+  --color-dialog-border: color-mix(in oklch, oklch(0.40 0.06 350) 13%, transparent);
+  --color-dialog-shadow: oklch(0.50 0.10 350 / 0.18);
+  --color-overlay:       oklch(0.80 0.04 350 / 0.50);
+  --color-overlay-dark:  oklch(0.70 0.04 350 / 0.62);
+
+  --color-overlay-label: color-mix(in oklch, oklch(0.30 0.05 350) 50%, transparent);
+  --color-overlay-id:    color-mix(in oklch, var(--color-accent) 85%, black);
+  --color-overlay-sub:   color-mix(in oklch, oklch(0.30 0.05 350) 36%, transparent);
+
+  --color-glow-idle: oklch(0.620 0.020 350);
+}
+
+/* ── Pure ────────────────────────────────────────────────────────────────────
+   A stark, high-contrast light theme: pure white surfaces and pure black text
+   + accent. No tint anywhere (neutral chroma 0). Danger keeps a real red so the
+   hang-up affordance stays unmistakable; everything else is black on white. */
+[data-theme="pure"] {
+  --color-bg:      oklch(1 0 0);     /* pure white */
+  --color-panel:   oklch(1 0 0);
+  --color-panel-2: oklch(0.965 0 0);
+  --color-panel-3: oklch(0.925 0 0);
+  --color-video:   oklch(0.115 0.006 245); /* video stays dark in every theme */
+  --color-video-empty: oklch(0.970 0 0);
+
+  --color-border:  color-mix(in oklch, black 14%, transparent);
+
+  --color-text:      oklch(0 0 0);   /* pure black */
+  --color-text-soft: oklch(0.250 0 0);
+  --color-muted:     oklch(0.450 0 0);
+  --color-faint:     oklch(0.580 0 0);
+  --color-faint-2:   oklch(0.700 0 0);
+  --color-dim:       oklch(0.820 0 0);
+
+  /* Accent = pure black (monochrome, maximum contrast). */
+  --color-accent-base:   #000000;
+  --color-accent:        oklch(0 0 0);
+  --color-accent-strong: oklch(0.220 0 0);
+  --color-accent-soft:   color-mix(in oklch, black 12%, transparent);
+  --color-on-accent:     oklch(1 0 0); /* white text on black fill */
+
+  --color-success:        oklch(0 0 0);
+  --color-glow-connected: oklch(0 0 0);
+  --color-glow-idle:      oklch(0.600 0 0);
+
+  --color-warning:   oklch(0.550 0.130 70);
+  --color-info:      oklch(0.450 0 0);
+  --color-danger:    oklch(0.550 0.200 25);
+  --color-danger-h:  oklch(0.480 0.210 25);
+  --color-danger-fg: oklch(0.520 0.210 25);
+  --color-on-danger: oklch(0.990 0.010 25);
+
+  --color-surface:    color-mix(in oklch, black 5%,  transparent);
   --color-surface-hi: color-mix(in oklch, black 10%, transparent);
   --color-surface-lo: color-mix(in oklch, black 3%,  transparent);
   --color-surface-md: color-mix(in oklch, black 8%,  transparent);
 
-  --color-dialog-bg:     oklch(0.985 0.002 245);
-  --color-dialog-border: color-mix(in oklch, black 12%, transparent);
-  --color-dialog-shadow: oklch(0 0 0 / 0.18);
-  --color-overlay:       oklch(0.55 0.01 245 / 0.45);
-  --color-overlay-dark:  oklch(0.45 0.01 245 / 0.6);
+  --color-dialog-bg:     oklch(1 0 0);
+  --color-dialog-border: color-mix(in oklch, black 14%, transparent);
+  --color-dialog-shadow: oklch(0 0 0 / 0.16);
+  --color-overlay:       oklch(0.500 0 0 / 0.45);
+  --color-overlay-dark:  oklch(0.400 0 0 / 0.60);
 
-  --color-overlay-label: color-mix(in oklch, black 45%, transparent);
-  --color-overlay-id:    color-mix(in oklch, var(--color-accent) 85%, black);
-  --color-overlay-sub:   color-mix(in oklch, black 32%, transparent);
-
-  --color-glow-idle: oklch(0.5 0.01 245);
+  --color-overlay-label: color-mix(in oklch, black 50%, transparent);
+  --color-overlay-id:    oklch(0 0 0);
+  --color-overlay-sub:   color-mix(in oklch, black 36%, transparent);
 }

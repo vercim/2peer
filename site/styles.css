@@ -1,24 +1,24 @@
 /* ============================================================
-   2peer site — dark theme mirroring the app palette
+   2peer site — light theme
    ============================================================ */
 :root {
-  --accent:      #22C79C;
-  --accent-soft: color-mix(in oklch, #22C79C 15%, transparent);
-  --accent-on:   oklch(0.27 0.06 169);
+  --accent:      #0f9e7a;
+  --accent-soft: color-mix(in oklch, #0f9e7a 12%, transparent);
+  --accent-on:   #ffffff;
 
-  --bg:      oklch(0.155 0.007 245);
-  --panel:   oklch(0.198 0.008 245);
-  --panel-2: oklch(0.238 0.009 245);
-  --panel-3: oklch(0.288 0.010 245);
+  --bg:      oklch(0.985 0.003 245);
+  --panel:   oklch(0.970 0.004 245);
+  --panel-2: oklch(0.950 0.005 245);
+  --panel-3: oklch(0.925 0.006 245);
   --video:   oklch(0.115 0.006 245);
 
-  --border:    color-mix(in oklch, white 9%,  transparent);
-  --border-hi: color-mix(in oklch, white 15%, transparent);
+  --border:    color-mix(in oklch, black 9%,  transparent);
+  --border-hi: color-mix(in oklch, black 18%, transparent);
 
-  --text:      oklch(0.945 0.004 245);
-  --text-soft: oklch(0.820 0.005 245);
-  --muted:     oklch(0.660 0.006 245);
-  --faint:     oklch(0.500 0.007 245);
+  --text:      oklch(0.155 0.007 245);
+  --text-soft: oklch(0.280 0.008 245);
+  --muted:     oklch(0.440 0.009 245);
+  --faint:     oklch(0.580 0.008 245);
 
   --r-lg: 16px;
   --r-md: 12px;
@@ -135,17 +135,17 @@ code {
 }
 .hero__glow {
   position: absolute;
-  top: -200px;
+  top: -160px;
   left: 50%;
   transform: translateX(-50%);
   width: 900px;
   height: 600px;
   background: radial-gradient(
     ellipse at center,
-    color-mix(in oklch, #22C79C 28%, transparent),
+    color-mix(in oklch, #0f9e7a 14%, transparent),
     transparent 62%
   );
-  filter: blur(10px);
+  filter: blur(16px);
   pointer-events: none;
   z-index: 0;
 }
@@ -169,8 +169,8 @@ code {
   animation: ping 2.4s var(--ease) infinite;
 }
 @keyframes ping {
-  0%        { box-shadow: 0 0 0 0   color-mix(in oklch, #22C79C 50%, transparent); }
-  70%, 100% { box-shadow: 0 0 0 7px color-mix(in oklch, #22C79C 0%,  transparent); }
+  0%        { box-shadow: 0 0 0 0   color-mix(in oklch, #0f9e7a 50%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 7px color-mix(in oklch, #0f9e7a 0%,  transparent); }
 }
 
 .hero__title {
@@ -215,7 +215,7 @@ code {
   border-radius: 14px;
   background: var(--panel);
   border: 1px solid var(--border);
-  box-shadow: 0 22px 50px -28px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 12px 40px -20px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -224,7 +224,7 @@ code {
 .wire__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--panel-3); }
 .wire__screen--live {
   background: var(--video);
-  border-color: var(--border);
+  border-color: color-mix(in oklch, black 20%, transparent);
 }
 .wire__play {
   width: 0; height: 0;
@@ -232,7 +232,7 @@ code {
   border-top: 11px solid transparent;
   border-bottom: 11px solid transparent;
   margin-left: 4px;
-  filter: drop-shadow(0 0 14px color-mix(in oklch, var(--accent) 55%, transparent));
+  filter: drop-shadow(0 0 10px color-mix(in oklch, var(--accent) 55%, transparent));
 }
 .wire__id {
   font-family: var(--mono);
@@ -255,7 +255,7 @@ code {
   width: 9px; height: 9px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 12px 2px color-mix(in oklch, var(--accent) 70%, transparent);
+  box-shadow: 0 0 10px 2px color-mix(in oklch, var(--accent) 55%, transparent);
   animation: travel 2.6s var(--ease) infinite;
 }
 @keyframes travel { 0% { left: 0; } 50% { left: calc(100% - 9px); } 100% { left: 0; } }
@@ -325,11 +325,11 @@ code {
   overflow: hidden;
 }
 .feature {
-  background: var(--panel);
+  background: var(--bg);
   padding: 28px 30px;
   transition: background 0.3s var(--ease);
 }
-.feature:hover { background: var(--panel-2); }
+.feature:hover { background: var(--panel); }
 .feature__num {
   font-family: var(--mono);
   font-size: 12px;
@@ -382,13 +382,17 @@ code {
   gap: 20px;
 }
 .card {
-  background: var(--panel);
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 26px;
-  transition: border-color 0.3s var(--ease), transform 0.3s var(--ease);
+  transition: border-color 0.3s var(--ease), transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
 }
-.card:hover { border-color: var(--border-hi); transform: translateY(-2px); }
+.card:hover {
+  border-color: var(--border-hi);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px -20px rgba(0, 0, 0, 0.12);
+}
 .card--wide { grid-column: 1 / -1; }
 .card__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .card__head h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
@@ -420,7 +424,7 @@ code {
   transform: rotate(-45deg);
 }
 .ticks li code { background: var(--panel-2); color: var(--accent); }
-.ticks__warn { color: oklch(0.72 0.15 23); }
+.ticks__warn { color: oklch(0.50 0.18 23); }
 .ticks li.ticks__warn::before {
   content: "✕";
   width: auto; height: auto;
@@ -428,7 +432,7 @@ code {
   transform: none;
   top: -1px;
   font-weight: 700; font-size: 13px;
-  color: oklch(0.72 0.15 23);
+  color: oklch(0.50 0.18 23);
 }
 
 /* Quality table */
@@ -460,7 +464,7 @@ code {
   display: block;
   height: 3px;
   width: var(--w);
-  background: linear-gradient(90deg, color-mix(in oklch, #22C79C 50%, transparent), var(--accent));
+  background: linear-gradient(90deg, color-mix(in oklch, #0f9e7a 40%, transparent), var(--accent));
   border-radius: 4px;
   margin-bottom: 7px;
 }
@@ -474,7 +478,7 @@ code {
   margin: 0 auto;
 }
 .dl-card {
-  background: var(--panel-2);
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 28px;
@@ -483,7 +487,7 @@ code {
 }
 .dl-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 24px 50px -26px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 50px -26px rgba(0, 0, 0, 0.18);
   border-color: var(--border-hi);
 }
 .dl-card.is-detected {

@@ -19,19 +19,19 @@ export function CallingOverlay({ peerId, onCancel, isOutgoing = true }) {
       {/* ── Labels ────────────────────────────────────────────── */}
       <div className="relative z-10 flex flex-col items-center gap-[7px] text-center">
         <span
-          className="text-[10px] tracking-[0.15em] uppercase"
+          className="t-micro tracking-[0.15em] uppercase"
           style={{ color: "var(--color-overlay-label)" }}
         >
           {isOutgoing ? "Calling" : "Connecting"}
         </span>
         <span
-          className="font-mono text-[21px] tracking-[0.05em]"
+          className="font-mono t-display tracking-[0.05em]"
           style={{ color: "var(--color-overlay-label)" }}
         >
           {formatId(peerId)}
         </span>
         <span
-          className="text-[11px]"
+          className="t-body"
           style={{ color: "var(--color-overlay-sub)" }}
         >
           {isOutgoing
@@ -42,7 +42,7 @@ export function CallingOverlay({ peerId, onCancel, isOutgoing = true }) {
 
       {/* ── Cancel button ─────────────────────────────────────── */}
       <button
-        className="relative z-10 bg-danger text-[#e8b4b4] rounded-[8px] py-[10px] px-[32px] text-[12px] font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h active:opacity-70 tracking-[0.04em]"
+        className="relative z-10 bg-danger text-[#e8b4b4] rounded-[8px] py-[10px] px-[32px] t-body font-semibold cursor-pointer transition-all duration-120 hover:bg-danger-h active:opacity-70 tracking-[0.04em]"
         onClick={onCancel}
       >
         Cancel

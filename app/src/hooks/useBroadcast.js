@@ -67,7 +67,7 @@ export function useBroadcast({
         setLocalStream(null);
         localStreamRef.current = null;
         setLocalVideoWrapClass(
-          "flex-1 min-h-0 relative bg-[#050505] placeholder",
+          "flex-1 min-h-0 relative bg-video-empty placeholder",
         );
         setLocalMeta("—-");
         addStatus("Broadcast stopped.");
@@ -167,7 +167,7 @@ export function useBroadcast({
       localStreamRef.current = null;
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    setLocalVideoWrapClass("flex-1 min-h-0 relative bg-[#050505] placeholder");
+    setLocalVideoWrapClass("flex-1 min-h-0 relative bg-video-empty placeholder");
     setLocalMeta("");
     addStatus("Broadcast stopped.");
     if (currentPeerId && pcRef.current?.connectionState === "connected")

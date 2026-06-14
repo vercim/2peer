@@ -58,7 +58,7 @@ export function StatusLog({ messages = [] }) {
         return (
           <div
             key={id}
-            className={`entry text-[12px] text-muted leading-[1.4] py-[2px] break-word ${msg.isError ? "text-red-400" : ""} ${shouldAnimate ? "animate-pulse-once" : ""}`}
+            className={`entry t-body text-muted leading-[1.4] py-[2px] break-word ${msg.isError ? "text-red-400" : ""} ${shouldAnimate ? "animate-pulse-once" : ""}`}
           >
             {formatMessage(msg.text)}
           </div>

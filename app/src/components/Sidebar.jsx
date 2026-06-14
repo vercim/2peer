@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Airplay, Pipette, GlobeLock, GlobeOff, Settings, SquareArrowOutUpRight, Expand, History } from "lucide-react";
 import { TextMorph } from "torph/react";
 import { useSettings } from "../contexts/SettingsContext.js";
+import { ICON } from "../utils/icons.js";
 import StatusLog from "./StatusLog";
 
 function IconBtn({ onClick, disabled, children }) {
@@ -109,10 +110,10 @@ export function Sidebar({
   return (
     <aside className="flex flex-col gap-[8px] overflow-hidden min-h-0 h-full w-full">
       <div className="bg-panel border border-border rounded-[8px] p-[12px_14px] flex flex-col gap-[8px] shrink-0">
-        <span className="text-[10px] tracking-[0.09em] uppercase text-faint">
+        <span className="t-micro tracking-[0.09em] uppercase text-faint">
           Your ID
         </span>
-        <div className="bg-panel-2 border border-border rounded-[5px] p-[8px_10px] font-mono text-[16px] tracking-[0.04em] text-text break-all">
+        <div className="bg-panel-2 border border-border rounded-[5px] p-[8px_10px] font-mono t-id tracking-[0.04em] text-text break-all">
           <AnimatedFormattedId id={selfId} />
         </div>
         <div className="flex gap-[6px]">
@@ -135,11 +136,11 @@ export function Sidebar({
 
       <div className="bg-panel border border-border rounded-[8px] p-[12px_14px] flex flex-col gap-[8px] shrink-0">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] tracking-[0.09em] uppercase text-faint">
+          <span className="t-micro tracking-[0.09em] uppercase text-faint">
             Call
           </span>
           {hasActiveCall && (
-            <span className="font-mono text-[10px] text-faint tabular-nums">
+            <span className="font-mono t-micro text-faint tabular-nums">
               {formatDuration(callSeconds)}
             </span>
           )}
@@ -201,23 +202,23 @@ export function Sidebar({
         {hasActiveCall && (
           <div className="flex gap-[6px]">
             <button
-              className={`flex-1 bg-[var(--color-surface)] border border-border rounded-[5px] py-[7px] px-[10px] text-[11px] font-semibold cursor-pointer transition-all duration-120 flex items-center justify-center gap-[5px] ${
+              className={`flex-1 bg-[var(--color-surface)] border border-border rounded-[5px] py-[7px] px-[10px] t-body font-semibold cursor-pointer transition-all duration-120 flex items-center justify-center gap-[5px] ${
                 localStream
                   ? "text-accent hover:text-text hover:bg-[var(--color-surface-hi)]"
                   : "text-faint hover:text-text hover:bg-[var(--color-surface-hi)]"
               }`}
               onClick={localStream ? onStopBroadcast : onBroadcast}
             >
-              <Airplay size={12} />
+              <Airplay size={ICON.sm} />
               {localStream ? "Stop" : "Share"}
             </button>
             {localStream && (
               <button
-                className="bg-[var(--color-surface)] border border-border rounded-[5px] py-[7px] px-[10px] text-[11px] text-faint hover:text-text hover:bg-[var(--color-surface-hi)] cursor-pointer transition-all duration-120 flex items-center justify-center"
+                className="bg-[var(--color-surface)] border border-border rounded-[5px] py-[7px] px-[10px] t-body text-faint hover:text-text hover:bg-[var(--color-surface-hi)] cursor-pointer transition-all duration-120 flex items-center justify-center"
                 onClick={onChangeSource}
                 title="Change source"
               >
-                <Pipette size={12} />
+                <Pipette size={ICON.sm} />
               </button>
             )}
           </div>
@@ -225,7 +226,7 @@ export function Sidebar({
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col gap-[8px] overflow-hidden">
-        <span className="text-[10px] tracking-[0.09em] uppercase text-faint">
+        <span className="t-micro tracking-[0.09em] uppercase text-faint">
           Status
         </span>
         <StatusLog messages={statusMessages} />
@@ -252,7 +253,7 @@ export function Sidebar({
           }
         >
           <div
-            className="text-[11px] font-mono overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-[6px] transition-colors duration-300"
+            className="t-body font-mono overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-[6px] transition-colors duration-300"
             style={{
               color:
                 signalingStatus === "error"
@@ -263,9 +264,9 @@ export function Sidebar({
             }}
           >
             {signalingStatus === "connected" ? (
-              <GlobeLock size={14} />
+              <GlobeLock size={ICON.md} />
             ) : (
-              <GlobeOff size={14} />
+              <GlobeOff size={ICON.md} />
             )}
             {reduceMotion ? (
               signalingStatus === "connected" ? "P2P Ready"
@@ -290,14 +291,14 @@ export function Sidebar({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-[12px]">
               <IconBtn onClick={onOpenHistory}>
-                <History size={15} />
+                <History size={ICON.md} />
               </IconBtn>
               <button
                 className="flex items-center gap-[5px] text-faint hover:text-accent cursor-pointer transition-colors duration-120"
                 onClick={onOpenSettings}
               >
-                <Settings size={15} />
-                <span className="text-[10px] font-medium">Settings</span>
+                <Settings size={ICON.md} />
+                <span className="t-body">Settings</span>
               </button>
             </div>
 
@@ -308,13 +309,13 @@ export function Sidebar({
                 onClick={hasActiveCall ? onPiP : undefined}
                 disabled={!hasActiveCall}
               >
-                <SquareArrowOutUpRight size={15} />
+                <SquareArrowOutUpRight size={ICON.md} />
               </IconBtn>
               <IconBtn
                 onClick={hasActiveCall ? onFullscreen : undefined}
                 disabled={!hasActiveCall}
               >
-                <Expand size={15} />
+                <Expand size={ICON.md} />
               </IconBtn>
             </div>
           </div>

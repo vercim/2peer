@@ -19,21 +19,18 @@ import { useSignaling } from "./hooks/useSignaling.js";
 import { usePeerConnection } from "./hooks/usePeerConnection.js";
 import { useBroadcast } from "./hooks/useBroadcast.js";
 
-// We store the raw accent *seed* (a #rrggbb hex) and let colormap.css derive the
-// live --color-accent per theme via color-mix (brighten on dark, darken on
-// light). This replaces the old per-theme hex math. The previous brand default
-// (#B9D9CC sage) is migrated to the new teal so users who never customized it
-// pick up the redesign; deliberately-chosen custom colors are preserved.
-const LEGACY_DEFAULT_ACCENT = "#B9D9CC";
-function normalizeAccent(value) {
-  if (value === LEGACY_DEFAULT_ACCENT) return DEFAULT_SETTINGS.accentColor;
-  if (typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value)) return value;
-  return DEFAULT_SETTINGS.accentColor;
+// Named themes — each owns its full palette + accent in colormap.css. The
+// accent color is not user-customizable; picking a theme picks the accent.
+// The legacy "light" theme migrates to the new "blush".
+const THEMES = ["dark", "midnight", "blush", "pure"];
+function normalizeTheme(value) {
+  if (value === "light") return "blush";
+  return THEMES.includes(value) ? value : "dark";
 }
 
 const DEFAULT_SETTINGS = {
-  accentColor: "#22C79C",
   theme: "dark",
+  fontSize: 12,
   soundEnabled: true,
   reduceMotion: false,
   monochromatic: false,
@@ -48,9 +45,9 @@ const DEFAULT_SETTINGS = {
   minimizeToTray: true,
 };
 
-const SIDEBAR_MIN = 190;
+const SIDEBAR_MIN = 220;
 const SIDEBAR_MAX = 360;
-const SIDEBAR_DEFAULT = 190;
+const SIDEBAR_DEFAULT = 220;
 
 export default function App({ version = "" }) {
   const [selfId, setSelfId] = useState("");
@@ -117,10 +114,10 @@ export default function App({ version = "" }) {
   const [remoteStream, setRemoteStream] = useState(null);
   const [isRemoteMuted, setIsRemoteMuted] = useState(false);
   const [remoteVideoWrapClass, setRemoteVideoWrapClass] = useState(
-    "flex-1 min-h-0 relative bg-video placeholder",
+    "flex-1 min-h-0 relative bg-video-empty placeholder",
   );
   const [localVideoWrapClass, setLocalVideoWrapClass] = useState(
-    "flex-1 min-h-0 relative bg-video placeholder",
+    "flex-1 min-h-0 relative bg-video-empty placeholder",
   );
   const [isElectronReady, setIsElectronReady] = useState(false);
   const streamQuality = { resolution: appSettings.resolution, fps: appSettings.fps };
@@ -360,7 +357,7 @@ export default function App({ version = "" }) {
         localStreamRef.current = null;
         setLocalMeta("");
         setLocalVideoWrapClass(
-          "flex-1 min-h-0 relative bg-video placeholder",
+          "flex-1 min-h-0 relative bg-video-empty placeholder",
         );
       }
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
@@ -370,7 +367,7 @@ export default function App({ version = "" }) {
       setRemoteMeta("");
       setNetworkWarning(false);
       setRemoteVideoWrapClass(
-        "flex-1 min-h-0 relative bg-video placeholder",
+        "flex-1 min-h-0 relative bg-video-empty placeholder",
       );
     },
     [
@@ -681,12 +678,13 @@ export default function App({ version = "" }) {
   // Apply visual settings to document
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--color-accent-base", normalizeAccent(appSettings.accentColor));
-    root.style.setProperty("--t-base", (appSettings.fontSize ?? 14) + "px");
-    root.setAttribute("data-theme", appSettings.theme || "dark");
+    // Each theme owns its full palette + accent in colormap.css — the accent is
+    // no longer user-customizable, so we only set the theme + font size here.
+    root.setAttribute("data-theme", normalizeTheme(appSettings.theme));
+    root.style.setProperty("--t-base", (appSettings.fontSize ?? 12) + "px");
     root.classList.toggle("reduce-motion", !!appSettings.reduceMotion);
     root.classList.toggle("monochromatic", !!appSettings.monochromatic);
-  }, [appSettings.accentColor, appSettings.fontSize, appSettings.theme, appSettings.reduceMotion, appSettings.monochromatic]);
+  }, [appSettings.fontSize, appSettings.theme, appSettings.reduceMotion, appSettings.monochromatic]);
 
   // Apply sound enabled state
   useEffect(() => {
@@ -734,7 +732,7 @@ export default function App({ version = "" }) {
 
   return (
     <SettingsContext.Provider value={appSettings}>
-    <div className="h-screen flex flex-col bg-bg text-text font-sans text-[13px] antialiased overflow-hidden">
+    <div className="h-screen flex flex-col bg-bg text-text font-sans t-body antialiased overflow-hidden">
 <StatusGlow state={glowState} trigger={glowTrigger} />
       <TitleBar
         connectionStatus={callStatus}
